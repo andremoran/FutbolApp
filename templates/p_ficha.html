@@ -1,0 +1,183 @@
+{% extends '_shell.html' %}
+{% block title %}Mi Ficha · ProFoot{% endblock %}
+
+{# screens/PlayerEvaluationViewScreen.tsx: la ficha del jugador en solo lectura.
+   Los atributos los mueve el entrenador al evaluar; aquí se muestran en radar. #}
+
+{% block hero_label %}<div class="pf-hero__label">Perfil deportivo</div>{% endblock %}
+{% block hero_title %}Mi Ficha{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {% if perfil.posicion %}{{ perfil.posicion|capitalize }}{% else %}Sin posición asignada{% endif %}
+  {%- if perfil.dorsal %} · Dorsal {{ perfil.dorsal }}{% endif %}
+</div>
+{% endblock %}
+
+{% block hero_extra %}
+<div style="display:flex;align-items:center;gap:14px;margin-top:18px">
+  <div style="width:62px;height:62px;border-radius:31px;background:#fff;color:var(--primary);
+              display:flex;align-items:center;justify-content:center;
+              font-size:24px;font-weight:800;flex:none">{{ media }}</div>
+  <div>
+    <div style="font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;
+                color:rgba(255,255,255,.75)">Valoración general</div>
+    <div style="font-size:13px;color:rgba(255,255,255,.9);margin-top:3px">
+      {% if media >= 80 %}Nivel destacado
+      {% elif media >= 65 %}Buen nivel
+      {% elif media >= 50 %}En progreso
+      {% else %}Con mucho margen de mejora{% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block head %}
+<style>
+  .fc-attr { padding: 11px 0; }
+  .fc-attr__row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 7px; }
+  .fc-attr__n { font-size: 14px; font-weight: 700; }
+  .fc-attr__v { font-size: 14px; font-weight: 800; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ── Radar de atributos ── #}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Atributos</h2>
+    <span class="pf-card__badge">{{ media }}/100</span>
+  </div>
+
+  <div style="display:flex;justify-content:center;padding:10px 0 4px">
+    {% set a = atributos %}
+    {% set cx = 110 %}{% set cy = 108 %}{% set r = 78 %}
+    <svg viewBox="0 0 220 216" width="220" height="216" aria-label="Radar de atributos">
+      {# Rejilla de fondo: 4 rombos concéntricos #}
+      {% for f in [0.25, 0.5, 0.75, 1.0] %}
+        <polygon fill="none" stroke="#e2e8f0" stroke-width="1"
+          points="{{ cx }},{{ cy - r*f }} {{ cx + r*f }},{{ cy }} {{ cx }},{{ cy + r*f }} {{ cx - r*f }},{{ cy }}"/>
+      {% endfor %}
+      <line x1="{{ cx }}" y1="{{ cy - r }}" x2="{{ cx }}" y2="{{ cy + r }}" stroke="#e2e8f0"/>
+      <line x1="{{ cx - r }}" y1="{{ cy }}" x2="{{ cx + r }}" y2="{{ cy }}" stroke="#e2e8f0"/>
+
+      {# Polígono de los valores: arriba técnica, derecha físico, abajo táctico, izquierda mental #}
+      {% set pt = cy - r * a.tecnica / 100 %}
+      {% set pd = cx + r * a.fisico / 100 %}
+      {% set pb = cy + r * a.tactico / 100 %}
+      {% set pi = cx - r * a.mental / 100 %}
+      <polygon fill="rgba(4,120,87,.22)" stroke="#047857" stroke-width="2.5" stroke-linejoin="round"
+        points="{{ cx }},{{ pt }} {{ pd }},{{ cy }} {{ cx }},{{ pb }} {{ pi }},{{ cy }}"/>
+      <circle cx="{{ cx }}" cy="{{ pt }}" r="4" fill="#047857"/>
+      <circle cx="{{ pd }}" cy="{{ cy }}" r="4" fill="#047857"/>
+      <circle cx="{{ cx }}" cy="{{ pb }}" r="4" fill="#047857"/>
+      <circle cx="{{ pi }}" cy="{{ cy }}" r="4" fill="#047857"/>
+
+      <text x="{{ cx }}" y="14" text-anchor="middle" font-size="11" font-weight="800" fill="#64748b">TÉCNICA</text>
+      <text x="214" y="{{ cy + 4 }}" text-anchor="end" font-size="11" font-weight="800" fill="#64748b">FÍSICO</text>
+      <text x="{{ cx }}" y="208" text-anchor="middle" font-size="11" font-weight="800" fill="#64748b">TÁCTICO</text>
+      <text x="6" y="{{ cy + 4 }}" font-size="11" font-weight="800" fill="#64748b">MENTAL</text>
+    </svg>
+  </div>
+
+  {% for clave, nombre in [('tecnica','Técnica'), ('fisico','Físico'),
+                           ('tactico','Táctico'), ('mental','Mental')] %}
+    {% set v = atributos[clave] %}
+    <div class="fc-attr">
+      <div class="fc-attr__row">
+        <span class="fc-attr__n">{{ nombre }}</span>
+        <span class="fc-attr__v" style="color:
+          {%- if v >= 70 %}var(--primary){% elif v >= 50 %}var(--warning){% else %}var(--danger){% endif %}">
+          {{ v }}
+        </span>
+      </div>
+      <div class="pf-bar"><div class="pf-bar__fill" style="width:{{ v }}%"></div></div>
+    </div>
+  {% endfor %}
+
+  <p style="font-size:12px;color:var(--text-muted);margin:12px 0 0;line-height:1.5">
+    Estos valores los actualiza tu entrenador cada vez que te evalúa.
+  </p>
+</div>
+
+{# ── Datos personales ── #}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Mis datos</h2>
+    <a href="{{ url_for('futbol.perfil') }}" class="pf-item__right">Editar</a>
+  </div>
+  <div class="pf-item">
+    <span class="pf-item__icon"><i data-ico="user" class="pf-ico--sm"></i></span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">{{ current_user.name }}</span>
+      <span class="pf-item__sub">
+        {%- if perfil.posicion %}{{ perfil.posicion|capitalize }}{% else %}Sin posición{% endif -%}
+        {%- if perfil.pie_habil %} · Pie {{ perfil.pie_habil }}{% endif -%}
+      </span>
+    </span>
+  </div>
+  {% if current_user.last_height or current_user.last_weight %}
+  <div class="pf-item">
+    <span class="pf-item__icon"><i data-ico="activity" class="pf-ico--sm"></i></span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">Físico</span>
+      <span class="pf-item__sub">
+        {%- if current_user.last_height %}{{ current_user.last_height }} cm{% endif -%}
+        {%- if current_user.last_height and current_user.last_weight %} · {% endif -%}
+        {%- if current_user.last_weight %}{{ current_user.last_weight }} kg{% endif -%}
+      </span>
+    </span>
+  </div>
+  {% endif %}
+  {% if entrenador %}
+  <div class="pf-item">
+    <span class="pf-item__icon"><i data-ico="users" class="pf-ico--sm"></i></span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">{{ entrenador.name }}</span>
+      <span class="pf-item__sub">Tu entrenador</span>
+    </span>
+  </div>
+  {% endif %}
+</div>
+
+{# ── Evaluaciones del coach ── #}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Evaluaciones</h2>
+    {% if evaluaciones %}<span class="pf-card__badge">{{ evaluaciones|length }}</span>{% endif %}
+  </div>
+
+  {% for e in evaluaciones %}
+  <div class="pf-item" style="align-items:flex-start">
+    <span class="pf-item__icon" style="background:rgba(139,92,246,.12);color:var(--purple)">
+      <i data-ico="file-text" class="pf-ico--sm"></i>
+    </span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">{{ e.fecha }}</span>
+      {% if e.notas %}
+      <span class="pf-item__sub" style="white-space:normal">{{ e.notas }}</span>
+      {% endif %}
+      {% if e.puntuaciones %}
+      <span class="pf-row" style="gap:5px;margin-top:7px;flex-wrap:wrap">
+        {% for k, v in e.puntuaciones.items() %}
+          <span class="pf-pill pf-pill--muted">{{ k|capitalize }} {{ v }}</span>
+        {% endfor %}
+      </span>
+      {% endif %}
+    </span>
+  </div>
+  {% endfor %}
+
+  {% if not evaluaciones %}
+  <div class="pf-empty" style="padding:20px 8px">
+    <div class="pf-empty__icon"><i data-ico="clipboard" class="pf-ico--xxl"></i></div>
+    <h3 class="pf-empty__title">Sin evaluaciones</h3>
+    <p class="pf-empty__text">
+      Tu entrenador todavía no te ha evaluado. Cuando lo haga, verás aquí sus notas
+      y cómo se mueven tus atributos.
+    </p>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

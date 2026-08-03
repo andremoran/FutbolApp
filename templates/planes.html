@@ -1,0 +1,135 @@
+{% extends '_shell.html' %}
+{% block title %}Planes · ProFoot{% endblock %}
+
+{# screens/PremiumScreen.tsx con la piel de ProFoot.
+   Los precios y el checkout son los REALES de la plataforma (paypal_plans.py):
+   los planes propios de ProFoot definidos en pagos.PLANES.
+   El botón lleva al flujo de cobro que ya está en producción. #}
+
+{% set es_coach = fut_es_entrenador %}
+{% set plan_key = 'entrenador_pro' if es_coach else 'jugador_pro' %}
+{% set plan_precio = '14.99' if es_coach else '4.99' %}
+{% set plan_nombre = 'Entrenador Pro' if es_coach else 'Jugador Pro' %}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.home') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Suscripción</div>{% endblock %}
+{% block hero_title %}Planes{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {{ 'Tu cuenta está activa' if cuenta_activa else 'Desbloquea todo el potencial' }}
+</div>
+{% endblock %}
+{% block hero_actions %}{% endblock %}
+
+{% block head %}
+<style>
+  .pl-card {
+    background: #fff; border: 2px solid var(--border); border-radius: var(--r-xl);
+    padding: 20px; margin: 16px; box-shadow: var(--sh-sm);
+  }
+  .pl-card--destacado { border-color: var(--primary); box-shadow: 0 10px 30px rgba(4,120,87,.14); }
+  .pl-tag {
+    display: inline-block; padding: 5px 12px; border-radius: 100px;
+    font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
+    background: var(--primary); color: #fff; margin-bottom: 12px;
+  }
+  .pl-nombre { font-size: 21px; font-weight: 800; letter-spacing: -.3px; margin: 0 0 4px; }
+  .pl-precio { font-size: 38px; font-weight: 800; letter-spacing: -1.5px; color: var(--primary); }
+  .pl-precio span { font-size: 15px; font-weight: 600; color: var(--text-sec); letter-spacing: 0; }
+  .pl-feat { display: flex; align-items: flex-start; gap: 10px; padding: 7px 0; font-size: 14px; }
+  .pl-feat i, .pl-feat svg { color: var(--primary); flex: none; margin-top: 2px; }
+  .pl-feat--no { color: var(--text-muted); }
+  .pl-feat--no svg { color: var(--text-muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{% if cuenta_activa %}
+<div class="pf-flash pf-flash--success" style="margin:16px">
+  <i data-ico="check-circle" class="pf-ico--sm"></i>
+  <span>Tu cuenta está activa. Tienes acceso completo a ProFoot Assistant.</span>
+</div>
+{% endif %}
+
+{# ── Gratis ── #}
+<div class="pl-card">
+  <h2 class="pl-nombre">Básico</h2>
+  <div class="pl-precio">$0 <span>/ siempre</span></div>
+  <div style="margin-top:16px">
+    <div class="pl-feat"><i data-ico="check" class="pf-ico--sm"></i>
+      <span>{{ 'Hasta 5 jugadores en la plantilla' if es_coach else 'Hábitos, metas y entrenos' }}</span></div>
+    <div class="pl-feat"><i data-ico="check" class="pf-ico--sm"></i>
+      <span>{{ 'Agenda de entrenamientos' if es_coach else 'Agenda del equipo' }}</span></div>
+    <div class="pl-feat"><i data-ico="check" class="pf-ico--sm"></i>
+      <span>Check-in de bienestar</span></div>
+    <div class="pl-feat pl-feat--no"><i data-ico="x" class="pf-ico--sm"></i>
+      <span>Asistente de IA</span></div>
+    <div class="pl-feat pl-feat--no"><i data-ico="x" class="pf-ico--sm"></i>
+      <span>Herramientas de análisis avanzado</span></div>
+  </div>
+</div>
+
+{# ── Pro (el que corresponde al rol) ── #}
+<div class="pl-card pl-card--destacado">
+  <span class="pl-tag">Recomendado</span>
+  <h2 class="pl-nombre">{{ plan_nombre }}</h2>
+  <div class="pl-precio">${{ plan_precio }} <span>/ mes</span></div>
+
+  <div style="margin-top:16px">
+    <div class="pl-feat"><i data-ico="check" class="pf-ico--sm"></i>
+      <span>{{ 'Plantilla ilimitada' if es_coach else 'Todo lo del plan Básico' }}</span></div>
+    <div class="pl-feat"><i data-ico="check" class="pf-ico--sm"></i>
+      <span>{{ 'Evaluaciones y perfil dinámico de cada jugador' if es_coach else 'IA Coach con tus datos reales' }}</span></div>
+    <div class="pl-feat"><i data-ico="check" class="pf-ico--sm"></i>
+      <span>{{ 'Pizarra táctica y biblioteca de jugadas' if es_coach else 'Pruebas físicas y ranking del equipo' }}</span></div>
+    <div class="pl-feat"><i data-ico="check" class="pf-ico--sm"></i>
+      <span>{{ 'Asistente de IA para planificación' if es_coach else 'Tu ficha completa con evaluaciones' }}</span></div>
+    <div class="pl-feat"><i data-ico="check" class="pf-ico--sm"></i>
+      <span>Análisis 3D de video, sensores y atlas muscular</span></div>
+    <div class="pl-feat"><i data-ico="check" class="pf-ico--sm"></i>
+      <span>Videollamadas con resumen automático</span></div>
+  </div>
+
+  {% if not cuenta_activa %}
+  <a class="pf-btn pf-btn--primary pf-btn--block pf-mt-16"
+     href="{{ url_for('pagos.checkout', plan=plan_key) }}">
+    <i data-ico="credit-card" class="pf-ico--sm"></i> Activar {{ plan_nombre }}
+  </a>
+  {% else %}
+  <div class="pf-btn pf-btn--ghost pf-btn--block pf-mt-16" style="cursor:default">
+    <i data-ico="check" class="pf-ico--sm"></i> Plan activo
+  </div>
+  {% endif %}
+</div>
+
+{# ── Club ── #}
+<div class="pl-card">
+  <h2 class="pl-nombre">Club</h2>
+  <div class="pl-precio">$49 <span>/ mes</span></div>
+  <div style="margin-top:16px">
+    <div class="pl-feat"><i data-ico="check" class="pf-ico--sm"></i>
+      <span>Varios entrenadores y categorías</span></div>
+    <div class="pl-feat"><i data-ico="check" class="pf-ico--sm"></i>
+      <span>Todos los jugadores del club incluidos</span></div>
+    <div class="pl-feat"><i data-ico="check" class="pf-ico--sm"></i>
+      <span>Asistentes técnicos con acceso completo</span></div>
+    <div class="pl-feat"><i data-ico="check" class="pf-ico--sm"></i>
+      <span>Acompañamiento en la puesta en marcha</span></div>
+  </div>
+  <a class="pf-btn pf-btn--secondary pf-btn--block pf-mt-16"
+     href="{{ url_for('pagos.checkout', plan='club') }}">
+    <i data-ico="credit-card" class="pf-ico--sm"></i> Activar Club
+  </a>
+</div>
+
+<p class="pf-center" style="font-size:12px;color:var(--text-muted);padding:6px 26px 34px;line-height:1.6">
+  Pago mensual, cancelas cuando quieras. Se cobra con tarjeta vía PayPal o por
+  transferencia con DeUna.
+</p>
+
+{% endblock %}

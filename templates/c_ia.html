@@ -1,0 +1,28 @@
+{% extends '_shell.html' %}
+{% block title %}IA · ProFoot{% endblock %}
+
+{# screens/CoachIAScreen.tsx: el asistente del entrenador. Ve la plantilla, las
+   medias del equipo y la agenda, así que responde con datos, no con teoría. #}
+
+{% block hero_label %}<div class="pf-hero__label">Asistente técnico</div>{% endblock %}
+{% block hero_title %}IA{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  Analiza tu equipo de {{ n_jugadores }} jugador{{ '' if n_jugadores == 1 else 'es' }}
+</div>
+{% endblock %}
+
+{% block content %}
+{% set titulo_vacio = 'Pregúntame sobre tu equipo' %}
+{% set texto_vacio = 'Conozco tu plantilla, las medias de atributos y tu agenda. Pregúntame por planificación, táctica o por un jugador concreto.' %}
+{% set placeholder = 'Escribe tu pregunta…' %}
+{% set sugerencias = [
+  '¿Cómo planifico la semana antes de un partido?',
+  '¿Qué formación me conviene con esta plantilla?',
+  'Dame ejercicios para mejorar la salida de balón',
+  '¿En qué debería enfocar el próximo entrenamiento?'
+] %}
+{% include '_chat_ia.html' %}
+{% endblock %}
+
+{% block scripts %}{% include '_chat_ia_estilos.html' %}{% endblock %}

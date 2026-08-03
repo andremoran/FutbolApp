@@ -1,0 +1,26 @@
+{% extends '_shell.html' %}
+{% block title %}IA Coach · ProFoot{% endblock %}
+
+{# screens/CoachScreen.tsx: el asistente personal del jugador.
+   Responde con SUS datos reales (atributos, racha, entrenos, metas). #}
+
+{% block hero_label %}<div class="pf-hero__label">Tu asistente</div>{% endblock %}
+{% block hero_title %}IA Coach{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">Conoce tus datos y te aconseja con ellos</div>
+{% endblock %}
+
+{% block content %}
+{% set titulo_vacio = 'Pregúntame lo que quieras' %}
+{% set texto_vacio = 'Miro tus atributos, tu racha de hábitos, tus entrenos y tus metas para darte consejos concretos, no frases hechas.' %}
+{% set placeholder = 'Escribe tu pregunta…' %}
+{% set sugerencias = [
+  '¿En qué debería enfocarme esta semana?',
+  '¿Cómo mejoro mi pierna izquierda?',
+  'Dame una rutina para ganar velocidad',
+  '¿Qué como antes de un partido?'
+] %}
+{% include '_chat_ia.html' %}
+{% endblock %}
+
+{% block scripts %}{% include '_chat_ia_estilos.html' %}{% endblock %}

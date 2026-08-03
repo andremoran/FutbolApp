@@ -1,0 +1,139 @@
+{% extends '_shell.html' %}
+{% block title %}Equipo · ProFoot{% endblock %}
+
+{# screens/TeamPlayersScreen.tsx: la plantilla con buscador y badge de nivel.
+   Los jugadores salen de especialista_paciente, la relación que ya existe. #}
+
+{% block hero_label %}<div class="pf-hero__label">Plantilla</div>{% endblock %}
+{% block hero_title %}{{ equipo.nombre }}{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {{ jugadores|length }} jugador{{ '' if jugadores|length == 1 else 'es' }}
+  {%- if codigo %} · Código {{ codigo }}{% endif %}
+</div>
+{% endblock %}
+
+{% block head %}
+<style>
+  .tp-nivel {
+    width: 36px; height: 36px; border-radius: 10px; flex: none;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 800; color: #fff;
+  }
+  .tp-buscar { padding: 16px 16px 0; position: relative; }
+  .tp-buscar input { padding-left: 40px; }
+  .tp-buscar .pf-ico { position: absolute; left: 30px; top: 29px; color: var(--text-muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{% if jugadores %}
+<div class="tp-buscar">
+  <i data-ico="search" class="pf-ico--sm"></i>
+  <input class="pf-input" id="tp-q" type="search" placeholder="Buscar jugador…"
+         aria-label="Buscar jugador">
+</div>
+{% endif %}
+
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Jugadores</h2>
+    <a href="{{ url_for('futbol.c_tests') }}" class="pf-item__right">Pruebas</a>
+  </div>
+
+  <div id="tp-lista">
+    {% for j in jugadores %}
+    <a class="pf-item" href="{{ url_for('futbol.c_jugador', pid=j.id) }}"
+       data-nombre="{{ (j.name or '')|lower }}">
+      <span class="pf-avatar">
+        {%- if j.profile_photo %}<img src="{{ j.profile_photo }}" alt="">
+        {%- else %}{{ (j.name or '?')[:1]|upper }}{% endif -%}
+      </span>
+      <span class="pf-item__body">
+        <span class="pf-item__title">
+          {%- if (j.fut or {}).get('dorsal') %}
+            <span style="color:var(--text-muted);font-weight:800">{{ j.fut.dorsal }}</span>
+          {% endif %}
+          {{ j.name }}
+        </span>
+        <span class="pf-item__sub">
+          {{ (j.fut or {}).get('posicion') or 'Sin posición' }}
+          {%- if not j.activo %} · Cuenta inactiva{% endif %}
+        </span>
+      </span>
+      <span class="tp-nivel" style="background:
+        {%- if j._media >= 70 %}var(--primary)
+        {%- elif j._media >= 50 %}var(--warning)
+        {%- else %}var(--danger){% endif %}">{{ j._media }}</span>
+    </a>
+    {% endfor %}
+  </div>
+
+  <p id="tp-vacio" class="pf-center pf-hide" style="padding:20px;color:var(--text-sec);font-size:13px">
+    Ningún jugador coincide con la búsqueda.
+  </p>
+
+  {% if not jugadores %}
+  <div class="pf-empty" style="padding:22px 8px">
+    <div class="pf-empty__icon"><i data-ico="users" class="pf-ico--xxl"></i></div>
+    <h3 class="pf-empty__title">Sin jugadores todavía</h3>
+    <p class="pf-empty__text">
+      {% if codigo %}
+        Comparte el código <strong>{{ codigo }}</strong> con tus jugadores.
+        Al registrarse con él entran directo a esta plantilla.
+      {% else %}
+        Necesitas un código profesional para que tus jugadores puedan unirse.
+      {% endif %}
+    </p>
+  </div>
+  {% endif %}
+</div>
+
+{% if codigo %}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Invitar jugadores</h2></div>
+  <p style="font-size:13px;color:var(--text-sec);line-height:1.55;margin:10px 0 14px">
+    Manda este enlace y el código ya va incluido: solo tienen que completar sus datos.
+  </p>
+  <button class="pf-btn pf-btn--primary pf-btn--block" type="button" id="btn-invitar">
+    <i data-ico="share-2" class="pf-ico--sm"></i> Compartir invitación
+  </button>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var q = document.getElementById('tp-q');
+  if (q) {
+    q.addEventListener('input', function () {
+      var t = q.value.trim().toLowerCase();
+      var visibles = 0;
+      document.querySelectorAll('#tp-lista [data-nombre]').forEach(function (fila) {
+        var ok = !t || fila.dataset.nombre.indexOf(t) !== -1;
+        fila.classList.toggle('pf-hide', !ok);
+        if (ok) visibles++;
+      });
+      document.getElementById('tp-vacio').classList.toggle('pf-hide', visibles > 0);
+    });
+  }
+
+  var inv = document.getElementById('btn-invitar');
+  if (inv) {
+    var codigo = {{ codigo|tojson }};
+    var enlace = window.location.origin + '/futbol/registro?rol=jugador&codigo=' + encodeURIComponent(codigo);
+    var mensaje = 'Únete a mi equipo en ProFoot Assistant con el código: ' + codigo + '\n' + enlace;
+    inv.addEventListener('click', function () {
+      if (navigator.share) {
+        navigator.share({ title: 'Únete a mi equipo', text: mensaje }).catch(function () {});
+      } else {
+        PF.copy(mensaje, 'Invitación copiada');
+      }
+    });
+  }
+})();
+</script>
+{% endblock %}

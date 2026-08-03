@@ -1,0 +1,118 @@
+{% extends '_shell.html' %}
+{% block title %}Pruebas físicas · ProFoot{% endblock %}
+
+{# screens/TestsHomeScreen.tsx: las pruebas que el entrenador toma al equipo
+   (sprint 30 m, salto vertical, Yo-Yo…) y su histórico. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_equipo') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Medición</div>{% endblock %}
+{% block hero_title %}Pruebas físicas{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">{{ tests|length }} prueba{{ '' if tests|length == 1 else 's' }} registradas</div>
+{% endblock %}
+
+{% block content %}
+
+{# ── Nueva prueba ── #}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Nueva prueba</h2></div>
+
+  <div class="pf-field pf-mt-12">
+    <input class="pf-input" id="t-nombre" type="text" maxlength="80"
+           placeholder="Ej. Sprint 30 metros" list="t-sugeridas">
+    <datalist id="t-sugeridas">
+      <option value="Sprint 30 metros"></option>
+      <option value="Sprint 10 metros"></option>
+      <option value="Salto vertical"></option>
+      <option value="Salto horizontal"></option>
+      <option value="Test de Cooper"></option>
+      <option value="Yo-Yo Intermitente"></option>
+      <option value="Agilidad en T"></option>
+      <option value="Flexibilidad sit and reach"></option>
+    </datalist>
+  </div>
+
+  <div class="pf-row" style="gap:10px">
+    <div class="pf-grow">
+      <label class="pf-label" for="t-tipo">Tipo</label>
+      <select class="pf-select" id="t-tipo">
+        <option value="tiempo">Tiempo (menor es mejor)</option>
+        <option value="distancia">Distancia (mayor es mejor)</option>
+        <option value="repeticiones">Repeticiones</option>
+        <option value="velocidad">Velocidad</option>
+      </select>
+    </div>
+    <div style="width:100px;flex:none">
+      <label class="pf-label" for="t-unidad">Unidad</label>
+      <input class="pf-input" id="t-unidad" type="text" maxlength="20" placeholder="s / m / cm">
+    </div>
+  </div>
+
+  <div class="pf-field pf-mt-12">
+    <label class="pf-label" for="t-fecha">Fecha</label>
+    <input class="pf-input" id="t-fecha" type="date">
+  </div>
+
+  <button class="pf-btn pf-btn--primary pf-btn--block" type="button" id="btn-test">
+    <i data-ico="plus" class="pf-ico--sm"></i> Crear prueba
+  </button>
+</div>
+
+{# ── Historial ── #}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Pruebas</h2></div>
+
+  {% for t in tests %}
+  <a class="pf-item" href="{{ url_for('futbol.c_test_detalle', tid=t.id) }}">
+    <span class="pf-item__icon" style="background:rgba(139,92,246,.12);color:var(--purple)">
+      <i data-ico="bar-chart-2" class="pf-ico--sm"></i>
+    </span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">{{ t.nombre }}</span>
+      <span class="pf-item__sub">
+        {{ t.fecha }} · {{ (t.tipo or '')|capitalize }}{% if t.unidad %} ({{ t.unidad }}){% endif %}
+      </span>
+    </span>
+    <span class="pf-item__chev"><i data-ico="chevron-right" class="pf-ico--sm"></i></span>
+  </a>
+  {% endfor %}
+
+  {% if not tests %}
+  <div class="pf-empty" style="padding:22px 8px">
+    <div class="pf-empty__icon"><i data-ico="bar-chart-2" class="pf-ico--xxl"></i></div>
+    <h3 class="pf-empty__title">Sin pruebas todavía</h3>
+    <p class="pf-empty__text">
+      Crea una prueba arriba, apunta la marca de cada jugador y tendrás el
+      ranking del equipo al instante.
+    </p>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  document.getElementById('t-fecha').value = new Date().toISOString().slice(0, 10);
+
+  document.getElementById('btn-test').addEventListener('click', function () {
+    var nombre = document.getElementById('t-nombre').value.trim();
+    if (!nombre) { document.getElementById('t-nombre').focus(); return; }
+
+    PF.api('{{ url_for("futbol.api_test_crear") }}', {
+      nombre: nombre,
+      tipo: document.getElementById('t-tipo').value,
+      unidad: document.getElementById('t-unidad').value.trim(),
+      fecha: document.getElementById('t-fecha').value
+    })
+      .then(function (r) { window.location.href = r.redirect; })
+      .catch(function (e) { PF.toast(e.message, 'error'); });
+  });
+})();
+</script>
+{% endblock %}

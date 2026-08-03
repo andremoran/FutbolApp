@@ -1,0 +1,122 @@
+{% extends '_shell.html' %}
+{% block title %}Observaciones · ProFoot{% endblock %}
+
+{# screens/TrainingObservationScreen.tsx (versión escrita).
+   Notas del entrenador tras cada sesión: del grupo o de un jugador concreto. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_agenda') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Después del entreno</div>{% endblock %}
+{% block hero_title %}Observaciones{% endblock %}
+
+{% block content %}
+
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Nueva observación</h2></div>
+
+  <div class="pf-row pf-mt-12" style="gap:10px">
+    <div class="pf-grow">
+      <label class="pf-label" for="ob-titulo">Título</label>
+      <input class="pf-input" id="ob-titulo" type="text" maxlength="120"
+             placeholder="Ej. Sesión de presión alta">
+    </div>
+    <div style="width:140px;flex:none">
+      <label class="pf-label" for="ob-fecha">Fecha</label>
+      <input class="pf-input" id="ob-fecha" type="date" value="{{ hoy }}">
+    </div>
+  </div>
+
+  <div class="pf-field pf-mt-12">
+    <label class="pf-label" for="ob-jugador">Sobre</label>
+    <select class="pf-select" id="ob-jugador">
+      <option value="">Todo el grupo</option>
+      {% for j in jugadores %}
+      <option value="{{ j.id }}">{{ j.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="pf-field">
+    <textarea class="pf-textarea" id="ob-texto" rows="5" maxlength="4000"
+              placeholder="Qué funcionó, qué no, quién destacó, qué corregir la próxima sesión…"></textarea>
+  </div>
+
+  <button class="pf-btn pf-btn--primary pf-btn--block" type="button" id="btn-obs">
+    <i data-ico="save" class="pf-ico--sm"></i> Guardar observación
+  </button>
+</div>
+
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Registro</h2>
+    {% if observaciones %}<span class="pf-card__badge">{{ observaciones|length }}</span>{% endif %}
+  </div>
+
+  {% for o in observaciones %}
+  <div class="pf-item" data-obs="{{ o.id }}" style="align-items:flex-start">
+    <span class="pf-item__icon" style="background:rgba(139,92,246,.12);color:var(--purple)">
+      <i data-ico="file-text" class="pf-ico--sm"></i>
+    </span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">{{ o.titulo }}</span>
+      <span class="pf-item__sub">
+        {%- if o._fecha %}{{ o._fecha.strftime('%d/%m/%Y') }}{% endif -%}
+        · {{ o._jugador or 'Todo el grupo' }}
+      </span>
+      <span style="display:block;font-size:13px;color:var(--text-sec);line-height:1.55;
+                   margin-top:5px;white-space:pre-wrap">{{ o.texto }}</span>
+    </span>
+    <button type="button" class="pf-item__chev ob-del" data-id="{{ o.id }}"
+            aria-label="Eliminar" style="color:var(--text-muted)">
+      <i data-ico="trash-2" class="pf-ico--sm"></i>
+    </button>
+  </div>
+  {% endfor %}
+
+  {% if not observaciones %}
+  <div class="pf-empty" style="padding:22px 8px">
+    <div class="pf-empty__icon"><i data-ico="file-text" class="pf-ico--xxl"></i></div>
+    <h3 class="pf-empty__title">Sin observaciones</h3>
+    <p class="pf-empty__text">
+      Anotar en caliente lo que viste en el entreno es lo que después convierte
+      una evaluación en algo con fundamento.
+    </p>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  document.getElementById('btn-obs').addEventListener('click', function () {
+    var texto = document.getElementById('ob-texto').value.trim();
+    if (!texto) { document.getElementById('ob-texto').focus(); return; }
+
+    PF.api('{{ url_for("futbol.api_observacion") }}', {
+      titulo: document.getElementById('ob-titulo').value.trim() || 'Sesión',
+      fecha: document.getElementById('ob-fecha').value,
+      player_id: document.getElementById('ob-jugador').value || null,
+      texto: texto
+    })
+      .then(function () { location.reload(); })
+      .catch(function (e) { PF.toast(e.message, 'error'); });
+  });
+
+  document.querySelectorAll('.ob-del').forEach(function (b) {
+    b.addEventListener('click', function () {
+      PF.api('/api/observacion/' + b.dataset.id, null, 'DELETE')
+        .then(function () {
+          document.querySelector('[data-obs="' + b.dataset.id + '"]').remove();
+          PF.toast('Observación eliminada');
+        })
+        .catch(function (e) { PF.toast(e.message, 'error'); });
+    });
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,166 @@
+{% extends '_shell.html' %}
+{% block title %}Metas · ProFoot{% endblock %}
+
+{# screens/GoalsScreen.tsx: metas con barra de progreso arrastrable.
+   Las que crea el entrenador llevan su distintivo. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.progreso') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Objetivos</div>{% endblock %}
+{% block hero_title %}Metas{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {{ activas|length }} activa{{ '' if activas|length == 1 else 's' }} ·
+  {{ hechas|length }} lograda{{ '' if hechas|length == 1 else 's' }}
+</div>
+{% endblock %}
+
+{% block head %}
+<style>
+  .mt-goal { padding: 14px 4px; border-top: 1px solid var(--border-soft); }
+  .mt-goal:first-child { border-top: none; }
+  .mt-goal__t { font-size: 15px; font-weight: 700; }
+  .mt-goal__d { font-size: 12px; color: var(--text-sec); margin-top: 3px; line-height: 1.45; }
+  .mt-range { width: 100%; margin-top: 10px; accent-color: var(--primary); }
+  .mt-pct { font-size: 13px; font-weight: 800; color: var(--primary); min-width: 42px; text-align: right; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">En marcha</h2>
+    <span class="pf-card__badge">{{ activas|length }}</span>
+  </div>
+
+  {% for m in activas %}
+  <div class="mt-goal" data-meta="{{ m.id }}">
+    <div class="pf-row pf-row--between" style="gap:10px;align-items:flex-start">
+      <div class="pf-grow">
+        <div class="mt-goal__t">{{ m.titulo }}</div>
+        {% if m.descripcion %}<div class="mt-goal__d">{{ m.descripcion }}</div>{% endif %}
+        <div class="pf-row" style="gap:6px;margin-top:7px;flex-wrap:wrap">
+          {% if m.categoria and m.categoria != 'general' %}
+            <span class="pf-pill">{{ m.categoria }}</span>
+          {% endif %}
+          {% if m.creado_por and m.creado_por != current_user.id %}
+            <span class="pf-pill pf-pill--info">
+              <i data-ico="users" class="pf-ico--xs"></i> De tu coach
+            </span>
+          {% endif %}
+          {% if m.fecha_limite %}
+            <span class="pf-pill pf-pill--muted">
+              <i data-ico="clock" class="pf-ico--xs"></i> {{ m.fecha_limite }}
+            </span>
+          {% endif %}
+        </div>
+      </div>
+      <span class="mt-pct">{{ m.progreso|default(0) }}%</span>
+    </div>
+
+    <div class="pf-bar pf-mt-8">
+      <div class="pf-bar__fill" style="width: {{ m.progreso|default(0) }}%"></div>
+    </div>
+    <input class="mt-range" type="range" min="0" max="100" step="5"
+           value="{{ m.progreso|default(0) }}" data-id="{{ m.id }}"
+           aria-label="Progreso de {{ m.titulo }}">
+  </div>
+  {% endfor %}
+
+  {% if not activas %}
+  <div class="pf-empty" style="padding:22px 8px">
+    <div class="pf-empty__icon"><i data-ico="target" class="pf-ico--xxl"></i></div>
+    <h3 class="pf-empty__title">Ponte una meta</h3>
+    <p class="pf-empty__text">
+      Concreta y medible funciona mejor: "marcar 5 goles este mes" gana a "jugar mejor".
+    </p>
+  </div>
+  {% endif %}
+</div>
+
+{% if hechas %}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Logradas</h2></div>
+  {% for m in hechas %}
+  <div class="pf-item">
+    <span class="pf-item__icon" style="background:var(--success-bg);color:var(--primary)">
+      <i data-ico="check" class="pf-ico--sm"></i>
+    </span>
+    <span class="pf-item__body"><span class="pf-item__title">{{ m.titulo }}</span></span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ── Nueva meta ── #}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Nueva meta</h2></div>
+  <div class="pf-field pf-mt-12">
+    <input class="pf-input" id="meta-titulo" type="text" maxlength="120"
+           placeholder="Ej. Marcar 5 goles este mes">
+  </div>
+  <div class="pf-field">
+    <textarea class="pf-textarea" id="meta-desc" maxlength="600" rows="2"
+              placeholder="¿Cómo la vas a lograr? (opcional)"></textarea>
+  </div>
+  <div class="pf-row" style="gap:10px">
+    <select class="pf-select pf-grow" id="meta-cat">
+      <option value="general">General</option>
+      <option value="tecnica">Técnica</option>
+      <option value="fisico">Físico</option>
+      <option value="tactico">Táctico</option>
+      <option value="mental">Mental</option>
+    </select>
+    <input class="pf-input" id="meta-fecha" type="date" style="flex:none;width:150px">
+  </div>
+  <button class="pf-btn pf-btn--primary pf-btn--block pf-mt-12" id="btn-meta" type="button">
+    <i data-ico="plus" class="pf-ico--sm"></i> Crear meta
+  </button>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  document.querySelectorAll('.mt-range').forEach(function (r) {
+    var fila = r.closest('.mt-goal');
+    var barra = fila.querySelector('.pf-bar__fill');
+    var pct = fila.querySelector('.mt-pct');
+
+    // Mientras arrastra, actualiza solo la vista; se guarda al soltar.
+    r.addEventListener('input', function () {
+      barra.style.width = r.value + '%';
+      pct.textContent = r.value + '%';
+    });
+    r.addEventListener('change', function () {
+      PF.api('/futbol/api/meta/' + r.dataset.id, { progreso: parseInt(r.value, 10) })
+        .then(function (res) {
+          if (res.estado === 'completada') {
+            PF.toast('¡Meta lograda! 🎉');
+            setTimeout(function () { location.reload(); }, 900);
+          }
+        })
+        .catch(function (e) { PF.toast(e.message, 'error'); });
+    });
+  });
+
+  document.getElementById('btn-meta').addEventListener('click', function () {
+    var titulo = document.getElementById('meta-titulo').value.trim();
+    if (!titulo) { document.getElementById('meta-titulo').focus(); return; }
+    PF.api('{{ url_for("futbol.api_meta_crear") }}', {
+      titulo: titulo,
+      descripcion: document.getElementById('meta-desc').value.trim(),
+      categoria: document.getElementById('meta-cat').value,
+      fecha_limite: document.getElementById('meta-fecha').value || null
+    })
+      .then(function () { location.reload(); })
+      .catch(function (e) { PF.toast(e.message, 'error'); });
+  });
+})();
+</script>
+{% endblock %}

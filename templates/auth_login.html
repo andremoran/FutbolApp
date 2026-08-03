@@ -1,0 +1,80 @@
+{% extends '_shell.html' %}
+{% block title %}Entrar · ProFoot Assistant{% endblock %}
+
+{# Sin cabecera hero: la portada es el logo, como en screens/AuthScreen.tsx #}
+{% block hero %}{% endblock %}
+
+{% block head %}
+<style>
+  .auth-wrap { max-width: 420px; margin: 0 auto; padding: 0 22px; }
+  .auth-top {
+    text-align: center;
+    padding: calc(38px + env(safe-area-inset-top, 0px)) 0 26px;
+  }
+  .auth-logo { width: 132px; height: auto; margin: 0 auto 14px; display: block; }
+  .auth-title { font-size: 27px; font-weight: 800; letter-spacing: -0.5px; margin: 0 0 6px; }
+  .auth-sub { font-size: 15px; color: var(--text-sec); margin: 0; }
+  .auth-card {
+    background: #fff; border: 1px solid var(--border-soft); border-radius: var(--r-xl);
+    padding: 20px; box-shadow: var(--sh-md);
+  }
+  .auth-alt { text-align: center; margin-top: 22px; font-size: 14px; color: var(--text-sec); }
+  .auth-alt a { color: var(--primary); font-weight: 700; }
+  .auth-sep { display: flex; align-items: center; gap: 12px; margin: 18px 0; color: var(--text-muted); font-size: 12px; font-weight: 600; }
+  .auth-sep::before, .auth-sep::after { content: ''; height: 1px; background: var(--border); flex: 1; }
+  .auth-foot { text-align: center; font-size: 11px; color: var(--text-muted); margin: 26px 0 30px; }
+  /* Franja de cancha decorativa detrás del logo */
+  .auth-band { position: absolute; inset: 0 0 auto; height: 210px; overflow: hidden; z-index: -1;
+               background: linear-gradient(180deg, var(--primary-faint), transparent); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="auth-band" aria-hidden="true"></div>
+
+<div class="auth-wrap">
+  <div class="auth-top">
+    <img class="auth-logo" src="{{ url_for('static', filename='logo.svg') }}"
+         alt="ProFoot Assistant">
+    <h1 class="auth-title">Bienvenido de vuelta</h1>
+    <p class="auth-sub">Entra para seguir a tu equipo</p>
+  </div>
+
+  <form class="auth-card" method="POST" action="{{ url_for('auth.login') }}" autocomplete="on">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+
+    <div class="pf-field">
+      <label class="pf-label" for="correo">Correo electrónico</label>
+      <input class="pf-input" id="correo" name="correo" type="email"
+             inputmode="email" autocomplete="email" required
+             placeholder="tu@correo.com">
+    </div>
+
+    <div class="pf-field">
+      <label class="pf-label" for="password">Contraseña</label>
+      <input class="pf-input" id="password" name="password" type="password"
+             autocomplete="current-password" required placeholder="••••••••">
+    </div>
+
+    <button class="pf-btn pf-btn--primary pf-btn--block pf-mt-8" type="submit">
+      <i data-ico="arrow-right" class="pf-ico--sm"></i> Entrar
+    </button>
+
+    <p class="pf-center pf-mt-12" style="font-size:13px">
+      <a href="{{ url_for('auth.olvide') }}" style="color:var(--text-sec);font-weight:600">
+        ¿Olvidaste tu contraseña?
+      </a>
+    </p>
+  </form>
+
+  <div class="auth-sep">¿Primera vez?</div>
+
+  <a class="pf-btn pf-btn--secondary pf-btn--block" href="{{ url_for('auth.rol') }}">
+    <i data-ico="user-plus" class="pf-ico--sm"></i> Crear una cuenta
+  </a>
+
+  <p class="auth-foot">
+    ProFoot Assistant
+  </p>
+</div>
+{% endblock %}

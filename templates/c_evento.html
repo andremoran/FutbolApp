@@ -1,0 +1,133 @@
+{% extends '_shell.html' %}
+{% block title %}{{ evento.titulo }} · ProFoot{% endblock %}
+
+{# screens/EventAttendanceScreen.tsx: pasar lista. El entrenador puede marcar
+   por cada jugador aunque este no haya confirmado desde su teléfono. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_agenda') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">{{ (evento.tipo or 'evento')|capitalize }}</div>{% endblock %}
+{% block hero_title %}{{ evento.titulo }}{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {{ evento.fecha }}{% if evento.hora %} · {{ evento.hora[:5] }}{% endif %}
+  {%- if evento.lugar %} · {{ evento.lugar }}{% endif %}
+</div>
+{% endblock %}
+
+{% block head %}
+<style>
+  .as-btns { display: flex; gap: 5px; flex: none; }
+  .as-btn {
+    padding: 6px 10px; border-radius: 100px; font-size: 11px; font-weight: 800;
+    background: var(--border-soft); color: var(--text-sec); transition: all .15s;
+  }
+  .as-btn.is-on[data-estado="asiste"] { background: var(--success); color: #fff; }
+  .as-btn.is-on[data-estado="duda"]   { background: var(--warning); color: #fff; }
+  .as-btn.is-on[data-estado="falta"]  { background: var(--danger);  color: #fff; }
+  .as-btn:active { transform: scale(.94); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{% if evento.descripcion %}
+<div class="pf-card">
+  <p style="font-size:14px;line-height:1.6;margin:0;color:var(--text-sec)">{{ evento.descripcion }}</p>
+</div>
+{% endif %}
+
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Asistencia</h2>
+    <span class="pf-card__badge" id="conteo">
+      {{ jugadores|selectattr('_asistencia', 'equalto', 'asiste')|list|length }}/{{ jugadores|length }}
+    </span>
+  </div>
+
+  {% for j in jugadores %}
+  <div class="pf-item" data-fila="{{ j.id }}">
+    <span class="pf-avatar pf-avatar--sm">
+      {%- if j.profile_photo %}<img src="{{ j.profile_photo }}" alt="">
+      {%- else %}{{ (j.name or '?')[:1]|upper }}{% endif -%}
+    </span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">{{ j.name }}</span>
+      <span class="pf-item__sub">{{ (j.fut or {}).get('posicion') or 'Sin posición' }}</span>
+    </span>
+    <span class="as-btns">
+      {% for clave, texto in [('asiste','✓'), ('duda','?'), ('falta','✕')] %}
+      <button type="button" class="as-btn {{ 'is-on' if j._asistencia == clave }}"
+              data-estado="{{ clave }}" data-jugador="{{ j.id }}"
+              aria-label="{{ texto }} {{ j.name }}">{{ texto }}</button>
+      {% endfor %}
+    </span>
+  </div>
+  {% endfor %}
+
+  {% if not jugadores %}
+  <div class="pf-empty" style="padding:22px 8px">
+    <div class="pf-empty__icon"><i data-ico="users" class="pf-ico--xxl"></i></div>
+    <h3 class="pf-empty__title">Sin jugadores</h3>
+    <p class="pf-empty__text">Suma jugadores a tu plantilla para poder pasar lista.</p>
+  </div>
+  {% endif %}
+</div>
+
+<div style="padding:0 16px 30px">
+  <button class="pf-btn pf-btn--danger pf-btn--block" type="button" id="btn-borrar">
+    <i data-ico="trash-2" class="pf-ico--sm"></i> Eliminar evento
+  </button>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  function recontar() {
+    var total = document.querySelectorAll('[data-fila]').length;
+    var van = document.querySelectorAll('.as-btn.is-on[data-estado="asiste"]').length;
+    document.getElementById('conteo').textContent = van + '/' + total;
+  }
+
+  document.querySelectorAll('.as-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      PF.api('{{ url_for("futbol.api_asistencia") }}', {
+        event_id: {{ evento.id|tojson }},
+        player_id: btn.dataset.jugador,
+        estado: btn.dataset.estado
+      })
+        .then(function () {
+          document.querySelectorAll('[data-fila="' + btn.dataset.jugador + '"] .as-btn')
+            .forEach(function (b) { b.classList.toggle('is-on', b === btn); });
+          recontar();
+        })
+        .catch(function (e) { PF.toast(e.message, 'error'); });
+    });
+  });
+
+  // Borrado en dos toques: el primero pide confirmación en el propio botón.
+  var borrar = document.getElementById('btn-borrar');
+  var armado = false;
+  borrar.addEventListener('click', function () {
+    if (!armado) {
+      armado = true;
+      borrar.innerHTML = 'Toca otra vez para confirmar';
+      setTimeout(function () {
+        armado = false;
+        borrar.innerHTML = '<i data-ico="trash-2" class="pf-ico--sm"></i> Eliminar evento';
+        PF.icons(borrar);
+      }, 4000);
+      return;
+    }
+    PF.api('/futbol/api/evento/{{ evento.id }}', null, 'DELETE')
+      .then(function () { window.location.href = '{{ url_for("futbol.c_agenda") }}'; })
+      .catch(function (e) { PF.toast(e.message, 'error'); });
+  });
+})();
+</script>
+{% endblock %}

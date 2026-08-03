@@ -1,0 +1,144 @@
+{% extends '_shell.html' %}
+{% block title %}Entrenos · ProFoot{% endblock %}
+
+{# screens/TrainingScreen.tsx: registro de sesiones con tipo, duración,
+   intensidad y esfuerzo percibido (RPE). #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.progreso') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Mi carga</div>{% endblock %}
+{% block hero_title %}Entrenos{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">{{ entrenos|length }} sesion{{ 'es' if entrenos|length != 1 else '' }} registradas</div>
+{% endblock %}
+
+{% block content %}
+
+{# ── Registrar sesión ── #}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Registrar sesión</h2></div>
+
+  <div class="pf-row pf-mt-12" style="gap:10px">
+    <div class="pf-grow">
+      <label class="pf-label" for="e-fecha">Fecha</label>
+      <input class="pf-input" id="e-fecha" type="date" value="{{ hoy }}">
+    </div>
+    <div class="pf-grow">
+      <label class="pf-label" for="e-tipo">Tipo</label>
+      <select class="pf-select" id="e-tipo">
+        <option value="tecnico">Técnico</option>
+        <option value="fisico">Físico</option>
+        <option value="tactico">Táctico</option>
+        <option value="gimnasio">Gimnasio</option>
+        <option value="partido">Partido</option>
+        <option value="general">General</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="pf-row pf-mt-12" style="gap:10px">
+    <div class="pf-grow">
+      <label class="pf-label" for="e-dur">Duración (min)</label>
+      <input class="pf-input" id="e-dur" type="number" inputmode="numeric" min="0" max="400" value="60">
+    </div>
+    <div class="pf-grow">
+      <label class="pf-label" for="e-int">Intensidad</label>
+      <select class="pf-select" id="e-int">
+        <option value="baja">Baja</option>
+        <option value="media" selected>Media</option>
+        <option value="alta">Alta</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="pf-mt-12">
+    <label class="pf-label" for="e-rpe">Esfuerzo percibido: <span id="rpe-val">6</span>/10</label>
+    <input type="range" id="e-rpe" min="1" max="10" value="6"
+           style="width:100%;accent-color:var(--primary)">
+  </div>
+
+  <div class="pf-field pf-mt-12">
+    <textarea class="pf-textarea" id="e-notas" rows="2" maxlength="800"
+              placeholder="¿Cómo te sentiste? (opcional)"></textarea>
+  </div>
+
+  <button class="pf-btn pf-btn--primary pf-btn--block" id="btn-entreno" type="button">
+    <i data-ico="plus" class="pf-ico--sm"></i> Guardar entreno
+  </button>
+</div>
+
+{# ── Historial ── #}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Historial</h2></div>
+
+  {% for e in entrenos %}
+  <div class="pf-item" data-entreno="{{ e.id }}">
+    <span class="pf-item__icon" style="
+      {% if e.intensidad == 'alta' %}background:rgba(239,68,68,.10);color:var(--danger)
+      {% elif e.intensidad == 'baja' %}background:rgba(59,130,246,.10);color:var(--info)
+      {% endif %}">
+      <i data-ico="activity" class="pf-ico--sm"></i>
+    </span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">{{ (e.tipo or 'general')|capitalize }}</span>
+      <span class="pf-item__sub">
+        {{ e.fecha }} · {{ e.duracion_min or 0 }} min · {{ (e.intensidad or 'media')|capitalize }}
+        {%- if e.rpe %} · RPE {{ e.rpe }}/10{% endif %}
+      </span>
+      {% if e.notas %}<span class="pf-item__sub" style="white-space:normal">{{ e.notas }}</span>{% endif %}
+    </span>
+    <button type="button" class="pf-item__chev e-del" data-id="{{ e.id }}"
+            aria-label="Eliminar" style="color:var(--text-muted)">
+      <i data-ico="trash-2" class="pf-ico--sm"></i>
+    </button>
+  </div>
+  {% endfor %}
+
+  {% if not entrenos %}
+  <div class="pf-empty" style="padding:22px 8px">
+    <div class="pf-empty__icon"><i data-ico="activity" class="pf-ico--xxl"></i></div>
+    <h3 class="pf-empty__title">Sin entrenos todavía</h3>
+    <p class="pf-empty__text">Registra tu primera sesión para empezar a ver tu carga semanal.</p>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var rpe = document.getElementById('e-rpe');
+  rpe.addEventListener('input', function () {
+    document.getElementById('rpe-val').textContent = rpe.value;
+  });
+
+  document.getElementById('btn-entreno').addEventListener('click', function () {
+    PF.api('{{ url_for("futbol.api_entreno_crear") }}', {
+      fecha: document.getElementById('e-fecha').value,
+      tipo: document.getElementById('e-tipo').value,
+      duracion_min: document.getElementById('e-dur').value,
+      intensidad: document.getElementById('e-int').value,
+      rpe: rpe.value,
+      notas: document.getElementById('e-notas').value.trim()
+    })
+      .then(function () { location.reload(); })
+      .catch(function (e) { PF.toast(e.message, 'error'); });
+  });
+
+  document.querySelectorAll('.e-del').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      PF.api('/futbol/api/entreno/' + btn.dataset.id, null, 'DELETE')
+        .then(function () {
+          document.querySelector('[data-entreno="' + btn.dataset.id + '"]').remove();
+          PF.toast('Entreno eliminado');
+        })
+        .catch(function (e) { PF.toast(e.message, 'error'); });
+    });
+  });
+})();
+</script>
+{% endblock %}

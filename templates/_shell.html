@@ -1,0 +1,123 @@
+{# ============================================================================
+   _shell.html — Armazón de ProFoot Assistant.
+
+   De aquí heredan TODAS las pantallas de la app. Reproduce la estructura de la
+   app nativa: cabecera hero verde, contenido desplazable y barra de pestañas
+   inferior fija. En ancho de celular usa la variante NATIVA de la barra (la que
+   se ve en el teléfono), no la variante web.
+
+   Bloques que puede definir una pantalla hija:
+     title      — título del documento
+     hero       — reemplaza la cabecera entera
+     hero_label / hero_title / hero_subtitle — partes de la cabecera por defecto
+     hero_extra — contenido dentro de la cabecera, bajo el título
+     content    — el cuerpo de la pantalla (obligatorio)
+     scripts    — JS propio de la pantalla
+   ============================================================================ #}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  {# viewport-fit=cover: el contenido llega bajo el notch, como en la app #}
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5.0">
+  <title>{% block title %}ProFoot Assistant{% endblock %}</title>
+
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <meta name="theme-color" content="#047857">
+  <meta name="description" content="Gestión de equipos y jugadores de fútbol: entrenamientos, tácticas, evaluaciones y rendimiento.">
+
+  {# PWA: instalada en la pantalla de inicio arranca sin barra del navegador #}
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ProFoot">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-192.png') }}">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='profoot.css') }}">
+  {% block head %}{% endblock %}
+</head>
+
+<body class="pf">
+<div class="pf-app">
+
+  {# ══════════════════ CABECERA HERO ══════════════════ #}
+  {% block hero %}
+  <header class="pf-hero {% block hero_pb %}pf-hero--pb{% endblock %}">
+    {% include '_field_lines.html' %}
+    <div class="pf-hero__content">
+      <div class="pf-wrap">
+        <div class="pf-hero__row">
+          {% block hero_back %}{% endblock %}
+          <div class="pf-hero__grow">
+            {% block hero_label %}{% endblock %}
+            <h1 class="pf-hero__title">{% block hero_title %}ProFoot{% endblock %}</h1>
+            {% block hero_subtitle %}{% endblock %}
+          </div>
+          <div class="pf-hero__actions">
+            {% block hero_actions %}{% endblock %}
+            <button type="button" class="pf-hero__btn" onclick="PF.openSheet('pf-sheet-mas')"
+                    aria-label="Ver más opciones">
+              <i data-ico="more-horizontal"></i>
+            </button>
+            {% if current_user.is_authenticated %}
+            <a class="pf-hero__avatar"
+               href="{{ url_for('futbol.perfil') }}" aria-label="Mi perfil">
+              {%- if current_user.profile_photo -%}
+                <img src="{{ current_user.profile_photo }}" alt="">
+              {%- else -%}
+                {{ (current_user.name or '?')[:1]|upper }}
+              {%- endif -%}
+            </a>
+            {% endif %}
+          </div>
+        </div>
+        {% block hero_extra %}{% endblock %}
+      </div>
+    </div>
+  </header>
+  {% endblock %}
+
+  {# ══════════════════ AVISOS ══════════════════ #}
+  {% with mensajes = get_flashed_messages(with_categories=true) %}
+    {% if mensajes %}
+      <div class="pf-wrap">
+        {% for categoria, texto in mensajes %}
+        <div class="pf-flash pf-flash--{{ 'error' if categoria == 'error' else ('success' if categoria == 'success' else ('warning' if categoria == 'warning' else 'info')) }}">
+          <i data-ico="{{ 'alert-circle' if categoria == 'error' else ('check-circle' if categoria == 'success' else 'info') }}" class="pf-ico--sm"></i>
+          <span>{{ texto }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  {# ══════════════════ CONTENIDO ══════════════════ #}
+  <main class="pf-scroll">
+    <div class="pf-wrap">
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+
+  {# ══════════════════ BARRA DE PESTAÑAS ══════════════════ #}
+  {% if current_user.is_authenticated and not hide_tabbar %}
+    {% if fut_es_entrenador %}
+      {% include '_tabs_coach.html' %}
+    {% else %}
+      {% include '_tabs_player.html' %}
+    {% endif %}
+  {% endif %}
+
+</div>
+
+{# ══════════════════ HOJA "⋯ VER MÁS" ══════════════════ #}
+{% include '_sheet_mas.html' %}
+
+<script src="{{ url_for('static', filename='profoot.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

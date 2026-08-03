@@ -1,0 +1,54 @@
+{% extends '_shell.html' %}
+{% block title %}Mis pruebas · ProFoot{% endblock %}
+
+{# screens/MyTestsScreen.tsx: resultados del jugador en las pruebas físicas que
+   monta el entrenador. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.progreso') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Pruebas físicas</div>{% endblock %}
+{% block hero_title %}Mis resultados{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">{{ resultados|length }} registro{{ '' if resultados|length == 1 else 's' }}</div>
+{% endblock %}
+
+{% block content %}
+
+{% if not resultados %}
+<div class="pf-empty">
+  <div class="pf-empty__icon"><i data-ico="bar-chart-2" class="pf-ico--xxl"></i></div>
+  <h2 class="pf-empty__title">Sin pruebas todavía</h2>
+  <p class="pf-empty__text">
+    Cuando tu entrenador te tome un test (sprint de 30 m, salto vertical, Yo-Yo…),
+    tu marca aparecerá aquí para que veas cómo evolucionas.
+  </p>
+</div>
+
+{% else %}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Historial</h2></div>
+
+  {% for r in resultados %}
+  <div class="pf-item">
+    <span class="pf-item__icon" style="background:rgba(139,92,246,.12);color:var(--purple)">
+      <i data-ico="bar-chart-2" class="pf-ico--sm"></i>
+    </span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">{{ r._test.nombre or 'Prueba' }}</span>
+      <span class="pf-item__sub">
+        {{ r._test.fecha or '' }}
+        {%- if r._test.tipo %} · {{ r._test.tipo|capitalize }}{% endif %}
+      </span>
+    </span>
+    <span class="pf-item__right">
+      {{ r.valor }}{% if r._test.unidad %} {{ r._test.unidad }}{% endif %}
+    </span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,105 @@
+{% extends '_shell.html' %}
+{% block title %}Partidos · ProFoot{% endblock %}
+
+{# screens/MatchesScreen.tsx: acumulado personal arriba y lista de partidos con
+   el resultado del equipo y las estadísticas propias de cada uno. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.progreso') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Competición</div>{% endblock %}
+{% block hero_title %}Partidos{% endblock %}
+
+{% block hero_extra %}
+<div style="display:flex;gap:10px;margin-top:18px">
+  <div class="pf-hero-kpi"><span class="pf-hero-kpi__v">{{ totales.partidos }}</span><span class="pf-hero-kpi__l">jugados</span></div>
+  <div class="pf-hero-kpi"><span class="pf-hero-kpi__v">{{ totales.goles }}</span><span class="pf-hero-kpi__l">goles</span></div>
+  <div class="pf-hero-kpi"><span class="pf-hero-kpi__v">{{ totales.asistencias }}</span><span class="pf-hero-kpi__l">asistencias</span></div>
+  <div class="pf-hero-kpi"><span class="pf-hero-kpi__v">{{ totales.minutos }}</span><span class="pf-hero-kpi__l">minutos</span></div>
+</div>
+{% endblock %}
+
+{% block head %}
+<style>
+  .pf-hero-kpi { flex:1; background:rgba(255,255,255,.14); border-radius:12px; padding:10px 8px; text-align:center; }
+  .pf-hero-kpi__v { display:block; font-size:20px; font-weight:800; color:#fff; line-height:1.1; }
+  .pf-hero-kpi__l { display:block; font-size:10px; font-weight:600; color:rgba(255,255,255,.8); margin-top:3px; }
+
+  .mp-score { font-size:17px; font-weight:800; letter-spacing:-.5px; flex:none; }
+  .mp-res { width:26px; height:26px; border-radius:13px; flex:none; font-size:11px; font-weight:800;
+            display:flex; align-items:center; justify-content:center; color:#fff; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{% if not tiene_equipo %}
+<div class="pf-empty">
+  <div class="pf-empty__icon"><i data-ico="award" class="pf-ico--xxl"></i></div>
+  <h2 class="pf-empty__title">Aún no estás en un equipo</h2>
+  <p class="pf-empty__text">
+    Los partidos los registra tu entrenador. Únete a su equipo con el código
+    que te dé y aquí verás tus goles, asistencias y minutos.
+  </p>
+</div>
+
+{% elif not partidos %}
+<div class="pf-empty">
+  <div class="pf-empty__icon"><i data-ico="award" class="pf-ico--xxl"></i></div>
+  <h2 class="pf-empty__title">Sin partidos todavía</h2>
+  <p class="pf-empty__text">Cuando tu entrenador registre el primer partido, aparecerá aquí.</p>
+</div>
+
+{% else %}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Historial del equipo</h2></div>
+
+  {% for m in partidos %}
+    {% set gf = m.goles_favor|default(0) %}
+    {% set gc = m.goles_contra|default(0) %}
+    <div class="pf-item" style="align-items:flex-start">
+      <span class="mp-res" style="background:
+        {%- if gf > gc %}var(--success)
+        {%- elif gf < gc %}var(--danger)
+        {%- else %}var(--text-muted){% endif %}">
+        {{ 'G' if gf > gc else ('P' if gf < gc else 'E') }}
+      </span>
+
+      <span class="pf-item__body">
+        <span class="pf-row" style="gap:8px">
+          <span class="pf-item__title pf-grow">
+            {{ 'vs' if m.local else '@' }} {{ m.rival }}
+          </span>
+          <span class="mp-score">{{ gf }}-{{ gc }}</span>
+        </span>
+        <span class="pf-item__sub">
+          {{ m.fecha }}{% if m.competicion %} · {{ m.competicion }}{% endif %}
+          · {{ 'Local' if m.local else 'Visitante' }}
+        </span>
+
+        {% if m._stats %}
+        <span class="pf-row" style="gap:6px;margin-top:8px;flex-wrap:wrap">
+          <span class="pf-pill pf-pill--muted">{{ m._stats.minutos|default(0) }}'</span>
+          {% if m._stats.goles %}
+            <span class="pf-pill">⚽ {{ m._stats.goles }}</span>{% endif %}
+          {% if m._stats.asistencias %}
+            <span class="pf-pill pf-pill--info">🅰 {{ m._stats.asistencias }}</span>{% endif %}
+          {% if m._stats.tarjetas_a %}
+            <span class="pf-pill pf-pill--warning">🟨 {{ m._stats.tarjetas_a }}</span>{% endif %}
+          {% if m._stats.tarjetas_r %}
+            <span class="pf-pill pf-pill--danger">🟥 {{ m._stats.tarjetas_r }}</span>{% endif %}
+          {% if m._stats.valoracion %}
+            <span class="pf-pill pf-pill--purple">★ {{ m._stats.valoracion }}</span>{% endif %}
+        </span>
+        {% else %}
+        <span class="pf-item__sub" style="color:var(--text-muted)">No participaste</span>
+        {% endif %}
+      </span>
+    </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}

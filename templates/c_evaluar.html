@@ -1,0 +1,103 @@
+{% extends '_shell.html' %}
+{% block title %}Evaluar a {{ jugador.name }} · ProFoot{% endblock %}
+
+{# screens/PlayerEvaluationScreen.tsx: el entrenador mueve los 4 atributos y deja
+   sus notas. Lo que guarda aquí es lo que el jugador ve en "Mi Ficha". #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_jugador', pid=jugador.id) }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Evaluación</div>{% endblock %}
+{% block hero_title %}{{ jugador.name }}{% endblock %}
+
+{% block head %}
+<style>
+  .ev-attr { padding: 16px 0; border-top: 1px solid var(--border-soft); }
+  .ev-attr:first-of-type { border-top: none; }
+  .ev-attr__row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+  .ev-attr__n { font-size: 15px; font-weight: 700; }
+  .ev-attr__v { font-size: 22px; font-weight: 800; }
+  .ev-attr__h { font-size: 12px; color: var(--text-sec); margin-bottom: 10px; }
+  .ev-range { width: 100%; accent-color: var(--primary); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Atributos</h2></div>
+
+  {% set descripciones = {
+    'tecnica': 'Control, pase, regate y definición',
+    'fisico':  'Velocidad, resistencia y fuerza',
+    'tactico': 'Lectura del juego y posicionamiento',
+    'mental':  'Actitud, concentración y carácter'
+  } %}
+
+  {% for clave, nombre in [('tecnica','Técnica'), ('fisico','Físico'),
+                           ('tactico','Táctico'), ('mental','Mental')] %}
+  <div class="ev-attr">
+    <div class="ev-attr__row">
+      <span class="ev-attr__n">{{ nombre }}</span>
+      <span class="ev-attr__v" id="v-{{ clave }}">{{ atributos[clave] }}</span>
+    </div>
+    <div class="ev-attr__h">{{ descripciones[clave] }}</div>
+    <input class="ev-range" type="range" min="0" max="100" step="1"
+           id="r-{{ clave }}" value="{{ atributos[clave] }}"
+           aria-label="{{ nombre }}">
+  </div>
+  {% endfor %}
+</div>
+
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Notas</h2></div>
+  <div class="pf-field pf-mt-12">
+    <textarea class="pf-textarea" id="ev-notas" rows="5" maxlength="2000"
+              placeholder="Qué hizo bien, en qué debe insistir, qué le pides para las próximas semanas…"></textarea>
+    <p style="font-size:12px;color:var(--text-sec);margin:8px 0 0;line-height:1.5">
+      El jugador lee estas notas en su pestaña «Mi Ficha».
+    </p>
+  </div>
+</div>
+
+<div style="padding:0 16px 30px">
+  <button class="pf-btn pf-btn--primary pf-btn--block" type="button" id="btn-guardar">
+    <i data-ico="check" class="pf-ico--sm"></i> Guardar evaluación
+  </button>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var claves = ['tecnica', 'fisico', 'tactico', 'mental'];
+
+  function color(v) {
+    return v >= 70 ? 'var(--primary)' : (v >= 50 ? 'var(--warning)' : 'var(--danger)');
+  }
+
+  claves.forEach(function (k) {
+    var r = document.getElementById('r-' + k);
+    var v = document.getElementById('v-' + k);
+    function pintar() { v.textContent = r.value; v.style.color = color(parseInt(r.value, 10)); }
+    r.addEventListener('input', pintar);
+    pintar();
+  });
+
+  document.getElementById('btn-guardar').addEventListener('click', function () {
+    var btn = this;
+    var datos = { player_id: {{ jugador.id|tojson }},
+                  notas: document.getElementById('ev-notas').value.trim() };
+    claves.forEach(function (k) { datos[k] = parseInt(document.getElementById('r-' + k).value, 10); });
+
+    btn.disabled = true;
+    PF.api('{{ url_for("futbol.api_evaluacion") }}', datos)
+      .then(function (r) { window.location.href = r.redirect; })
+      .catch(function (e) { PF.toast(e.message, 'error'); btn.disabled = false; });
+  });
+})();
+</script>
+{% endblock %}

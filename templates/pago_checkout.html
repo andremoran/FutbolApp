@@ -1,0 +1,119 @@
+{% extends '_shell.html' %}
+{% block title %}Pagar · ProFoot{% endblock %}
+
+{# El número de la tarjeta lo captura el SDK de PayPal dentro de su propio
+   recuadro: nunca pasa por nuestro servidor. Nosotros solo recibimos el ID de
+   la suscripción y lo verificamos contra su API antes de activar nada. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.planes') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Suscripción</div>{% endblock %}
+{% block hero_title %}{{ meta.nombre }}{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">${{ meta.precio }} al mes · cancelas cuando quieras</div>
+{% endblock %}
+{% block hero_actions %}{% endblock %}
+
+{% block content %}
+
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Cómo se paga</h2></div>
+  <div class="pf-item" style="border-top:none">
+    <span class="pf-item__icon"><i data-ico="credit-card" class="pf-ico--sm"></i></span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">Con tu tarjeta</span>
+      <span class="pf-item__sub">No necesitas cuenta de PayPal</span>
+    </span>
+  </div>
+  <div class="pf-item">
+    <span class="pf-item__icon"><i data-ico="lock" class="pf-ico--sm"></i></span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">Tus datos no pasan por nosotros</span>
+      <span class="pf-item__sub">Los captura PayPal directamente</span>
+    </span>
+  </div>
+  <div class="pf-item">
+    <span class="pf-item__icon"><i data-ico="repeat" class="pf-ico--sm"></i></span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">Cobro mensual</span>
+      <span class="pf-item__sub">Se cancela desde tu perfil en cualquier momento</span>
+    </span>
+  </div>
+</div>
+
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Pagar</h2></div>
+  <div id="paypal-botones" class="pf-mt-12" style="min-height:130px"></div>
+  <div id="pago-estado" class="pf-center pf-hide"
+       style="padding:14px;font-size:14px;font-weight:600"></div>
+</div>
+
+<p class="pf-center" style="font-size:12px;color:var(--text-muted);padding:6px 26px 34px;line-height:1.6">
+  Al suscribirte aceptas el cobro mensual de ${{ meta.precio }}. Puedes cancelarlo
+  cuando quieras y seguirás teniendo acceso hasta el final del periodo pagado.
+</p>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://www.paypal.com/sdk/js?client-id={{ client_id }}&vault=true&intent=subscription&currency=USD"
+        data-sdk-integration-source="button-factory"></script>
+<script>
+(function () {
+  var estado = document.getElementById('pago-estado');
+
+  function aviso(texto, color) {
+    estado.textContent = texto;
+    estado.style.color = color || 'var(--text-sec)';
+    estado.classList.remove('pf-hide');
+  }
+
+  if (!window.paypal) {
+    aviso('No se pudo cargar la pasarela de pago. Revisa tu conexión y recarga.', 'var(--danger)');
+    return;
+  }
+
+  paypal.Buttons({
+    style: { shape: 'rect', color: 'black', layout: 'vertical', label: 'subscribe' },
+
+    createSubscription: function (data, actions) {
+      return actions.subscription.create({
+        plan_id: '{{ plan_id }}',
+        // custom_id marca la suscripción como de ProFoot: así, en la MISMA cuenta
+        // de PayPal, se distinguen de las de la otra plataforma del CEO.
+        custom_id: 'profoot:{{ plan }}:{{ current_user.id }}'
+      });
+    },
+
+    onApprove: function (data) {
+      aviso('Confirmando tu pago…');
+      return PF.api('{{ url_for("pagos.api_activar") }}', {
+        subscription_id: data.subscriptionID,
+        plan: '{{ plan }}'
+      })
+        .then(function (r) {
+          aviso('¡Listo! Activando tu cuenta…', 'var(--primary)');
+          window.location.href = r.redirect;
+        })
+        .catch(function (e) {
+          // El cobro pudo salir bien aunque falle la activación: hay que decirlo.
+          aviso(e.message + ' Si el cargo se hizo, escríbenos y lo resolvemos.',
+                'var(--danger)');
+        });
+    },
+
+    onError: function (err) {
+      console.error(err);
+      aviso('Hubo un problema con el pago. Inténtalo de nuevo.', 'var(--danger)');
+    },
+
+    onCancel: function () {
+      aviso('Cancelaste el pago. Tu cuenta sigue igual.');
+    }
+  }).render('#paypal-botones');
+})();
+</script>
+{% endblock %}

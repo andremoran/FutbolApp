@@ -1,0 +1,14 @@
+.env
+.env.*
+!.env.example
+planes_paypal.json
+.git
+.gitignore
+__pycache__
+*.pyc
+.venv
+venv
+.vscode
+.idea
+*.log
+README.md

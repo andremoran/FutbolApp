@@ -1,0 +1,153 @@
+{% extends '_shell.html' %}
+{% block title %}Check-in de bienestar · ProFoot{% endblock %}
+
+{# screens/MentalCheckInScreen.tsx: asistente de una pregunta por pantalla.
+   Va a pantalla completa (hide_tabbar) porque la barra taparía los controles. #}
+
+{% block hero %}
+<header style="padding: calc(14px + env(safe-area-inset-top,0px)) 0 12px;background:#fff;
+               border-bottom:1px solid var(--border-soft)">
+  <div class="pf-wrap" style="padding:0 16px">
+    <div class="pf-row" style="gap:12px">
+      <a href="{{ url_for('futbol.inicio') }}" style="color:var(--text-sec);display:flex" aria-label="Salir">
+        <i data-ico="x"></i>
+      </a>
+      <div class="pf-grow">
+        <div class="pf-bar" style="height:6px">
+          <div class="pf-bar__fill" id="ck-barra" style="width:0%"></div>
+        </div>
+      </div>
+      <span id="ck-contador" style="font-size:12px;font-weight:800;color:var(--text-sec);flex:none">
+        1/{{ preguntas|length }}
+      </span>
+    </div>
+  </div>
+</header>
+{% endblock %}
+
+{% block head %}
+<style>
+  .ck-paso { display: none; padding: 34px 22px 0; text-align: center; }
+  .ck-paso.is-on { display: block; animation: pfFadeUp .3s ease both; }
+  .ck-emoji { font-size: 52px; margin-bottom: 18px; }
+  .ck-preg { font-size: 22px; font-weight: 800; letter-spacing: -.3px; line-height: 1.3;
+             margin: 0 0 30px; }
+  .ck-ops { display: flex; flex-direction: column; gap: 10px; max-width: 380px; margin: 0 auto; }
+  .ck-op {
+    display: flex; align-items: center; gap: 12px; width: 100%;
+    padding: 15px 18px; border-radius: var(--r-lg); text-align: left;
+    background: #fff; border: 2px solid var(--border);
+    font-size: 15px; font-weight: 600; transition: all .15s;
+  }
+  .ck-op:active { transform: scale(.98); }
+  .ck-op.is-on { border-color: var(--primary); background: var(--primary-faint); }
+  .ck-dot { width: 14px; height: 14px; border-radius: 7px; flex: none; }
+  .ck-escala { display: flex; justify-content: space-between; font-size: 11px;
+               color: var(--text-muted); font-weight: 700; margin: 14px auto 0; max-width: 380px; }
+  .ck-nav { max-width: 380px; margin: 26px auto 40px; display: flex; gap: 10px; padding: 0 22px; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<form id="ck-form" onsubmit="return false">
+  {% for clave, texto, bajo, alto in preguntas %}
+  <div class="ck-paso {{ 'is-on' if loop.first }}" data-paso="{{ loop.index0 }}" data-clave="{{ clave }}">
+    <div class="ck-emoji">{{ ['😊','⚡','😴','🧘','🦵','🔥','💪','🤝'][loop.index0 % 8] }}</div>
+    <h2 class="ck-preg">{{ texto }}</h2>
+
+    <div class="ck-ops">
+      {% for v in [5, 4, 3, 2, 1] %}
+      <button type="button" class="ck-op" data-valor="{{ v }}">
+        <span class="ck-dot" style="background:
+          {%- if v >= 4 %}var(--success){% elif v == 3 %}var(--warning){% else %}var(--danger){% endif %}"></span>
+        {# Escala que funciona igual de bien con «¿cómo está tu ánimo?» que con
+           «¿qué tan libre de molestias estás?» — mejor que Mucho/Poco. #}
+        <span>{{ ['Mal', 'Regular', 'Normal', 'Bien', 'Excelente'][v - 1] }}</span>
+      </button>
+      {% endfor %}
+    </div>
+
+    <div class="ck-escala"><span>{{ bajo }}</span><span>{{ alto }}</span></div>
+  </div>
+  {% endfor %}
+</form>
+
+<div class="ck-nav">
+  <button type="button" class="pf-btn pf-btn--ghost" id="ck-atras" style="flex:none">
+    <i data-ico="chevron-left" class="pf-ico--sm"></i>
+  </button>
+  <button type="button" class="pf-btn pf-btn--primary pf-grow" id="ck-siguiente" disabled>
+    Siguiente
+  </button>
+</div>
+
+<p class="pf-center" style="font-size:12px;color:var(--text-muted);padding:0 30px 40px;line-height:1.5">
+  🔒 Tus respuestas son confidenciales. Tu entrenador solo ve un semáforo general,
+  nunca lo que contestaste pregunta por pregunta.
+</p>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var pasos = Array.prototype.slice.call(document.querySelectorAll('.ck-paso'));
+  var total = pasos.length;
+  var actual = 0;
+  var respuestas = {};
+
+  var barra = document.getElementById('ck-barra');
+  var contador = document.getElementById('ck-contador');
+  var btnSig = document.getElementById('ck-siguiente');
+  var btnAtras = document.getElementById('ck-atras');
+
+  function pintar() {
+    pasos.forEach(function (p, i) { p.classList.toggle('is-on', i === actual); });
+    barra.style.width = ((actual) / total * 100) + '%';
+    contador.textContent = (actual + 1) + '/' + total;
+    btnAtras.style.visibility = actual === 0 ? 'hidden' : 'visible';
+
+    var clave = pasos[actual].dataset.clave;
+    btnSig.disabled = !(clave in respuestas);
+    btnSig.textContent = actual === total - 1 ? 'Terminar' : 'Siguiente';
+  }
+
+  pasos.forEach(function (paso) {
+    paso.querySelectorAll('.ck-op').forEach(function (op) {
+      op.addEventListener('click', function () {
+        respuestas[paso.dataset.clave] = parseInt(op.dataset.valor, 10);
+        paso.querySelectorAll('.ck-op').forEach(function (o) {
+          o.classList.toggle('is-on', o === op);
+        });
+        btnSig.disabled = false;
+        // Avance automático: se siente más ágil, como en la app
+        if (actual < total - 1) {
+          setTimeout(function () { actual++; pintar(); }, 260);
+        }
+      });
+    });
+  });
+
+  btnAtras.addEventListener('click', function () {
+    if (actual > 0) { actual--; pintar(); }
+  });
+
+  btnSig.addEventListener('click', function () {
+    if (actual < total - 1) { actual++; pintar(); return; }
+
+    btnSig.disabled = true;
+    btnSig.textContent = 'Guardando…';
+    PF.api('{{ url_for("futbol.api_checkin") }}', { respuestas: respuestas })
+      .then(function (r) { window.location.href = r.redirect; })
+      .catch(function (e) {
+        PF.toast(e.message, 'error');
+        btnSig.disabled = false;
+        btnSig.textContent = 'Terminar';
+      });
+  });
+
+  pintar();
+})();
+</script>
+{% endblock %}

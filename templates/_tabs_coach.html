@@ -1,0 +1,39 @@
+{# Barra de pestañas del ENTRENADOR — réplica de navigation/CoachTabNavigator.tsx.
+   Inicio · Equipo · Agenda · Táctica · IA, con los iconos home/users/calendar/
+   target/cpu. En celular es la barra plana alta (90px) de la app nativa. #}
+{% set tab = tab_activa|default('inicio') %}
+<nav class="pf-tabbar pf-tabbar--coach" aria-label="Navegación principal">
+  <div class="pf-tabbar__inner">
+
+    <a class="pf-tab {{ 'is-active' if tab == 'inicio' }}" href="{{ url_for('futbol.c_inicio') }}"
+       {{ 'aria-current=page' if tab == 'inicio' }}>
+      <span class="pf-tab__icon"><i data-ico="home"></i></span>
+      <span class="pf-tab__label">Inicio</span>
+    </a>
+
+    <a class="pf-tab {{ 'is-active' if tab == 'equipo' }}" href="{{ url_for('futbol.c_equipo') }}"
+       {{ 'aria-current=page' if tab == 'equipo' }}>
+      <span class="pf-tab__icon"><i data-ico="users"></i></span>
+      <span class="pf-tab__label">Equipo</span>
+    </a>
+
+    <a class="pf-tab {{ 'is-active' if tab == 'agenda' }}" href="{{ url_for('futbol.c_agenda') }}"
+       {{ 'aria-current=page' if tab == 'agenda' }}>
+      <span class="pf-tab__icon"><i data-ico="calendar"></i></span>
+      <span class="pf-tab__label">Agenda</span>
+    </a>
+
+    <a class="pf-tab {{ 'is-active' if tab == 'tactica' }}" href="{{ url_for('futbol.c_tactica') }}"
+       {{ 'aria-current=page' if tab == 'tactica' }}>
+      <span class="pf-tab__icon"><i data-ico="target"></i></span>
+      <span class="pf-tab__label">Táctica</span>
+    </a>
+
+    <a class="pf-tab {{ 'is-active' if tab == 'ia' }}" href="{{ url_for('futbol.c_ia') }}"
+       {{ 'aria-current=page' if tab == 'ia' }}>
+      <span class="pf-tab__icon"><i data-ico="cpu"></i></span>
+      <span class="pf-tab__label">IA</span>
+    </a>
+
+  </div>
+</nav>

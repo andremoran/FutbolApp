@@ -1,0 +1,62 @@
+{% extends '_shell.html' %}
+{% block title %}Mensajes · ProFoot{% endblock %}
+
+{# screens/PlayerMessagesScreen.tsx #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.inicio') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">De tu entrenador</div>{% endblock %}
+{% block hero_title %}Mensajes{% endblock %}
+{% block hero_subtitle %}
+{% if entrenador %}<div class="pf-hero__subtitle">{{ entrenador.name }}</div>{% endif %}
+{% endblock %}
+
+{% block content %}
+
+{% if not entrenador %}
+<div class="pf-empty">
+  <div class="pf-empty__icon"><i data-ico="mail" class="pf-ico--xxl"></i></div>
+  <h2 class="pf-empty__title">Aún no estás en un equipo</h2>
+  <p class="pf-empty__text">
+    Únete con el código de tu entrenador y aquí te llegarán sus avisos.
+  </p>
+</div>
+
+{% elif not mensajes %}
+<div class="pf-empty">
+  <div class="pf-empty__icon"><i data-ico="mail" class="pf-ico--xxl"></i></div>
+  <h2 class="pf-empty__title">Sin mensajes</h2>
+  <p class="pf-empty__text">Tu entrenador todavía no ha escrito nada.</p>
+</div>
+
+{% else %}
+<div class="pf-card">
+  {% for m in mensajes %}
+  <div class="pf-item" style="align-items:flex-start">
+    <span class="pf-item__icon" style="
+      {% if m._para_mi %}background:rgba(59,130,246,.10);color:var(--info){% endif %}">
+      <i data-ico="{{ 'user' if m._para_mi else 'users' }}" class="pf-ico--sm"></i>
+    </span>
+    <span class="pf-item__body">
+      <span class="pf-row" style="gap:8px">
+        <span class="pf-item__title pf-grow">
+          {{ 'Para ti' if m._para_mi else 'Para todo el equipo' }}
+        </span>
+        {% if m._fecha %}
+        <span style="font-size:11px;color:var(--text-muted);flex:none">
+          {{ m._fecha.strftime('%d/%m') }}
+        </span>
+        {% endif %}
+      </span>
+      <span style="display:block;font-size:14px;line-height:1.55;margin-top:5px;
+                   white-space:pre-wrap">{{ m.texto }}</span>
+    </span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}

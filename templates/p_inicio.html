@@ -1,0 +1,206 @@
+{% extends '_shell.html' %}
+{% block title %}Inicio · ProFoot{% endblock %}
+
+{# Réplica de screens/HomeScreen.tsx: saludo + nombre con balón, dos tarjetas de
+   estadística en verde suave, consejo del día, tarjeta de check-in y acciones
+   rápidas. La cabecera de esta pantalla NO es el hero verde: en la app es un
+   saludo sobre fondo claro. #}
+{% block hero %}
+<header style="padding: calc(20px + env(safe-area-inset-top,0px)) 0 0;">
+  <div class="pf-wrap">
+    <div class="pf-row pf-row--between" style="padding:0 20px 24px">
+      <div>
+        <div style="font-size:16px;color:var(--text-sec);margin-bottom:4px">{{ saludo }}</div>
+        <div class="pf-row" style="gap:8px">
+          <span style="font-size:28px;font-weight:700;color:#000">{{ (current_user.name or 'Jugador').split(' ')[0] }}</span>
+          <span style="font-size:24px">⚽</span>
+        </div>
+      </div>
+      <div class="pf-row" style="gap:10px">
+        <a href="{{ url_for('futbol.mensajes') }}"
+           style="width:44px;height:44px;border-radius:22px;background:#fff;
+                  border:1px solid var(--border);display:flex;align-items:center;
+                  justify-content:center;color:#000;position:relative"
+           aria-label="Mensajes{{ ' (' ~ sin_leer ~ ' sin leer)' if sin_leer }}">
+          <i data-ico="mail"></i>
+          {% if sin_leer %}
+          <span style="position:absolute;top:-2px;right:-2px;min-width:20px;height:20px;
+                       padding:0 5px;border-radius:10px;background:#ef4444;color:#fff;
+                       font-size:10px;font-weight:700;display:flex;align-items:center;
+                       justify-content:center;border:2px solid var(--bg)">
+            {{ sin_leer if sin_leer < 10 else '9+' }}
+          </span>
+          {% endif %}
+        </a>
+        <button type="button" onclick="PF.openSheet('pf-sheet-mas')"
+                style="width:44px;height:44px;border-radius:22px;background:#fff;
+                       border:1px solid var(--border);display:flex;align-items:center;
+                       justify-content:center;color:#000"
+                aria-label="Ver más">
+          <i data-ico="more-horizontal"></i>
+        </button>
+        <a href="{{ url_for('futbol.perfil') }}"
+           style="width:48px;height:48px;border-radius:24px;background:var(--primary-light);
+                  display:flex;align-items:center;justify-content:center;color:#fff;
+                  font-size:20px;font-weight:700;overflow:hidden"
+           aria-label="Mi perfil">
+          {%- if current_user.profile_photo -%}
+            <img src="{{ current_user.profile_photo }}" alt="" style="width:100%;height:100%;object-fit:cover">
+          {%- else -%}{{ (current_user.name or 'P')[:1]|upper }}{%- endif -%}
+        </a>
+      </div>
+    </div>
+  </div>
+</header>
+{% endblock %}
+
+{% block content %}
+
+{# ── Dos tarjetas de estadística ── #}
+<div class="pf-bigstats">
+  <a class="pf-bigstat" href="{{ url_for('futbol.habitos_page') }}">
+    <div class="pf-bigstat__icon"><i data-ico="target" class="pf-ico--lg"></i></div>
+    <div class="pf-bigstat__label">Hábitos de Hoy</div>
+    <div class="pf-bigstat__value">{{ habitos_hoy }}/{{ habitos_total }}</div>
+  </a>
+  <a class="pf-bigstat" href="{{ url_for('futbol.habitos_page') }}">
+    <div class="pf-bigstat__icon"><i data-ico="zap" class="pf-ico--lg"></i></div>
+    <div class="pf-bigstat__label">Racha Actual</div>
+    <div class="pf-bigstat__value">{{ racha }} día{{ '' if racha == 1 else 's' }}</div>
+  </a>
+</div>
+
+{# ── Consejo del día ── #}
+<div style="background:#fff;margin:0 20px 24px;padding:20px;border-radius:12px;
+            border:1px solid var(--border)">
+  <div class="pf-row" style="gap:8px;margin-bottom:12px">
+    <i data-ico="{{ consejo_icono }}" class="pf-ico" style="color:var(--primary-light)"></i>
+    <span style="font-size:12px;font-weight:700;color:var(--primary-light);letter-spacing:.5px">
+      CONSEJO DEL DÍA · {{ consejo_categoria|upper }}
+    </span>
+  </div>
+  <p style="font-size:15px;line-height:22px;color:#000;margin:0">{{ consejo_texto }}</p>
+</div>
+
+{# ── Check-in de bienestar ──
+   Prioridad 1: el entrenador lo pidió expresamente. #}
+{% if asignacion %}
+<a href="{{ url_for('futbol.checkin') }}"
+   style="display:flex;align-items:center;gap:12px;margin:0 20px 24px;padding:16px;
+          border-radius:14px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;
+          box-shadow:0 6px 18px rgba(245,158,11,.30)">
+  <span style="width:44px;height:44px;border-radius:22px;background:rgba(255,255,255,.22);
+               display:flex;align-items:center;justify-content:center;flex:none">
+    <i data-ico="bell"></i>
+  </span>
+  <span class="pf-grow">
+    <span style="display:block;font-size:10px;font-weight:800;letter-spacing:1px;
+                 opacity:.9">TU COACH TE LO PIDIÓ</span>
+    <span style="display:block;font-size:15px;font-weight:700;margin-top:2px">
+      Check-in de bienestar
+    </span>
+    {% if asignacion.mensaje %}
+    <span style="display:block;font-size:12px;opacity:.9;margin-top:3px">
+      💬 «{{ asignacion.mensaje[:70] }}»
+    </span>
+    {% endif %}
+    <span style="display:block;font-size:11px;opacity:.85;margin-top:3px">
+      8 preguntas · 2 min · Confidencial
+      {%- if asignacion._limite %} · hasta el {{ asignacion._limite.strftime('%d/%m') }}{% endif %}
+    </span>
+  </span>
+  <i data-ico="chevron-right"></i>
+</a>
+
+{% elif not checkin_hecho %}
+<a href="{{ url_for('futbol.checkin') }}"
+   style="display:flex;align-items:center;gap:12px;margin:0 20px 24px;padding:16px;
+          border-radius:14px;background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;
+          box-shadow:0 6px 18px rgba(139,92,246,.28)">
+  <span style="width:44px;height:44px;border-radius:22px;background:rgba(255,255,255,.2);
+               display:flex;align-items:center;justify-content:center;flex:none;position:relative">
+    <i data-ico="heart"></i>
+    <span style="position:absolute;top:2px;right:2px;width:9px;height:9px;border-radius:5px;
+                 background:#fbbf24"></span>
+  </span>
+  <span class="pf-grow">
+    <span style="display:block;font-size:15px;font-weight:700">Check-in de bienestar pendiente</span>
+    <span style="display:block;font-size:12px;opacity:.85;margin-top:2px">
+      8 preguntas · 2 min · Confidencial
+    </span>
+  </span>
+  <i data-ico="chevron-right"></i>
+</a>
+{% else %}
+<a href="{{ url_for('futbol.checkin') }}"
+   style="display:flex;align-items:center;gap:12px;margin:0 20px 24px;padding:14px 16px;
+          border-radius:14px;background:#fff;border:1px solid var(--border)">
+  <span style="width:12px;height:12px;border-radius:6px;flex:none;background:
+    {%- if ultimo_checkin and ultimo_checkin.semaforo == 'rojo' %}var(--danger)
+    {%- elif ultimo_checkin and ultimo_checkin.semaforo == 'ambar' %}var(--warning)
+    {%- else %}var(--success){% endif %}"></span>
+  <span class="pf-grow">
+    <span style="display:block;font-size:14px;font-weight:700">Check-in de bienestar</span>
+    <span style="display:block;font-size:12px;color:var(--text-sec);margin-top:2px">
+      Hecho esta semana{% if ultimo_checkin and ultimo_checkin.puntaje is not none %}
+        · {{ ultimo_checkin.puntaje }}/100{% endif %}
+    </span>
+  </span>
+  <i data-ico="check-circle" class="pf-ico--sm" style="color:var(--primary-light)"></i>
+</a>
+{% endif %}
+
+{# ── Sin equipo: el paso que desbloquea todo lo demás ── #}
+{% if not entrenador %}
+<div style="margin:0 20px 24px;padding:16px;border-radius:14px;
+            background:var(--warning-bg);border:1px solid #fcd34d">
+  <div class="pf-row" style="gap:8px;margin-bottom:6px">
+    <i data-ico="alert-circle" class="pf-ico--sm" style="color:#b45309"></i>
+    <strong style="font-size:14px;color:#92400e">Aún no estás en un equipo</strong>
+  </div>
+  <p style="font-size:13px;color:#92400e;margin:0;line-height:1.5">
+    Pídele el código a tu entrenador para que tu agenda, tus partidos y tus
+    evaluaciones se llenen automáticamente.
+  </p>
+</div>
+{% endif %}
+
+{# ── Próximo evento ── #}
+{% if proximo %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Lo que viene</h2>
+    <span class="pf-card__badge">{{ proximo.tipo|default('entreno')|capitalize }}</span>
+  </div>
+  <div class="pf-item" style="border-top:none">
+    <span class="pf-item__icon"><i data-ico="calendar" class="pf-ico--sm"></i></span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">{{ proximo.titulo }}</span>
+      <span class="pf-item__sub">
+        {{ proximo.fecha }}{% if proximo.hora %} · {{ proximo.hora[:5] }}{% endif %}
+        {%- if proximo.lugar %} · {{ proximo.lugar }}{% endif %}
+      </span>
+    </span>
+    <a class="pf-item__chev" href="{{ url_for('futbol.agenda') }}" aria-label="Ver agenda">
+      <i data-ico="chevron-right" class="pf-ico--sm"></i>
+    </a>
+  </div>
+</div>
+{% endif %}
+
+{# ── Acciones rápidas ── #}
+<div style="padding:0 20px;margin-top:24px">
+  <h2 style="font-size:20px;font-weight:700;color:#000;margin:0 0 16px">Acciones Rápidas</h2>
+
+  <a class="pf-action" href="{{ url_for('futbol.entrenos') }}">
+    <i data-ico="activity" class="pf-ico--lg"></i> Agregar Entreno
+  </a>
+  <a class="pf-action pf-action--sec" href="{{ url_for('futbol.metas') }}">
+    <i data-ico="target" class="pf-ico--lg"></i> Ver Metas
+  </a>
+  <a class="pf-action pf-action--sec" href="{{ url_for('futbol.partidos') }}">
+    <i data-ico="trending-up" class="pf-ico--lg"></i> Estadísticas
+  </a>
+</div>
+
+{% endblock %}

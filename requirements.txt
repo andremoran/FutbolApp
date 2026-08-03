@@ -1,0 +1,19 @@
+# FutbolApp (ProFoot Assistant)
+# Deliberadamente corto: la app es Flask + Supabase y nada más. Cada dependencia
+# que no está aquí es una vulnerabilidad y un minuto de build que nos ahorramos.
+
+Flask==3.1.0
+Flask-Login==0.6.3
+Werkzeug==3.1.3
+Jinja2==3.1.5
+itsdangerous==2.2.0
+
+python-dotenv==1.0.1
+requests==2.32.3
+
+# Cliente de Supabase. Pineado: las versiones 2.x cambian la firma de create_client
+# entre menores y rompen el arranque sin avisar.
+supabase==2.28.0
+
+# Servidor de producción
+gunicorn==23.0.0

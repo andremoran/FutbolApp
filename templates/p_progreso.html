@@ -1,0 +1,101 @@
+{% extends '_shell.html' %}
+{% block title %}Progreso · ProFoot{% endblock %}
+
+{# Hub con tarjetas, réplica de screens/PlayerProgressHubScreen.tsx.
+   Agrupa Entrenos, Metas, Hábitos, Partidos y Tests bajo una sola pestaña. #}
+
+{% block hero_label %}<div class="pf-hero__label">Tu evolución</div>{% endblock %}
+{% block hero_title %}Progreso{% endblock %}
+
+{% block hero_extra %}
+<div style="display:flex;gap:10px;margin-top:18px;padding-bottom:2px">
+  <div class="pf-hero-kpi">
+    <span class="pf-hero-kpi__v">{{ n_entrenos }}</span>
+    <span class="pf-hero-kpi__l">entrenos<br>esta semana</span>
+  </div>
+  <div class="pf-hero-kpi">
+    <span class="pf-hero-kpi__v">{{ minutos_semana }}</span>
+    <span class="pf-hero-kpi__l">minutos<br>acumulados</span>
+  </div>
+  <div class="pf-hero-kpi">
+    <span class="pf-hero-kpi__v">{{ racha }}</span>
+    <span class="pf-hero-kpi__l">días de<br>racha</span>
+  </div>
+</div>
+{% endblock %}
+
+{% block head %}
+<style>
+  .pf-hero-kpi {
+    flex: 1; background: rgba(255,255,255,.14); border-radius: 12px;
+    padding: 10px 12px; backdrop-filter: blur(4px);
+  }
+  .pf-hero-kpi__v { display: block; font-size: 22px; font-weight: 800; color: #fff; line-height: 1.1; }
+  .pf-hero-kpi__l { display: block; font-size: 10px; font-weight: 600; color: rgba(255,255,255,.8);
+                    margin-top: 3px; line-height: 1.3; }
+
+  .pf-hub { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 16px; }
+  .pf-hub-card {
+    background: #fff; border: 1px solid var(--border-soft); border-radius: var(--r-xl);
+    padding: 16px; box-shadow: var(--sh-sm); transition: transform .12s, box-shadow .18s;
+  }
+  .pf-hub-card:active { transform: scale(.98); }
+  .pf-hub-card__ico {
+    width: 44px; height: 44px; border-radius: 12px; margin-bottom: 12px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .pf-hub-card__t { font-size: 15px; font-weight: 700; color: var(--text); }
+  .pf-hub-card__s { font-size: 12px; color: var(--text-sec); margin-top: 3px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pf-hub">
+
+  <a class="pf-hub-card" href="{{ url_for('futbol.entrenos') }}">
+    <span class="pf-hub-card__ico" style="background:rgba(4,120,87,.10);color:var(--primary)">
+      <i data-ico="activity" class="pf-ico--lg"></i>
+    </span>
+    <div class="pf-hub-card__t">Entrenos</div>
+    <div class="pf-hub-card__s">{{ n_entrenos }} esta semana</div>
+  </a>
+
+  <a class="pf-hub-card" href="{{ url_for('futbol.metas') }}">
+    <span class="pf-hub-card__ico" style="background:rgba(59,130,246,.10);color:var(--info)">
+      <i data-ico="target" class="pf-ico--lg"></i>
+    </span>
+    <div class="pf-hub-card__t">Metas</div>
+    <div class="pf-hub-card__s">{{ n_metas }} activa{{ '' if n_metas == 1 else 's' }}</div>
+  </a>
+
+  <a class="pf-hub-card" href="{{ url_for('futbol.habitos_page') }}">
+    <span class="pf-hub-card__ico" style="background:rgba(245,158,11,.12);color:var(--warning)">
+      <i data-ico="repeat" class="pf-ico--lg"></i>
+    </span>
+    <div class="pf-hub-card__t">Hábitos</div>
+    <div class="pf-hub-card__s">{{ n_habitos }} en marcha</div>
+  </a>
+
+  <a class="pf-hub-card" href="{{ url_for('futbol.partidos') }}">
+    <span class="pf-hub-card__ico" style="background:rgba(239,68,68,.10);color:var(--danger)">
+      <i data-ico="award" class="pf-ico--lg"></i>
+    </span>
+    <div class="pf-hub-card__t">Partidos</div>
+    <div class="pf-hub-card__s">Goles y minutos</div>
+  </a>
+
+  <a class="pf-hub-card" href="{{ url_for('futbol.mis_tests') }}" style="grid-column:1 / -1">
+    <span class="pf-row" style="gap:14px">
+      <span class="pf-hub-card__ico" style="margin:0;background:rgba(139,92,246,.12);color:var(--purple)">
+        <i data-ico="bar-chart-2" class="pf-ico--lg"></i>
+      </span>
+      <span class="pf-grow">
+        <span class="pf-hub-card__t" style="display:block">Mis pruebas físicas</span>
+        <span class="pf-hub-card__s">Resultados y puesto en el equipo</span>
+      </span>
+      <i data-ico="chevron-right" class="pf-ico--sm" style="color:var(--text-muted)"></i>
+    </span>
+  </a>
+
+</div>
+{% endblock %}

@@ -1,0 +1,193 @@
+{% extends '_shell.html' %}
+{% block title %}{{ jugador.name }} · ProFoot{% endblock %}
+
+{# screens/PlayerDetailScreen.tsx: la ficha completa de un jugador vista por su
+   entrenador, con edición de posición y dorsal. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_equipo') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Jugador</div>{% endblock %}
+{% block hero_title %}{{ jugador.name }}{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {{ perfil.posicion|capitalize if perfil.posicion else 'Sin posición' }}
+  {%- if perfil.dorsal %} · Dorsal {{ perfil.dorsal }}{% endif %}
+  · Valoración {{ media }}
+</div>
+{% endblock %}
+
+{% block content %}
+
+{# ── Acciones ── #}
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:16px">
+  <a class="pf-btn pf-btn--primary" href="{{ url_for('futbol.c_evaluar', pid=jugador.id) }}">
+    <i data-ico="star" class="pf-ico--sm"></i> Evaluar
+  </a>
+  <a class="pf-btn pf-btn--secondary" href="{{ url_for('futbol.c_tests') }}">
+    <i data-ico="bar-chart-2" class="pf-ico--sm"></i> Pruebas
+  </a>
+</div>
+
+{# ── Atributos ── #}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Atributos</h2>
+    <span class="pf-card__badge">{{ media }}/100</span>
+  </div>
+  {% for clave, nombre in [('tecnica','Técnica'), ('fisico','Físico'),
+                           ('tactico','Táctico'), ('mental','Mental')] %}
+    {% set v = atributos[clave] %}
+    <div style="padding:11px 0">
+      <div class="pf-row pf-row--between" style="margin-bottom:7px">
+        <span style="font-size:14px;font-weight:700">{{ nombre }}</span>
+        <span style="font-size:14px;font-weight:800;color:
+          {%- if v >= 70 %}var(--primary){% elif v >= 50 %}var(--warning){% else %}var(--danger){% endif %}">{{ v }}</span>
+      </div>
+      <div class="pf-bar"><div class="pf-bar__fill" style="width:{{ v }}%"></div></div>
+    </div>
+  {% endfor %}
+</div>
+
+{# ── Ficha editable ── #}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Ficha deportiva</h2></div>
+
+  <div class="pf-row pf-mt-12" style="gap:10px">
+    <div class="pf-grow">
+      <label class="pf-label" for="j-pos">Posición</label>
+      <select class="pf-select" id="j-pos">
+        {% for p in ['', 'portero', 'defensa', 'lateral', 'medio', 'extremo', 'delantero'] %}
+        <option value="{{ p }}" {{ 'selected' if perfil.posicion == p }}>
+          {{ p|capitalize if p else 'Sin asignar' }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="width:96px;flex:none">
+      <label class="pf-label" for="j-dorsal">Dorsal</label>
+      <input class="pf-input" id="j-dorsal" type="number" inputmode="numeric"
+             min="1" max="99" value="{{ perfil.dorsal or '' }}">
+    </div>
+  </div>
+
+  <div class="pf-field pf-mt-12">
+    <label class="pf-label" for="j-pie">Pie hábil</label>
+    <select class="pf-select" id="j-pie">
+      {% for p in ['', 'derecho', 'izquierdo', 'ambidiestro'] %}
+      <option value="{{ p }}" {{ 'selected' if perfil.pie_habil == p }}>
+        {{ p|capitalize if p else 'Sin asignar' }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <button class="pf-btn pf-btn--primary pf-btn--block" type="button" id="btn-ficha">
+    <i data-ico="save" class="pf-ico--sm"></i> Guardar ficha
+  </button>
+</div>
+
+{# ── Datos de contacto ── #}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Datos</h2></div>
+  <div class="pf-item">
+    <span class="pf-item__icon"><i data-ico="zap" class="pf-ico--sm"></i></span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">Racha de hábitos</span>
+      <span class="pf-item__sub">{{ racha }} día{{ '' if racha == 1 else 's' }} seguidos</span>
+    </span>
+  </div>
+  {% if jugador.last_height or jugador.last_weight %}
+  <div class="pf-item">
+    <span class="pf-item__icon"><i data-ico="activity" class="pf-ico--sm"></i></span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">Físico</span>
+      <span class="pf-item__sub">
+        {%- if jugador.last_height %}{{ jugador.last_height }} cm{% endif -%}
+        {%- if jugador.last_height and jugador.last_weight %} · {% endif -%}
+        {%- if jugador.last_weight %}{{ jugador.last_weight }} kg{% endif -%}
+      </span>
+    </span>
+  </div>
+  {% endif %}
+  {% if jugador.correo %}
+  <div class="pf-item">
+    <span class="pf-item__icon"><i data-ico="mail" class="pf-ico--sm"></i></span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">{{ jugador.correo }}</span>
+      <span class="pf-item__sub">Correo</span>
+    </span>
+  </div>
+  {% endif %}
+  {% if jugador.telefono %}
+  <a class="pf-item" href="tel:{{ jugador.telefono }}">
+    <span class="pf-item__icon"><i data-ico="send" class="pf-ico--sm"></i></span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">{{ jugador.telefono }}</span>
+      <span class="pf-item__sub">Teléfono</span>
+    </span>
+  </a>
+  {% endif %}
+</div>
+
+{# ── Últimos entrenos ── #}
+{% if entrenos %}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Últimos entrenos</h2></div>
+  {% for e in entrenos %}
+  <div class="pf-item">
+    <span class="pf-item__icon"><i data-ico="activity" class="pf-ico--sm"></i></span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">{{ (e.tipo or 'general')|capitalize }}</span>
+      <span class="pf-item__sub">
+        {{ e.fecha }} · {{ e.duracion_min or 0 }} min
+        {%- if e.rpe %} · RPE {{ e.rpe }}/10{% endif %}
+      </span>
+    </span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ── Evaluaciones ── #}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Evaluaciones</h2>
+    <a href="{{ url_for('futbol.c_evaluar', pid=jugador.id) }}" class="pf-item__right">Nueva</a>
+  </div>
+  {% for e in evaluaciones %}
+  <div class="pf-item" style="align-items:flex-start">
+    <span class="pf-item__icon" style="background:rgba(139,92,246,.12);color:var(--purple)">
+      <i data-ico="file-text" class="pf-ico--sm"></i>
+    </span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">{{ e.fecha }}</span>
+      {% if e.notas %}<span class="pf-item__sub" style="white-space:normal">{{ e.notas }}</span>{% endif %}
+    </span>
+  </div>
+  {% endfor %}
+  {% if not evaluaciones %}
+  <p style="font-size:13px;color:var(--text-sec);padding:14px 4px 4px;margin:0;line-height:1.5">
+    Todavía no lo has evaluado. La primera evaluación fija su punto de partida.
+  </p>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('btn-ficha').addEventListener('click', function () {
+  PF.api('{{ url_for("futbol.api_perfil_jugador") }}', {
+    player_id: {{ jugador.id|tojson }},
+    posicion: document.getElementById('j-pos').value,
+    dorsal: document.getElementById('j-dorsal').value,
+    pie_habil: document.getElementById('j-pie').value
+  })
+    .then(function () { PF.toast('Ficha guardada'); })
+    .catch(function (e) { PF.toast(e.message, 'error'); });
+});
+</script>
+{% endblock %}

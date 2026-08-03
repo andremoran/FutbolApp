@@ -1,0 +1,142 @@
+{% extends '_shell.html' %}
+{% block title %}Partidos · ProFoot{% endblock %}
+
+{# screens/MatchesScreen.tsx (lado entrenador) #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_agenda') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Competición</div>{% endblock %}
+{% block hero_title %}Partidos{% endblock %}
+
+{% block hero_extra %}
+<div style="display:flex;gap:8px;margin-top:18px">
+  <div class="mp-kpi"><span class="mp-kpi__v">{{ balance.ganados }}</span><span class="mp-kpi__l">ganados</span></div>
+  <div class="mp-kpi"><span class="mp-kpi__v">{{ balance.empatados }}</span><span class="mp-kpi__l">empatados</span></div>
+  <div class="mp-kpi"><span class="mp-kpi__v">{{ balance.perdidos }}</span><span class="mp-kpi__l">perdidos</span></div>
+  <div class="mp-kpi"><span class="mp-kpi__v">{{ balance.gf }}:{{ balance.gc }}</span><span class="mp-kpi__l">goles</span></div>
+</div>
+{% endblock %}
+
+{% block head %}
+<style>
+  .mp-kpi { flex:1; background:rgba(255,255,255,.14); border-radius:12px; padding:10px 6px; text-align:center; }
+  .mp-kpi__v { display:block; font-size:19px; font-weight:800; color:#fff; line-height:1.1; }
+  .mp-kpi__l { display:block; font-size:10px; font-weight:600; color:rgba(255,255,255,.8); margin-top:3px; }
+  .mp-res { width:28px; height:28px; border-radius:14px; flex:none; font-size:12px; font-weight:800;
+            display:flex; align-items:center; justify-content:center; color:#fff; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ── Registrar partido ── #}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Registrar partido</h2></div>
+
+  <div class="pf-row pf-mt-12" style="gap:10px">
+    <div class="pf-grow">
+      <label class="pf-label" for="pa-rival">Rival</label>
+      <input class="pf-input" id="pa-rival" type="text" maxlength="80" placeholder="Club Deportivo">
+    </div>
+    <div style="width:140px;flex:none">
+      <label class="pf-label" for="pa-fecha">Fecha</label>
+      <input class="pf-input" id="pa-fecha" type="date" value="{{ hoy }}">
+    </div>
+  </div>
+
+  {# El marcador en su propia fila: a 390 px, tres columnas partían las etiquetas. #}
+  <div class="pf-mt-12">
+    <label class="pf-label">Marcador</label>
+    <div class="pf-row" style="gap:10px">
+      <input class="pf-input" id="pa-gf" type="number" inputmode="numeric" min="0" max="30"
+             value="0" aria-label="Goles a favor"
+             style="text-align:center;font-size:20px;font-weight:800">
+      <span style="font-size:18px;font-weight:800;color:var(--text-muted);flex:none">–</span>
+      <input class="pf-input" id="pa-gc" type="number" inputmode="numeric" min="0" max="30"
+             value="0" aria-label="Goles en contra"
+             style="text-align:center;font-size:20px;font-weight:800">
+    </div>
+    <div class="pf-row" style="gap:10px;margin-top:4px">
+      <span style="flex:1;text-align:center;font-size:11px;color:var(--text-sec);font-weight:600">nosotros</span>
+      <span style="width:14px;flex:none"></span>
+      <span style="flex:1;text-align:center;font-size:11px;color:var(--text-sec);font-weight:600">rival</span>
+    </div>
+  </div>
+
+  <div class="pf-field pf-mt-12">
+    <label class="pf-label" for="pa-local">Condición</label>
+    <select class="pf-select" id="pa-local">
+      <option value="1">Jugamos de local</option>
+      <option value="0">Jugamos de visitante</option>
+    </select>
+  </div>
+
+  <div class="pf-field pf-mt-12">
+    <label class="pf-label" for="pa-comp">Competición <span style="font-weight:500;color:var(--text-muted)">(opcional)</span></label>
+    <input class="pf-input" id="pa-comp" type="text" maxlength="80" placeholder="Liga Sub-17">
+  </div>
+
+  <button class="pf-btn pf-btn--primary pf-btn--block" type="button" id="btn-partido">
+    <i data-ico="plus" class="pf-ico--sm"></i> Guardar partido
+  </button>
+</div>
+
+{# ── Historial ── #}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Historial</h2></div>
+
+  {% for m in partidos %}
+    {% set gf = m.goles_favor|default(0) %}
+    {% set gc = m.goles_contra|default(0) %}
+    <a class="pf-item" href="{{ url_for('futbol.c_partido', mid=m.id) }}">
+      <span class="mp-res" style="background:
+        {%- if gf > gc %}var(--success){% elif gf < gc %}var(--danger){% else %}var(--text-muted){% endif %}">
+        {{ 'G' if gf > gc else ('P' if gf < gc else 'E') }}
+      </span>
+      <span class="pf-item__body">
+        <span class="pf-item__title">{{ 'vs' if m.local else '@' }} {{ m.rival }}</span>
+        <span class="pf-item__sub">
+          {{ m.fecha }}{% if m.competicion %} · {{ m.competicion }}{% endif %}
+        </span>
+      </span>
+      <span class="pf-item__right">{{ gf }}-{{ gc }}</span>
+      <span class="pf-item__chev"><i data-ico="chevron-right" class="pf-ico--sm"></i></span>
+    </a>
+  {% endfor %}
+
+  {% if not partidos %}
+  <div class="pf-empty" style="padding:22px 8px">
+    <div class="pf-empty__icon"><i data-ico="award" class="pf-ico--xxl"></i></div>
+    <h3 class="pf-empty__title">Sin partidos</h3>
+    <p class="pf-empty__text">
+      Registra el primero arriba. Después podrás apuntar los minutos y goles de
+      cada jugador, y lo verán en su ficha.
+    </p>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('btn-partido').addEventListener('click', function () {
+  var rival = document.getElementById('pa-rival').value.trim();
+  if (!rival) { document.getElementById('pa-rival').focus(); return; }
+
+  PF.api('{{ url_for("futbol.api_partido") }}', {
+    rival: rival,
+    fecha: document.getElementById('pa-fecha').value,
+    goles_favor: document.getElementById('pa-gf').value,
+    goles_contra: document.getElementById('pa-gc').value,
+    local: document.getElementById('pa-local').value === '1',
+    competicion: document.getElementById('pa-comp').value.trim()
+  })
+    .then(function () { location.reload(); })
+    .catch(function (e) { PF.toast(e.message, 'error'); });
+});
+</script>
+{% endblock %}

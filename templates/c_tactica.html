@@ -1,0 +1,90 @@
+{% extends '_shell.html' %}
+{% block title %}Táctica · ProFoot{% endblock %}
+
+{# screens/TacticalPlaysLibraryScreen.tsx: biblioteca de jugadas guardadas.
+   Cada tarjeta muestra una miniatura de la cancha con las posiciones reales. #}
+
+{% block hero_label %}<div class="pf-hero__label">Biblioteca</div>{% endblock %}
+{% block hero_title %}Táctica{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {{ jugadas|length }} jugada{{ '' if jugadas|length == 1 else 's' }} guardada{{ '' if jugadas|length == 1 else 's' }}
+</div>
+{% endblock %}
+{% block hero_actions %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_pizarra') }}" aria-label="Nueva jugada">
+  <i data-ico="plus" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+
+{% block head %}
+<style>
+  .tc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 16px; }
+  .tc-card {
+    background: #fff; border: 1px solid var(--border-soft); border-radius: var(--r-xl);
+    overflow: hidden; box-shadow: var(--sh-sm); transition: transform .12s;
+  }
+  .tc-card:active { transform: scale(.98); }
+  .tc-mini { display: block; width: 100%; background: #15803d; }
+  .tc-body { padding: 11px 12px; }
+  .tc-t { font-size: 14px; font-weight: 700; }
+  .tc-s { font-size: 11px; color: var(--text-sec); margin-top: 2px; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div style="padding:16px 16px 0">
+  <a class="pf-btn pf-btn--primary pf-btn--block" href="{{ url_for('futbol.c_pizarra') }}">
+    <i data-ico="plus" class="pf-ico--sm"></i> Nueva jugada
+  </a>
+</div>
+
+{% if jugadas %}
+<div class="tc-grid">
+  {% for j in jugadas %}
+  <a class="tc-card" href="{{ url_for('futbol.c_pizarra', jid=j.id) }}">
+    {# Miniatura: la cancha con los puntos donde están los jugadores #}
+    <svg class="tc-mini" viewBox="0 0 100 140" preserveAspectRatio="xMidYMid meet">
+      <rect x="0" y="0" width="100" height="140" fill="#15803d"/>
+      <rect x="3" y="3" width="94" height="134" fill="none" stroke="rgba(255,255,255,.6)" stroke-width="1"/>
+      <line x1="3" y1="70" x2="97" y2="70" stroke="rgba(255,255,255,.6)" stroke-width="1"/>
+      <circle cx="50" cy="70" r="12" fill="none" stroke="rgba(255,255,255,.6)" stroke-width="1"/>
+      <rect x="22" y="3" width="56" height="18" fill="none" stroke="rgba(255,255,255,.45)" stroke-width=".8"/>
+      <rect x="22" y="119" width="56" height="18" fill="none" stroke="rgba(255,255,255,.45)" stroke-width=".8"/>
+      {% if j.datos and j.datos.jugadores %}
+        {% for p in j.datos.jugadores %}
+        <circle cx="{{ (p.x * 100)|round(1) }}" cy="{{ (p.y * 140)|round(1) }}" r="3.6"
+                fill="#ecfdf5" stroke="#047857" stroke-width="1"/>
+        {% endfor %}
+      {% endif %}
+      {% if j.datos and j.datos.rivales %}
+        {% for p in j.datos.rivales %}
+        <circle cx="{{ (p.x * 100)|round(1) }}" cy="{{ (p.y * 140)|round(1) }}" r="3"
+                fill="#ef4444" opacity=".85"/>
+        {% endfor %}
+      {% endif %}
+    </svg>
+    <div class="tc-body">
+      <div class="tc-t pf-truncate">{{ j.nombre }}</div>
+      <div class="tc-s">
+        {{ j.formacion or '—' }}
+        {%- if j.datos and j.datos.flechas %} · {{ j.datos.flechas|length }} mov.{% endif %}
+      </div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="pf-empty">
+  <div class="pf-empty__icon"><i data-ico="target" class="pf-ico--xxl"></i></div>
+  <h2 class="pf-empty__title">Sin jugadas todavía</h2>
+  <p class="pf-empty__text">
+    Abre la pizarra, coloca a tus jugadores y dibuja los movimientos.
+    Cada jugada que guardes queda aquí para repasarla antes del partido.
+  </p>
+</div>
+{% endif %}
+
+{% endblock %}

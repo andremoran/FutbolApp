@@ -1,0 +1,189 @@
+{% extends '_shell.html' %}
+{% block title %}Hábitos · ProFoot{% endblock %}
+
+{# screens/HabitsScreen.tsx: lista de hábitos con marcado de hoy y rejilla de los
+   últimos 7 días. La racha es la métrica que engancha, así que va arriba. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.progreso') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Constancia</div>{% endblock %}
+{% block hero_title %}Hábitos{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle" id="racha-txt">
+  🔥 {{ racha }} día{{ '' if racha == 1 else 's' }} seguidos
+</div>
+{% endblock %}
+
+{% block head %}
+<style>
+  .hb-check {
+    width: 30px; height: 30px; border-radius: 15px; flex: none;
+    border: 2px solid var(--border); background: #fff;
+    display: flex; align-items: center; justify-content: center;
+    color: transparent; transition: all .18s;
+  }
+  .hb-check.is-on { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .hb-check:active { transform: scale(.9); }
+
+  .hb-grid { display: flex; gap: 5px; margin-top: 8px; }
+  .hb-day { flex: 1; text-align: center; }
+  .hb-day__n { font-size: 9px; font-weight: 700; color: var(--text-muted);
+               text-transform: uppercase; margin-bottom: 4px; }
+  .hb-day__b { height: 26px; border-radius: 7px; background: var(--border-soft);
+               display: flex; align-items: center; justify-content: center;
+               font-size: 10px; font-weight: 800; color: var(--text-muted); }
+  .hb-day__b.is-on { background: var(--primary-soft); color: var(--primary); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ── Últimos 7 días ── #}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Últimos 7 días</h2></div>
+  <div class="hb-grid">
+    {% for d in dias %}
+      {% set marcados = por_dia.get(d.isoformat(), []) %}
+      <div class="hb-day">
+        <div class="hb-day__n">{{ ['L','M','X','J','V','S','D'][d.weekday()] }}</div>
+        <div class="hb-day__b {{ 'is-on' if marcados }}">
+          {{ marcados|length if marcados else '·' }}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+{# ── Lista de hábitos ── #}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Mis hábitos</h2>
+    <span class="pf-card__badge" id="conteo-hoy">
+      {{ habitos|selectattr('_hecho')|list|length }}/{{ habitos|length }}
+    </span>
+  </div>
+
+  <div id="lista-habitos">
+    {% for h in habitos %}
+    <div class="pf-item" data-habito="{{ h.id }}">
+      <button type="button" class="hb-check {{ 'is-on' if h._hecho }}"
+              data-id="{{ h.id }}" aria-label="Marcar {{ h.nombre }}">
+        <i data-ico="check" class="pf-ico--sm"></i>
+      </button>
+      <span class="pf-item__body">
+        <span class="pf-item__title">{{ h.nombre }}</span>
+      </span>
+      <button type="button" class="pf-item__chev hb-del" data-id="{{ h.id }}"
+              aria-label="Eliminar {{ h.nombre }}" style="color:var(--text-muted)">
+        <i data-ico="trash-2" class="pf-ico--sm"></i>
+      </button>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if not habitos %}
+  <div class="pf-empty" style="padding:22px 8px">
+    <div class="pf-empty__icon"><i data-ico="repeat" class="pf-ico--xxl"></i></div>
+    <h3 class="pf-empty__title">Empieza por uno</h3>
+    <p class="pf-empty__text">
+      Un solo hábito fácil de cumplir vale más que cinco imposibles.
+      Beber 2 L de agua, estirar 10 minutos, dormir 8 horas…
+    </p>
+  </div>
+  {% endif %}
+</div>
+
+{# ── Nuevo hábito ── #}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Añadir hábito</h2></div>
+  <div class="pf-row pf-mt-12" style="gap:8px">
+    <input class="pf-input pf-grow" id="nuevo-habito" type="text" maxlength="80"
+           placeholder="Ej. Estirar 10 minutos">
+    <button class="pf-btn pf-btn--primary" id="btn-habito" type="button" style="flex:none">
+      <i data-ico="plus" class="pf-ico--sm"></i>
+    </button>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var lista = document.getElementById('lista-habitos');
+
+  function actualizarConteo() {
+    var todos = lista.querySelectorAll('.hb-check').length;
+    var hechos = lista.querySelectorAll('.hb-check.is-on').length;
+    document.getElementById('conteo-hoy').textContent = hechos + '/' + todos;
+  }
+
+  function conectar(raiz) {
+    (raiz || document).querySelectorAll('.hb-check').forEach(function (btn) {
+      if (btn.dataset.listo) return;
+      btn.dataset.listo = '1';
+      btn.addEventListener('click', function () {
+        PF.api('/futbol/api/habito/' + btn.dataset.id + '/toggle', {})
+          .then(function (r) {
+            btn.classList.toggle('is-on', r.hecho);
+            actualizarConteo();
+            var t = document.getElementById('racha-txt');
+            if (t) t.textContent = '🔥 ' + r.racha + ' día' + (r.racha === 1 ? '' : 's') + ' seguidos';
+          })
+          .catch(function (e) { PF.toast(e.message, 'error'); });
+      });
+    });
+
+    (raiz || document).querySelectorAll('.hb-del').forEach(function (btn) {
+      if (btn.dataset.listo) return;
+      btn.dataset.listo = '1';
+      btn.addEventListener('click', function () {
+        PF.api('/futbol/api/habito/' + btn.dataset.id, null, 'DELETE')
+          .then(function () {
+            var fila = lista.querySelector('[data-habito="' + btn.dataset.id + '"]');
+            if (fila) fila.remove();
+            actualizarConteo();
+            PF.toast('Hábito eliminado');
+          })
+          .catch(function (e) { PF.toast(e.message, 'error'); });
+      });
+    });
+  }
+  conectar();
+
+  document.getElementById('btn-habito').addEventListener('click', function () {
+    var input = document.getElementById('nuevo-habito');
+    var nombre = input.value.trim();
+    if (!nombre) { input.focus(); return; }
+
+    PF.api('{{ url_for("futbol.api_habito_crear") }}', { nombre: nombre })
+      .then(function (r) {
+        var fila = document.createElement('div');
+        fila.className = 'pf-item';
+        fila.dataset.habito = r.habito.id;
+        fila.innerHTML =
+          '<button type="button" class="hb-check" data-id="' + r.habito.id + '">' +
+            '<i data-ico="check" class="pf-ico--sm"></i></button>' +
+          '<span class="pf-item__body"><span class="pf-item__title"></span></span>' +
+          '<button type="button" class="pf-item__chev hb-del" data-id="' + r.habito.id +
+            '" style="color:var(--text-muted)"><i data-ico="trash-2" class="pf-ico--sm"></i></button>';
+        fila.querySelector('.pf-item__title').textContent = r.habito.nombre;
+        lista.appendChild(fila);
+        PF.icons(fila);
+        conectar(fila);
+        actualizarConteo();
+        input.value = '';
+        PF.toast('Hábito añadido');
+      })
+      .catch(function (e) { PF.toast(e.message, 'error'); });
+  });
+
+  document.getElementById('nuevo-habito').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') document.getElementById('btn-habito').click();
+  });
+})();
+</script>
+{% endblock %}

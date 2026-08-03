@@ -1,0 +1,40 @@
+{# Barra de pestañas del JUGADOR — réplica de navigation/PlayerTabNavigator.tsx.
+   Mismas 5 pestañas, mismo orden, mismos iconos Feather y mismos colores
+   (activo #10b981 / inactivo #6b7280). En celular es flotante y redondeada,
+   igual que en la app nativa. #}
+{% set tab = tab_activa|default('inicio') %}
+<nav class="pf-tabbar pf-tabbar--player" aria-label="Navegación principal">
+  <div class="pf-tabbar__inner">
+
+    <a class="pf-tab {{ 'is-active' if tab == 'inicio' }}" href="{{ url_for('futbol.inicio') }}"
+       {{ 'aria-current=page' if tab == 'inicio' }}>
+      <span class="pf-tab__icon"><i data-ico="home"></i></span>
+      <span class="pf-tab__label">Inicio</span>
+    </a>
+
+    <a class="pf-tab {{ 'is-active' if tab == 'agenda' }}" href="{{ url_for('futbol.agenda') }}"
+       {{ 'aria-current=page' if tab == 'agenda' }}>
+      <span class="pf-tab__icon"><i data-ico="calendar"></i></span>
+      <span class="pf-tab__label">Agenda</span>
+    </a>
+
+    <a class="pf-tab {{ 'is-active' if tab == 'progreso' }}" href="{{ url_for('futbol.progreso') }}"
+       {{ 'aria-current=page' if tab == 'progreso' }}>
+      <span class="pf-tab__icon"><i data-ico="trending-up"></i></span>
+      <span class="pf-tab__label">Progreso</span>
+    </a>
+
+    <a class="pf-tab {{ 'is-active' if tab == 'ficha' }}" href="{{ url_for('futbol.ficha') }}"
+       {{ 'aria-current=page' if tab == 'ficha' }}>
+      <span class="pf-tab__icon"><i data-ico="clipboard"></i></span>
+      <span class="pf-tab__label">Mi Ficha</span>
+    </a>
+
+    <a class="pf-tab {{ 'is-active' if tab == 'ia' }}" href="{{ url_for('futbol.ia_jugador') }}"
+       {{ 'aria-current=page' if tab == 'ia' }}>
+      <span class="pf-tab__icon"><i data-ico="message-circle"></i></span>
+      <span class="pf-tab__label">IA Coach</span>
+    </a>
+
+  </div>
+</nav>

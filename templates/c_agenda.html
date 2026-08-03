@@ -1,0 +1,143 @@
+{% extends '_shell.html' %}
+{% block title %}Agenda · ProFoot{% endblock %}
+
+{# screens/ScheduleScreen.tsx: el entrenador agenda entrenos, partidos y
+   reuniones; los jugadores los ven al instante en su propia Agenda. #}
+
+{% block hero_label %}<div class="pf-hero__label">Planificación</div>{% endblock %}
+{% block hero_title %}Agenda{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {{ proximos|length }} evento{{ '' if proximos|length == 1 else 's' }} por delante
+</div>
+{% endblock %}
+
+{% block content %}
+
+{# ── Nuevo evento ── #}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Agendar</h2></div>
+
+  <div class="pf-field pf-mt-12">
+    <input class="pf-input" id="ev-titulo" type="text" maxlength="120"
+           placeholder="Ej. Entrenamiento táctico">
+  </div>
+
+  <div class="pf-row" style="gap:10px">
+    <div class="pf-grow">
+      <label class="pf-label" for="ev-tipo">Tipo</label>
+      <select class="pf-select" id="ev-tipo">
+        <option value="entreno">Entrenamiento</option>
+        <option value="partido">Partido</option>
+        <option value="reunion">Reunión</option>
+      </select>
+    </div>
+    <div class="pf-grow">
+      <label class="pf-label" for="ev-fecha">Fecha</label>
+      <input class="pf-input" id="ev-fecha" type="date">
+    </div>
+  </div>
+
+  <div class="pf-row pf-mt-12" style="gap:10px">
+    <div style="width:120px;flex:none">
+      <label class="pf-label" for="ev-hora">Hora</label>
+      <input class="pf-input" id="ev-hora" type="time">
+    </div>
+    <div class="pf-grow">
+      <label class="pf-label" for="ev-lugar">Lugar</label>
+      <input class="pf-input" id="ev-lugar" type="text" maxlength="120" placeholder="Cancha 2">
+    </div>
+  </div>
+
+  <button class="pf-btn pf-btn--primary pf-btn--block pf-mt-12" type="button" id="btn-evento">
+    <i data-ico="plus" class="pf-ico--sm"></i> Agendar evento
+  </button>
+</div>
+
+{# ── Próximos ── #}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Próximos</h2>
+    {% if proximos %}<span class="pf-card__badge">{{ proximos|length }}</span>{% endif %}
+  </div>
+
+  {% for e in proximos %}
+  <a class="pf-item" href="{{ url_for('futbol.c_evento', eid=e.id) }}">
+    <span class="pf-item__icon" style="flex-direction:column;gap:0;
+      {% if e.tipo == 'partido' %}background:rgba(239,68,68,.10);color:var(--danger)
+      {% elif e.tipo == 'reunion' %}background:rgba(59,130,246,.10);color:var(--info)
+      {% endif %}">
+      {% if e._fecha %}
+        <span style="font-size:15px;font-weight:800;line-height:1">{{ e._fecha.day }}</span>
+        <span style="font-size:8px;font-weight:700;text-transform:uppercase">
+          {{ ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][e._fecha.month - 1] }}
+        </span>
+      {% endif %}
+    </span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">{{ e.titulo }}</span>
+      <span class="pf-item__sub">
+        {%- if e.hora %}{{ e.hora[:5] }}{% endif -%}
+        {%- if e.lugar %}{% if e.hora %} · {% endif %}{{ e.lugar }}{% endif -%}
+      </span>
+    </span>
+    <span class="pf-item__right">{{ e._confirmados }}/{{ n_jugadores }}</span>
+    <span class="pf-item__chev"><i data-ico="chevron-right" class="pf-ico--sm"></i></span>
+  </a>
+  {% endfor %}
+
+  {% if not proximos %}
+  <div class="pf-empty" style="padding:22px 8px">
+    <div class="pf-empty__icon"><i data-ico="calendar" class="pf-ico--xxl"></i></div>
+    <h3 class="pf-empty__title">Agenda vacía</h3>
+    <p class="pf-empty__text">
+      Agenda el primer entrenamiento arriba. Tus jugadores lo verán al instante
+      y podrán confirmar si asisten.
+    </p>
+  </div>
+  {% endif %}
+</div>
+
+{# ── Historial ── #}
+{% if pasados %}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Ya pasaron</h2></div>
+  {% for e in pasados %}
+  <a class="pf-item" href="{{ url_for('futbol.c_evento', eid=e.id) }}" style="opacity:.65">
+    <span class="pf-item__icon" style="background:var(--border-soft);color:var(--text-muted)">
+      <i data-ico="check" class="pf-ico--sm"></i>
+    </span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">{{ e.titulo }}</span>
+      <span class="pf-item__sub">{{ e.fecha }} · {{ e._confirmados }} asistieron</span>
+    </span>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  // La fecha arranca en hoy: es lo que se agenda el 90% de las veces
+  document.getElementById('ev-fecha').value = new Date().toISOString().slice(0, 10);
+
+  document.getElementById('btn-evento').addEventListener('click', function () {
+    var titulo = document.getElementById('ev-titulo').value.trim();
+    if (!titulo) { document.getElementById('ev-titulo').focus(); return; }
+
+    PF.api('{{ url_for("futbol.api_evento_crear") }}', {
+      titulo: titulo,
+      tipo: document.getElementById('ev-tipo').value,
+      fecha: document.getElementById('ev-fecha').value,
+      hora: document.getElementById('ev-hora').value || null,
+      lugar: document.getElementById('ev-lugar').value.trim()
+    })
+      .then(function () { location.reload(); })
+      .catch(function (e) { PF.toast(e.message, 'error'); });
+  });
+})();
+</script>
+{% endblock %}

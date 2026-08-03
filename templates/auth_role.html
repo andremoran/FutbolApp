@@ -1,0 +1,79 @@
+{% extends '_shell.html' %}
+{% block title %}Elige tu rol · ProFoot Assistant{% endblock %}
+{% block hero %}{% endblock %}
+
+{# Réplica de screens/RoleSelectionScreen.tsx: tarjeta de Jugador en azul (#3b82f6)
+   y de Entrenador en ámbar (#f59e0b), con su lista de ventajas. #}
+{% block head %}
+<style>
+  .role-wrap { max-width: 460px; margin: 0 auto; padding: 20px 20px 40px; }
+  .role-head { text-align: center; margin: calc(20px + env(safe-area-inset-top,0px)) 0 32px; }
+  .role-ball { font-size: 60px; line-height: 1; margin-bottom: 12px; }
+  .role-h1 { font-size: 28px; font-weight: 700; margin: 0 0 6px; }
+  .role-sub { font-size: 15px; color: var(--text-sec); margin: 0; }
+  .roles { display: flex; flex-direction: column; gap: 16px; }
+  .role-card {
+    display: block; background: #fff; border-radius: var(--r-xl);
+    padding: 20px; border: 2px solid var(--border);
+    transition: border-color .18s, transform .12s, box-shadow .18s;
+  }
+  .role-card:active { transform: scale(0.99); }
+  .role-card--player:hover { border-color: #3b82f6; box-shadow: 0 8px 24px rgba(59,130,246,.14); }
+  .role-card--coach:hover  { border-color: #f59e0b; box-shadow: 0 8px 24px rgba(245,158,11,.14); }
+  .role-icon {
+    width: 68px; height: 68px; border-radius: 34px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; margin-bottom: 14px;
+  }
+  .role-title { font-size: 20px; font-weight: 700; margin: 0 0 6px; }
+  .role-desc { font-size: 14px; color: var(--text-sec); line-height: 20px; margin: 0 0 14px; }
+  .role-feat { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-sec); margin-bottom: 6px; }
+  .role-back { text-align: center; margin-top: 26px; font-size: 14px; }
+  .role-back a { color: var(--primary); font-weight: 700; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="role-wrap">
+
+  <div class="role-head">
+    <div class="role-ball">⚽</div>
+    <h1 class="role-h1">¡Bienvenido!</h1>
+    <p class="role-sub">Selecciona tu rol en la app</p>
+  </div>
+
+  <div class="roles">
+
+    <a class="role-card role-card--player" href="{{ url_for('auth.registro', rol='jugador') }}">
+      <div class="role-icon" style="background:#3b82f6">
+        <i data-ico="user" class="pf-ico--xxl"></i>
+      </div>
+      <h2 class="role-title">Jugador</h2>
+      <p class="role-desc">
+        Registra entrenamientos, metas, hábitos y partidos. Mejora tu rendimiento con IA.
+      </p>
+      <div class="role-feat"><i data-ico="check" class="pf-ico--xs" style="color:#3b82f6"></i> Entrenamientos personalizados</div>
+      <div class="role-feat"><i data-ico="check" class="pf-ico--xs" style="color:#3b82f6"></i> Seguimiento de metas</div>
+      <div class="role-feat"><i data-ico="check" class="pf-ico--xs" style="color:#3b82f6"></i> IA Coach personal</div>
+    </a>
+
+    <a class="role-card role-card--coach" href="{{ url_for('auth.registro', rol='entrenador') }}">
+      <div class="role-icon" style="background:#f59e0b">
+        <i data-ico="users" class="pf-ico--xxl"></i>
+      </div>
+      <h2 class="role-title">Entrenador</h2>
+      <p class="role-desc">
+        Gestiona tu equipo, analiza el rendimiento de tus jugadores y planifica entrenamientos.
+      </p>
+      <div class="role-feat"><i data-ico="check" class="pf-ico--xs" style="color:#f59e0b"></i> Gestión de equipo completa</div>
+      <div class="role-feat"><i data-ico="check" class="pf-ico--xs" style="color:#f59e0b"></i> Análisis de rendimiento</div>
+      <div class="role-feat"><i data-ico="check" class="pf-ico--xs" style="color:#f59e0b"></i> Planificación táctica</div>
+    </a>
+
+  </div>
+
+  <p class="role-back">
+    ¿Ya tienes cuenta? <a href="{{ url_for('auth.entrar') }}">Entrar</a>
+  </p>
+</div>
+{% endblock %}

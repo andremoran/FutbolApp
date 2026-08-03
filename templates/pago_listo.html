@@ -1,0 +1,30 @@
+{% extends '_shell.html' %}
+{% block title %}Cuenta activada · ProFoot{% endblock %}
+{% block hero %}{% endblock %}
+
+{% block content %}
+<div style="max-width:420px;margin:0 auto;padding:calc(56px + env(safe-area-inset-top,0px)) 24px 40px;
+            text-align:center">
+
+  <div style="width:112px;height:112px;border-radius:56px;margin:0 auto 22px;
+              background:var(--primary);color:#fff;display:flex;align-items:center;
+              justify-content:center;box-shadow:0 12px 32px rgba(4,120,87,.35)">
+    <i data-ico="check" style="width:52px;height:52px;stroke-width:2.5"></i>
+  </div>
+
+  <h1 style="font-size:26px;font-weight:800;letter-spacing:-.5px;margin:0 0 10px">
+    ¡Tu cuenta está activa!
+  </h1>
+  <p style="font-size:15px;color:var(--text-sec);line-height:1.6;margin:0 0 28px">
+    Ya tienes todo desbloqueado. Te mandamos el comprobante a tu correo.
+  </p>
+
+  <a class="pf-btn pf-btn--primary pf-btn--block" href="{{ url_for('futbol.home') }}">
+    Empezar
+  </a>
+
+  <p style="font-size:12px;color:var(--text-muted);margin:22px 0 0;line-height:1.6">
+    Puedes cancelar la suscripción cuando quieras desde tu perfil.
+  </p>
+</div>
+{% endblock %}

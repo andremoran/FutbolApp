@@ -1,0 +1,61 @@
+{% extends '_shell.html' %}
+{% block title %}Resultado del check-in · ProFoot{% endblock %}
+
+{# screens/MentalCheckInResultScreen.tsx: semáforo, puntaje y una lectura
+   honesta de lo que significa. #}
+
+{% block hero %}{% endblock %}
+
+{% set sem = checkin.semaforo|default('verde') %}
+{% set color = 'var(--danger)' if sem == 'rojo' else ('var(--warning)' if sem == 'ambar' else 'var(--success)') %}
+
+{% block content %}
+<div style="max-width:420px;margin:0 auto;padding:calc(40px + env(safe-area-inset-top,0px)) 22px 40px;
+            text-align:center">
+
+  <div style="width:132px;height:132px;border-radius:66px;margin:0 auto 22px;
+              display:flex;align-items:center;justify-content:center;flex-direction:column;
+              background:{{ color }};color:#fff;box-shadow:0 12px 32px {{ color }}40">
+    <span style="font-size:40px;font-weight:800;line-height:1">{{ checkin.puntaje|default(0) }}</span>
+    <span style="font-size:11px;font-weight:700;opacity:.85;letter-spacing:1px">DE 100</span>
+  </div>
+
+  <h1 style="font-size:25px;font-weight:800;letter-spacing:-.4px;margin:0 0 10px">
+    {% if sem == 'rojo' %}Cuídate esta semana
+    {% elif sem == 'ambar' %}Vas bien, con matices
+    {% else %}Estás en buena forma{% endif %}
+  </h1>
+
+  <p style="font-size:15px;color:var(--text-sec);line-height:1.6;margin:0 0 26px">
+    {% if sem == 'rojo' %}
+      Tus respuestas muestran que la estás pasando cuesta arriba. No es debilidad: es
+      información. Habla con tu entrenador o con alguien de confianza, y prioriza el
+      descanso estos días.
+    {% elif sem == 'ambar' %}
+      Hay cosas que van bien y otras que te están pesando. Fíjate en lo que puntuaste
+      más bajo: casi siempre ahí está la palanca que mueve todo lo demás.
+    {% else %}
+      Ánimo, energía y descanso acompañan. Es el momento de exigirte un poco más en
+      los entrenamientos, que el cuerpo está para responder.
+    {% endif %}
+  </p>
+
+  <div style="background:#fff;border:1px solid var(--border-soft);border-radius:var(--r-xl);
+              padding:16px;text-align:left;margin-bottom:22px;box-shadow:var(--sh-sm)">
+    <div class="pf-row" style="gap:8px;margin-bottom:10px">
+      <i data-ico="lock" class="pf-ico--sm" style="color:var(--text-muted)"></i>
+      <strong style="font-size:13px">Qué ve tu entrenador</strong>
+    </div>
+    <p style="font-size:13px;color:var(--text-sec);line-height:1.55;margin:0">
+      Solo este semáforo
+      <span style="display:inline-block;width:10px;height:10px;border-radius:5px;
+                   background:{{ color }};vertical-align:middle"></span>
+      y la fecha. Tus respuestas concretas no las ve nadie más que tú.
+    </p>
+  </div>
+
+  <a class="pf-btn pf-btn--primary pf-btn--block" href="{{ url_for('futbol.inicio') }}">
+    Volver al inicio
+  </a>
+</div>
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends '_shell.html' %}
+{% block title %}Recuperar contraseña · ProFoot{% endblock %}
+{% block hero %}{% endblock %}
+
+{% block head %}
+<style>
+  .auth-wrap { max-width:420px; margin:0 auto; padding:0 22px; }
+  .auth-top { text-align:center; padding:calc(48px + env(safe-area-inset-top,0px)) 0 26px; }
+  .auth-logo { width:108px; height:auto; margin:0 auto 14px; display:block; }
+  .auth-title { font-size:25px; font-weight:800; letter-spacing:-.5px; margin:0 0 8px; }
+  .auth-sub { font-size:15px; color:var(--text-sec); margin:0; line-height:1.55; }
+  .auth-card { background:#fff; border:1px solid var(--border-soft); border-radius:var(--r-xl);
+               padding:20px; box-shadow:var(--sh-md); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="auth-wrap">
+  <div class="auth-top">
+    <img class="auth-logo" src="{{ url_for('static', filename='logo.svg') }}" alt="ProFoot Assistant">
+    <h1 class="auth-title">¿Olvidaste tu contraseña?</h1>
+    <p class="auth-sub">Escribe tu correo y te enviamos un enlace para crear una nueva.</p>
+  </div>
+
+  <form class="auth-card" method="POST" action="{{ url_for('auth.olvide') }}">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+
+    <div class="pf-field">
+      <label class="pf-label" for="correo">Correo electrónico</label>
+      <input class="pf-input" id="correo" name="correo" type="email" required
+             inputmode="email" autocomplete="email" placeholder="tu@correo.com">
+    </div>
+
+    <button class="pf-btn pf-btn--primary pf-btn--block pf-mt-8" type="submit">
+      <i data-ico="mail" class="pf-ico--sm"></i> Enviar enlace
+    </button>
+  </form>
+
+  <p class="pf-center pf-mt-24" style="font-size:14px">
+    <a href="{{ url_for('auth.entrar') }}" style="color:var(--primary);font-weight:700">
+      ← Volver a entrar
+    </a>
+  </p>
+</div>
+{% endblock %}

@@ -1,0 +1,124 @@
+{% extends '_shell.html' %}
+{% block title %}{{ test.nombre }} · ProFoot{% endblock %}
+
+{# screens/TestRankingScreen.tsx: apuntar la marca de cada jugador y ver el
+   ranking. En pruebas de tiempo gana el menor; en el resto, el mayor. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_tests') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">{{ test.fecha }}</div>{% endblock %}
+{% block hero_title %}{{ test.nombre }}{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {{ resultados|length }} de {{ jugadores|length }} registrados ·
+  {{ 'Menor es mejor' if menor_mejor else 'Mayor es mejor' }}
+</div>
+{% endblock %}
+
+{% block head %}
+<style>
+  .rk-pos {
+    width: 30px; height: 30px; border-radius: 15px; flex: none;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 800;
+    background: var(--border-soft); color: var(--text-sec);
+  }
+  .rk-pos.rk-1 { background: #fbbf24; color: #78350f; }
+  .rk-pos.rk-2 { background: #cbd5e1; color: #334155; }
+  .rk-pos.rk-3 { background: #d6ad7f; color: #4a2c0a; }
+  .rk-marca { width: 92px; flex: none; text-align: right; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ── Ranking ── #}
+{% if resultados %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Ranking</h2>
+    <span class="pf-card__badge">{{ resultados|length }}</span>
+  </div>
+
+  {% for r in resultados %}
+  <div class="pf-item">
+    <span class="rk-pos rk-{{ r._puesto if r._puesto <= 3 else '' }}">{{ r._puesto }}</span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">{{ r._jugador.name or 'Jugador' }}</span>
+      <span class="pf-item__sub">{{ (r._jugador.fut or {}).get('posicion') or 'Sin posición' }}</span>
+    </span>
+    <span class="pf-item__right">
+      {{ r.valor }}{% if test.unidad %} {{ test.unidad }}{% endif %}
+    </span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ── Apuntar marcas ── #}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Apuntar marcas</h2></div>
+
+  {% set con_marca = resultados|map(attribute='player_id')|list %}
+  {% for j in jugadores %}
+    {% set r = resultados|selectattr('player_id', 'equalto', j.id)|first %}
+    <div class="pf-item">
+      <span class="pf-avatar pf-avatar--sm">
+        {%- if j.profile_photo %}<img src="{{ j.profile_photo }}" alt="">
+        {%- else %}{{ (j.name or '?')[:1]|upper }}{% endif -%}
+      </span>
+      <span class="pf-item__body">
+        <span class="pf-item__title">{{ j.name }}</span>
+      </span>
+      <input class="pf-input rk-marca rk-input" type="number" step="0.01"
+             inputmode="decimal" data-jugador="{{ j.id }}"
+             value="{{ r.valor if r else '' }}"
+             placeholder="{{ test.unidad or '—' }}"
+             aria-label="Marca de {{ j.name }}"
+             style="padding:9px 10px;font-size:14px">
+    </div>
+  {% endfor %}
+
+  {% if not jugadores %}
+  <p style="font-size:13px;color:var(--text-sec);padding:14px 4px;margin:0">
+    Aún no tienes jugadores en la plantilla.
+  </p>
+  {% endif %}
+
+  {% if jugadores %}
+  <p style="font-size:12px;color:var(--text-muted);margin:14px 0 0;line-height:1.5">
+    Cada marca se guarda sola al salir del campo. Recarga para ver el ranking actualizado.
+  </p>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.rk-input').forEach(function (input) {
+  var previo = input.value;
+  input.addEventListener('change', function () {
+    var valor = input.value.trim();
+    if (valor === '' || valor === previo) return;
+
+    PF.api('/futbol/api/test/{{ test.id }}/resultado', {
+      player_id: input.dataset.jugador,
+      valor: valor
+    })
+      .then(function () {
+        previo = valor;
+        input.style.borderColor = 'var(--primary)';
+        setTimeout(function () { input.style.borderColor = ''; }, 900);
+      })
+      .catch(function (e) {
+        PF.toast(e.message, 'error');
+        input.value = previo;
+      });
+  });
+});
+</script>
+{% endblock %}

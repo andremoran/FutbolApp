@@ -1,0 +1,138 @@
+{% extends '_shell.html' %}
+{% block title %}Pedir check-in · ProFoot{% endblock %}
+
+{# screens/AssignMentalCheckInScreen.tsx #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_mental') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Bienestar</div>{% endblock %}
+{% block hero_title %}Check-in{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">Pídeselo a quien tú elijas</div>
+{% endblock %}
+
+{% block head %}
+<style>
+  .as-jug { display:flex; align-items:center; gap:12px; padding:11px 4px;
+            border-top:1px solid var(--border-soft); width:100%; text-align:left; }
+  .as-jug:first-of-type { border-top:none; }
+  .as-box { width:24px; height:24px; border-radius:7px; flex:none;
+            border:2px solid var(--border); background:#fff;
+            display:flex; align-items:center; justify-content:center; color:transparent;
+            transition:all .15s; }
+  .as-box.is-on { background:var(--primary); border-color:var(--primary); color:#fff; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">¿A quién?</h2>
+    <button type="button" class="pf-item__right" id="btn-todos"
+            style="background:none;border:none">Todos</button>
+  </div>
+
+  <div id="lista">
+    {% for j in jugadores %}
+    <button type="button" class="as-jug" data-id="{{ j.id }}">
+      <span class="as-box"><i data-ico="check" class="pf-ico--xs"></i></span>
+      <span class="pf-avatar pf-avatar--sm">
+        {%- if j.profile_photo %}<img src="{{ j.profile_photo }}" alt="">
+        {%- else %}{{ (j.name or '?')[:1]|upper }}{% endif -%}
+      </span>
+      <span class="pf-item__body">
+        <span class="pf-item__title">{{ j.name }}</span>
+        <span class="pf-item__sub">{{ (j.fut or {}).get('posicion') or 'Sin posición' }}</span>
+      </span>
+    </button>
+    {% endfor %}
+  </div>
+
+  {% if not jugadores %}
+  <p style="font-size:13px;color:var(--text-sec);padding:14px 4px;margin:0">
+    Aún no tienes jugadores en la plantilla.
+  </p>
+  {% endif %}
+</div>
+
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Mensaje</h2></div>
+  <div class="pf-field pf-mt-12">
+    <textarea class="pf-textarea" id="as-mensaje" rows="3" maxlength="400"
+              placeholder="Ej. Quiero saber cómo estáis llevando el calendario de partidos. Es confidencial."></textarea>
+    <p style="font-size:12px;color:var(--text-sec);margin:8px 0 0;line-height:1.5">
+      Lo verán al abrir la app. Explicar el porqué sube muchísimo la tasa de respuesta.
+    </p>
+  </div>
+  <div class="pf-field">
+    <label class="pf-label" for="as-limite">Hasta cuándo <span style="font-weight:500;color:var(--text-muted)">(opcional)</span></label>
+    <input class="pf-input" id="as-limite" type="date">
+  </div>
+</div>
+
+<div style="padding:0 16px 30px">
+  <button class="pf-btn pf-btn--primary pf-btn--block" type="button" id="btn-enviar" disabled>
+    <i data-ico="send" class="pf-ico--sm"></i> Enviar petición
+  </button>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var seleccion = new Set();
+  var botones = Array.prototype.slice.call(document.querySelectorAll('.as-jug'));
+  var enviar = document.getElementById('btn-enviar');
+
+  function refrescar() {
+    enviar.disabled = seleccion.size === 0;
+    enviar.innerHTML = seleccion.size
+      ? '<i data-ico="send" class="pf-ico--sm"></i> Enviar a ' + seleccion.size +
+        ' jugador' + (seleccion.size === 1 ? '' : 'es')
+      : '<i data-ico="send" class="pf-ico--sm"></i> Enviar petición';
+    PF.icons(enviar);
+  }
+
+  botones.forEach(function (b) {
+    b.addEventListener('click', function () {
+      var id = b.dataset.id;
+      var caja = b.querySelector('.as-box');
+      if (seleccion.has(id)) { seleccion.delete(id); caja.classList.remove('is-on'); }
+      else { seleccion.add(id); caja.classList.add('is-on'); }
+      refrescar();
+    });
+  });
+
+  document.getElementById('btn-todos').addEventListener('click', function () {
+    var faltan = seleccion.size < botones.length;
+    seleccion.clear();
+    botones.forEach(function (b) {
+      b.querySelector('.as-box').classList.toggle('is-on', faltan);
+      if (faltan) seleccion.add(b.dataset.id);
+    });
+    refrescar();
+  });
+
+  enviar.addEventListener('click', function () {
+    enviar.disabled = true;
+    PF.api('{{ url_for("futbol.api_mental_asignar") }}', {
+      players: Array.from(seleccion),
+      mensaje: document.getElementById('as-mensaje').value.trim(),
+      fecha_limite: document.getElementById('as-limite').value || null
+    })
+      .then(function () {
+        PF.toast('Petición enviada');
+        setTimeout(function () {
+          window.location.href = '{{ url_for("futbol.c_mental") }}';
+        }, 800);
+      })
+      .catch(function (e) { PF.toast(e.message, 'error'); enviar.disabled = false; });
+  });
+})();
+</script>
+{% endblock %}

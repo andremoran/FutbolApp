@@ -1,0 +1,25 @@
+# Secretos — NUNCA se suben
+.env
+.env.*
+!.env.example
+planes_paypal.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editores
+.vscode/
+.idea/
+
+# Temporales
+*.log
+/tmp/

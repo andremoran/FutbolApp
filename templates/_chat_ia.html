@@ -1,0 +1,41 @@
+{# Cuerpo del chat con la IA, compartido por el jugador (IA Coach) y el
+   entrenador (IA). Espera `historial` y `sugerencias`. #}
+
+<div id="chat-hilo" style="padding:16px 16px 4px">
+
+  {% if not historial %}
+  <div class="pf-empty" style="padding:24px 8px 16px">
+    <div class="pf-empty__icon" style="background:var(--primary-soft);color:var(--primary)">
+      <i data-ico="message-circle" class="pf-ico--xxl"></i>
+    </div>
+    <h2 class="pf-empty__title">{{ titulo_vacio }}</h2>
+    <p class="pf-empty__text">{{ texto_vacio }}</p>
+  </div>
+  {% endif %}
+
+  {% for m in historial %}
+    <div class="ia-msg ia-msg--yo">{{ m.pregunta }}</div>
+    <div class="ia-msg ia-msg--ia">{{ m.respuesta }}</div>
+  {% endfor %}
+</div>
+
+{# Sugerencias para arrancar la conversación #}
+<div id="chat-sugerencias" style="padding:4px 16px 8px;display:flex;gap:8px;flex-wrap:wrap">
+  {% for s in sugerencias %}
+  <button type="button" class="ia-sug">{{ s }}</button>
+  {% endfor %}
+</div>
+
+{# Barra de escritura, anclada sobre la barra de pestañas #}
+<div class="ia-bar">
+  <div class="pf-wrap" style="display:flex;gap:8px;align-items:flex-end;padding:10px 16px">
+    <textarea id="chat-input" class="pf-textarea" rows="1" maxlength="1200"
+              placeholder="{{ placeholder }}"
+              style="min-height:44px;max-height:120px;padding:11px 14px;border-radius:22px;resize:none"></textarea>
+    <button type="button" id="chat-enviar" class="pf-btn pf-btn--primary"
+            style="flex:none;width:44px;height:44px;padding:0;border-radius:22px"
+            aria-label="Enviar">
+      <i data-ico="send" class="pf-ico--sm"></i>
+    </button>
+  </div>
+</div>

@@ -1,0 +1,107 @@
+{% extends '_shell.html' %}
+{% block title %}Mensajes · ProFoot{% endblock %}
+
+{# screens/CoachMessagesScreen.tsx #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_equipo') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Comunicación</div>{% endblock %}
+{% block hero_title %}Mensajes{% endblock %}
+
+{% block content %}
+
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Escribir</h2></div>
+
+  <div class="pf-field pf-mt-12">
+    <label class="pf-label" for="ms-destino">Para</label>
+    <select class="pf-select" id="ms-destino">
+      <option value="">Todo el equipo</option>
+      {% for j in jugadores %}
+      <option value="{{ j.id }}">{{ j.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="pf-field">
+    <textarea class="pf-textarea" id="ms-texto" rows="4" maxlength="2000"
+              placeholder="Ej. Mañana entrenamos a las 17:00 en la cancha 2. Traed botines de recambio."></textarea>
+  </div>
+
+  <button class="pf-btn pf-btn--primary pf-btn--block" type="button" id="btn-enviar">
+    <i data-ico="send" class="pf-ico--sm"></i> Enviar
+  </button>
+</div>
+
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Enviados</h2>
+    {% if mensajes %}<span class="pf-card__badge">{{ mensajes|length }}</span>{% endif %}
+  </div>
+
+  {% for m in mensajes %}
+  <div class="pf-item" data-msg="{{ m.id }}" style="align-items:flex-start">
+    <span class="pf-item__icon" style="
+      {% if m.player_id %}background:rgba(59,130,246,.10);color:var(--info){% endif %}">
+      <i data-ico="{{ 'user' if m.player_id else 'users' }}" class="pf-ico--sm"></i>
+    </span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">{{ m._destino }}</span>
+      <span class="pf-item__sub" style="white-space:normal">{{ m.texto }}</span>
+      <span class="pf-item__sub" style="color:var(--text-muted)">
+        {%- if m._fecha %}{{ m._fecha.strftime('%d/%m/%Y') }}{% endif -%}
+        {%- if m.player_id %} · {{ 'Leído' if m.leido else 'Sin leer' }}{% endif -%}
+      </span>
+    </span>
+    <button type="button" class="pf-item__chev ms-del" data-id="{{ m.id }}"
+            aria-label="Eliminar" style="color:var(--text-muted)">
+      <i data-ico="trash-2" class="pf-ico--sm"></i>
+    </button>
+  </div>
+  {% endfor %}
+
+  {% if not mensajes %}
+  <div class="pf-empty" style="padding:22px 8px">
+    <div class="pf-empty__icon"><i data-ico="mail" class="pf-ico--xxl"></i></div>
+    <h3 class="pf-empty__title">Sin mensajes</h3>
+    <p class="pf-empty__text">
+      Lo que escribas aquí le aparece a tu plantilla en su app, sin depender
+      de grupos de WhatsApp.
+    </p>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  document.getElementById('btn-enviar').addEventListener('click', function () {
+    var texto = document.getElementById('ms-texto').value.trim();
+    if (!texto) { document.getElementById('ms-texto').focus(); return; }
+
+    PF.api('{{ url_for("futbol.api_mensaje") }}', {
+      texto: texto,
+      player_id: document.getElementById('ms-destino').value || null
+    })
+      .then(function () { location.reload(); })
+      .catch(function (e) { PF.toast(e.message, 'error'); });
+  });
+
+  document.querySelectorAll('.ms-del').forEach(function (b) {
+    b.addEventListener('click', function () {
+      PF.api('/api/mensaje/' + b.dataset.id, null, 'DELETE')
+        .then(function () {
+          document.querySelector('[data-msg="' + b.dataset.id + '"]').remove();
+          PF.toast('Mensaje eliminado');
+        })
+        .catch(function (e) { PF.toast(e.message, 'error'); });
+    });
+  });
+})();
+</script>
+{% endblock %}

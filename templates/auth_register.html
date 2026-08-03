@@ -1,0 +1,147 @@
+{% extends '_shell.html' %}
+{% block title %}Crear cuenta · ProFoot Assistant{% endblock %}
+{% block hero %}{% endblock %}
+
+{# Envía a /signup. El "código de equipo" es el codigo_equipo del entrenador:
+   auth.py lo valida y crea la fila en fut_plantilla al registrar al jugador. #}
+{% block head %}
+<style>
+  .reg-wrap { max-width: 460px; margin: 0 auto; padding: 0 20px 40px; }
+  .reg-top { text-align: center; padding: calc(26px + env(safe-area-inset-top,0px)) 0 22px; }
+  .reg-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 7px 14px; border-radius: 100px; font-size: 12px; font-weight: 800;
+    letter-spacing: .5px; text-transform: uppercase; margin-bottom: 12px;
+  }
+  .reg-h1 { font-size: 25px; font-weight: 800; letter-spacing: -.4px; margin: 0 0 6px; }
+  .reg-sub { font-size: 14px; color: var(--text-sec); margin: 0; line-height: 1.5; }
+  .reg-card { background:#fff; border:1px solid var(--border-soft); border-radius: var(--r-xl);
+              padding: 20px; box-shadow: var(--sh-md); }
+  .reg-group { font-size:10px; font-weight:800; letter-spacing:1px; text-transform:uppercase;
+               color: var(--text-muted); margin: 18px 0 10px; }
+  .reg-group:first-child { margin-top: 0; }
+  .reg-two { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .reg-hint { font-size:12px; color:var(--text-sec); margin:6px 0 0; line-height:1.45; }
+  .reg-code { letter-spacing: 3px; font-weight: 800; text-transform: uppercase; text-align:center; font-size:18px; }
+  .reg-back { text-align:center; margin-top:22px; font-size:14px; }
+  .reg-back a { color: var(--primary); font-weight: 700; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="reg-wrap">
+
+  <div class="reg-top">
+    {% if role == 'especialista' %}
+      <span class="reg-badge" style="background:#fef3c7;color:#b45309">
+        <i data-ico="users" class="pf-ico--xs"></i> Entrenador
+      </span>
+      <h1 class="reg-h1">Crea tu cuenta de entrenador</h1>
+      <p class="reg-sub">Al terminar recibirás el código con el que tus jugadores se unen al equipo.</p>
+    {% else %}
+      <span class="reg-badge" style="background:#dbeafe;color:#1d4ed8">
+        <i data-ico="user" class="pf-ico--xs"></i> Jugador
+      </span>
+      <h1 class="reg-h1">Únete a tu equipo</h1>
+      <p class="reg-sub">Necesitas el código que te dio tu entrenador.</p>
+    {% endif %}
+  </div>
+
+  <form class="reg-card" method="POST" action="{{ url_for('auth.signup') }}" autocomplete="on">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <input type="hidden" name="role" value="{{ role }}">
+
+    <div class="reg-group">
+      {{ 'Código de alta de entrenador' if role == 'especialista' else 'Código del equipo' }}
+    </div>
+    <div class="pf-field">
+      <input class="pf-input reg-code" name="codigo_vinculacion" type="text" required
+             value="{{ codigo }}" placeholder="ABC123" maxlength="24"
+             oninput="this.value=this.value.toUpperCase()">
+      <p class="reg-hint">
+        {% if role == 'especialista' %}
+          Es el código que te entrega ProFoot al contratar. Al registrarte
+          recibirás el tuyo propio para que tus jugadores se unan.
+        {% else %}
+          Pídeselo a tu entrenador: aparece en su pantalla de Inicio.
+        {% endif %}
+      </p>
+    </div>
+
+    <div class="reg-group">Tus datos</div>
+
+    <div class="pf-field">
+      <label class="pf-label" for="name">Nombre completo</label>
+      <input class="pf-input" id="name" name="name" type="text" required
+             autocomplete="name" placeholder="Juan Pérez">
+    </div>
+
+    <div class="reg-two">
+      <div class="pf-field">
+        <label class="pf-label" for="birth_year">Año de nacimiento</label>
+        <input class="pf-input" id="birth_year" name="birth_year" type="number"
+               inputmode="numeric" min="1930" max="2020" placeholder="2005">
+      </div>
+      <div class="pf-field">
+        <label class="pf-label" for="gender">Género</label>
+        <select class="pf-select" id="gender" name="gender">
+          <option value="male">Masculino</option>
+          <option value="female">Femenino</option>
+        </select>
+      </div>
+    </div>
+
+    {% if role != 'especialista' %}
+    <div class="reg-two">
+      <div class="pf-field">
+        <label class="pf-label" for="height">Estatura (cm)</label>
+        <input class="pf-input" id="height" name="height" type="number"
+               inputmode="decimal" step="0.1" placeholder="175">
+      </div>
+      <div class="pf-field">
+        <label class="pf-label" for="weight">Peso (kg)</label>
+        <input class="pf-input" id="weight" name="weight" type="number"
+               inputmode="decimal" step="0.1" placeholder="70">
+      </div>
+    </div>
+    {% else %}
+    <div class="pf-field">
+      <label class="pf-label" for="especialidad">Club o categoría</label>
+      <input class="pf-input" id="especialidad" name="especialidad" type="text"
+             placeholder="Sub-17 · Club Deportivo">
+    </div>
+    {% endif %}
+
+    <div class="reg-group">Acceso</div>
+
+    <div class="pf-field">
+      <label class="pf-label" for="correo">Correo electrónico</label>
+      <input class="pf-input" id="correo" name="correo" type="email" required
+             autocomplete="email" placeholder="tu@correo.com">
+      <p class="reg-hint">Con este correo entrarás a la app.</p>
+    </div>
+
+    <div class="pf-field">
+      <label class="pf-label" for="password">Contraseña</label>
+      <input class="pf-input" id="password" name="password" type="password" required
+             minlength="8" autocomplete="new-password" placeholder="Mínimo 8 caracteres">
+    </div>
+
+    <div class="pf-field">
+      <label class="pf-label" for="telefono">Teléfono <span style="font-weight:500;color:var(--text-muted)">(opcional)</span></label>
+      <input class="pf-input" id="telefono" name="telefono" type="tel"
+             autocomplete="tel" placeholder="0991234567">
+    </div>
+
+    <button class="pf-btn pf-btn--primary pf-btn--block pf-mt-8" type="submit">
+      <i data-ico="check" class="pf-ico--sm"></i> Crear mi cuenta
+    </button>
+  </form>
+
+  <p class="reg-back">
+    <a href="{{ url_for('auth.rol') }}">← Cambiar de rol</a>
+    &nbsp;·&nbsp;
+    <a href="{{ url_for('auth.entrar') }}">Ya tengo cuenta</a>
+  </p>
+</div>
+{% endblock %}

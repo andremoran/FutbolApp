@@ -1,0 +1,166 @@
+{% extends '_shell.html' %}
+{% block title %}Salud mental · ProFoot{% endblock %}
+
+{# screens/CoachMentalHealthScreen.tsx.
+   El entrenador ve SEMÁFOROS, nunca respuestas. Esa frontera es lo que hace
+   que los jugadores contesten con honestidad, y la plantilla lo dice en voz
+   alta para que quede claro por ambos lados. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_equipo') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Bienestar</div>{% endblock %}
+{% block hero_title %}Salud mental{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">{{ total }} jugador{{ '' if total == 1 else 'es' }} en seguimiento</div>
+{% endblock %}
+
+{% block hero_extra %}
+{# Fondo blanco y color en el número: sobre el verde del hero, los rellenos
+   translúcidos de rojo y ámbar se apagaban y no se distinguían entre sí. #}
+<div style="display:flex;gap:8px;margin-top:18px">
+  <div class="sm-kpi">
+    <span class="sm-kpi__v" style="color:#047857">{{ conteo.verde }}</span>
+    <span class="sm-kpi__l">bien</span>
+  </div>
+  <div class="sm-kpi">
+    <span class="sm-kpi__v" style="color:#b45309">{{ conteo.ambar }}</span>
+    <span class="sm-kpi__l">atención</span>
+  </div>
+  <div class="sm-kpi">
+    <span class="sm-kpi__v" style="color:#b91c1c">{{ conteo.rojo }}</span>
+    <span class="sm-kpi__l">prioridad</span>
+  </div>
+  <div class="sm-kpi">
+    <span class="sm-kpi__v" style="color:#64748b">{{ conteo.sin_datos }}</span>
+    <span class="sm-kpi__l">sin datos</span>
+  </div>
+</div>
+{% endblock %}
+
+{% block head %}
+<style>
+  .sm-kpi { flex:1; border-radius:12px; padding:10px 6px; text-align:center;
+            background:#fff; box-shadow:0 2px 8px rgba(0,0,0,.10); }
+  .sm-kpi__v { display:block; font-size:22px; font-weight:800; line-height:1.1; }
+  .sm-kpi__l { display:block; font-size:9px; font-weight:800; color:var(--text-sec);
+               margin-top:2px; text-transform:uppercase; letter-spacing:.4px; }
+
+  .sm-luz { width:14px; height:14px; border-radius:7px; flex:none; }
+  .sm-aviso {
+    display:flex; gap:10px; align-items:flex-start;
+    background:var(--info-bg); border-radius:var(--r-lg);
+    padding:13px 14px; margin:16px 16px 0;
+    font-size:12.5px; color:#1e40af; line-height:1.55;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="sm-aviso">
+  <i data-ico="lock" class="pf-ico--sm" style="flex:none;margin-top:1px"></i>
+  <span>
+    <strong>Ves el semáforo, no las respuestas.</strong>
+    Lo que cada jugador contesta es confidencial: ni tú ni nadie puede leerlo.
+    Eso es justo lo que hace que respondan con la verdad.
+  </span>
+</div>
+
+{# ── Acción ── #}
+<div style="padding:16px 16px 0">
+  <a class="pf-btn pf-btn--primary pf-btn--block" href="{{ url_for('futbol.c_asignar_checkin') }}">
+    <i data-ico="bell" class="pf-ico--sm"></i> Pedir un check-in
+  </a>
+</div>
+
+{# ── Estado por jugador ── #}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Estado del equipo</h2></div>
+
+  {% for j in jugadores %}
+  <div class="pf-item">
+    <span class="sm-luz" style="background:
+      {%- if j._estado == 'rojo' %}var(--danger)
+      {%- elif j._estado == 'ambar' %}var(--warning)
+      {%- elif j._estado == 'verde' %}var(--success)
+      {%- else %}var(--border){% endif %}"></span>
+
+    <span class="pf-avatar pf-avatar--sm">
+      {%- if j.profile_photo %}<img src="{{ j.profile_photo }}" alt="">
+      {%- else %}{{ (j.name or '?')[:1]|upper }}{% endif -%}
+    </span>
+
+    <span class="pf-item__body">
+      <span class="pf-item__title">{{ j.name }}</span>
+      <span class="pf-item__sub">
+        {%- if j._estado == 'sin_datos' -%}
+          Nunca ha respondido
+        {%- else -%}
+          {%- if j._estado == 'rojo' %}Necesita atención
+          {%- elif j._estado == 'ambar' %}Con altibajos
+          {%- else %}Se siente bien{% endif -%}
+          {%- if j._fecha %} · {{ j._fecha.strftime('%d/%m') }}{% endif -%}
+          {%- if j._atrasado %} · sin responder hace {{ semanas }}+ semanas{% endif -%}
+        {%- endif -%}
+      </span>
+    </span>
+
+    {% if j._estado == 'rojo' %}
+    <span class="pf-pill pf-pill--danger">Habla con él</span>
+    {% elif j._estado == 'sin_datos' or j._atrasado %}
+    <span class="pf-pill pf-pill--muted">Pídeselo</span>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  {% if not jugadores %}
+  <div class="pf-empty" style="padding:22px 8px">
+    <div class="pf-empty__icon"><i data-ico="heart" class="pf-ico--xxl"></i></div>
+    <h3 class="pf-empty__title">Sin jugadores</h3>
+    <p class="pf-empty__text">Suma jugadores a tu plantilla para hacer seguimiento del bienestar.</p>
+  </div>
+  {% endif %}
+</div>
+
+{# ── Qué hacer con un rojo ── #}
+{% if conteo.rojo %}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Cuando alguien sale en rojo</h2></div>
+  <p style="font-size:13.5px;color:var(--text-sec);line-height:1.6;margin:10px 0 0">
+    No preguntes por el test. Pregunta por la persona: un «¿cómo vas?» a solas,
+    sin prisa y sin público, vale más que cualquier informe. Si la situación se
+    sostiene semanas, sugiérele hablar con un psicólogo del deporte — es lo mismo
+    que mandarlo al fisio por una lesión, y así hay que plantearlo.
+  </p>
+</div>
+{% endif %}
+
+{# ── Historial de peticiones ── #}
+{% if asignaciones %}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Check-ins pedidos</h2></div>
+  {% for a in asignaciones %}
+  <div class="pf-item">
+    <span class="pf-item__icon" style="
+      {% if a.estado == 'respondido' %}background:var(--success-bg);color:var(--primary)
+      {% else %}background:var(--warning-bg);color:var(--warning){% endif %}">
+      <i data-ico="{{ 'check' if a.estado == 'respondido' else 'clock' }}" class="pf-ico--sm"></i>
+    </span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">
+        {{ 'Respondido' if a.estado == 'respondido' else 'Pendiente' }}
+      </span>
+      <span class="pf-item__sub">
+        {%- if a._fecha %}{{ a._fecha.strftime('%d/%m/%Y') }}{% endif -%}
+        {%- if a.mensaje %} · «{{ a.mensaje[:60] }}»{% endif -%}
+      </span>
+    </span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}

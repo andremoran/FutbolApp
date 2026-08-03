@@ -1,0 +1,484 @@
+/* ============================================================================
+   profoot.css — Sistema de diseño de ProFoot Assistant para la web.
+
+   Puerto 1:1 de theme/design.ts y components/ui.tsx de la app React Native.
+   Los números NO son aproximaciones: son los mismos que usa la app nativa,
+   para que en un celular se vea idéntica.
+   ========================================================================= */
+
+/* ─── TOKENS ──────────────────────────────────────────────────────────── */
+:root {
+  /* Marca: verde botella */
+  --primary:       #047857;   /* emerald-700 — principal */
+  --primary-dark:  #065f46;   /* emerald-800 — hovers, gradientes */
+  --primary-light: #10b981;   /* emerald-500 — acentos, pestaña activa */
+  --primary-soft:  #d1fae5;   /* emerald-100 — fondos suaves */
+  --primary-faint: #ecfdf5;   /* emerald-50  — fondos muy suaves */
+
+  /* Neutros (slate) */
+  --text:        #0f172a;
+  --text-sec:    #64748b;
+  --text-muted:  #94a3b8;
+  --border:      #e2e8f0;
+  --border-soft: #f1f5f9;
+
+  /* Fondos */
+  --bg:      #f9fafb;
+  --surface: #ffffff;
+
+  /* Cancha (SVG decorativos) */
+  --field:      #15803d;
+  --field-dark: #14532d;
+
+  /* Semánticos */
+  --warning:    #f59e0b;  --warning-bg: #fef3c7;
+  --danger:     #ef4444;  --danger-bg:  #fee2e2;
+  --success:    #10b981;  --success-bg: #d1fae5;
+  --info:       #3b82f6;  --info-bg:    #dbeafe;
+  --purple:     #8b5cf6;  --purple-bg:  #ede9fe;
+  --orange:     #f97316;
+  --pink:       #ec4899;
+
+  /* Radios */
+  --r-sm: 8px; --r-md: 10px; --r-lg: 12px; --r-xl: 16px; --r-xxl: 20px; --r-full: 9999px;
+
+  /* Sombras */
+  --sh-sm: 0 1px 6px rgba(0,0,0,0.04);
+  --sh-md: 0 4px 12px rgba(0,0,0,0.08);
+  --sh-lg: 0 8px 20px rgba(0,0,0,0.12);
+  --sh-primary: 0 4px 8px rgba(4,120,87,0.25);
+
+  /* Alto de la barra de pestañas — lo consumen los paddings de contenido */
+  --tabbar-h: 60px;
+  --tabbar-gap: 30px;
+}
+
+/* ─── BASE ────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body.pf {
+  margin: 0;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.45;
+  /* Sin rebote elástico ni resaltado azul al tocar: se siente app, no web. */
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body.pf * { -webkit-tap-highlight-color: transparent; }
+
+a { color: inherit; text-decoration: none; }
+button { font: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+input, select, textarea { font: inherit; color: inherit; }
+img, svg { max-width: 100%; }
+
+/* Scrollbar discreta (en escritorio) */
+.pf ::-webkit-scrollbar { width: 6px; height: 6px; }
+.pf ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ─── TIPOGRAFÍA ──────────────────────────────────────────────────────── */
+.t-display { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; }
+.t-h1      { font-size: 22px; font-weight: 800; letter-spacing: -0.3px; }
+.t-h2      { font-size: 18px; font-weight: 700; letter-spacing: -0.2px; }
+.t-h3      { font-size: 16px; font-weight: 700; }
+.t-body    { font-size: 14px; font-weight: 500; }
+.t-body-sm { font-size: 13px; font-weight: 500; }
+.t-caption { font-size: 12px; font-weight: 600; }
+.t-micro   { font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
+
+.c-sec   { color: var(--text-sec); }
+.c-muted { color: var(--text-muted); }
+.c-prim  { color: var(--primary); }
+
+/* ─── ESTRUCTURA DE PANTALLA ──────────────────────────────────────────── */
+/* Equivalente de WebContainer: full width en móvil, centrado en escritorio. */
+.pf-app { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+
+.pf-scroll {
+  flex: 1;
+  /* Deja aire para que la barra flotante no tape el último elemento (RN: paddingBottom 120) */
+  padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px));
+}
+
+.pf-wrap { width: 100%; margin: 0 auto; }
+
+@media (min-width: 1024px) {
+  .pf-wrap { max-width: 900px; padding: 0 24px; }
+  .pf-wrap--wide { max-width: 1200px; }
+}
+
+/* ─── HERO HEADER (ui.tsx › ScreenHeroHeader) ─────────────────────────── */
+.pf-hero {
+  position: relative;
+  overflow: hidden;
+  padding-top: calc(16px + env(safe-area-inset-top, 0px));
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  color: #fff;
+}
+.pf-hero__field {                 /* líneas de cancha decorativas */
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+}
+.pf-hero__content { position: relative; z-index: 1; padding: 8px 20px 0; }
+.pf-hero__row { display: flex; align-items: flex-start; gap: 10px; }
+.pf-hero__label {
+  font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
+  color: rgba(255,255,255,0.75); margin: 0 0 4px;
+}
+.pf-hero__title {
+  font-size: 28px; font-weight: 800; letter-spacing: -0.5px; color: #fff; margin: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pf-hero__subtitle {
+  font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.85); margin: 4px 0 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pf-hero__grow { flex: 1; min-width: 0; }
+.pf-hero__actions { display: flex; align-items: center; gap: 10px; }
+.pf-hero__btn {
+  width: 38px; height: 38px; border-radius: 19px; flex: none;
+  background: rgba(255,255,255,0.18);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; transition: background .15s;
+}
+.pf-hero__btn:active { background: rgba(255,255,255,0.30); }
+.pf-hero__avatar {
+  width: 38px; height: 38px; border-radius: 19px; flex: none;
+  background: #fff; color: var(--primary);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 800; overflow: hidden;
+}
+.pf-hero__avatar img { width: 100%; height: 100%; object-fit: cover; }
+.pf-hero--pb { padding-bottom: 24px; }
+
+/* ─── SECTION CARD (ui.tsx › SectionCard) ─────────────────────────────── */
+.pf-card {
+  background: #fff;
+  margin: 16px 16px 0;
+  padding: 16px;
+  border-radius: var(--r-xl);
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--sh-sm);
+}
+.pf-card__head {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 8px; margin-bottom: 4px;
+}
+.pf-card__title { font-size: 18px; font-weight: 700; letter-spacing: -0.2px; color: var(--text); flex: 1; margin: 0; }
+.pf-card__badge {
+  padding: 3px 8px; border-radius: 10px;
+  font-size: 12px; font-weight: 800;
+  background: var(--primary-soft); color: var(--primary);
+}
+
+/* ─── STAT MINI CARD (ui.tsx › StatMiniCard) ──────────────────────────── */
+.pf-stats { display: flex; gap: 12px; padding: 0 16px; margin-top: 16px; }
+.pf-stat {
+  flex: 1; min-width: 0; background: #fff; padding: 12px;
+  border-radius: var(--r-xl); border: 1px solid var(--border-soft);
+  box-shadow: var(--sh-sm);
+}
+.pf-stat__top { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.pf-stat__icon {
+  width: 24px; height: 24px; border-radius: 8px; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(4,120,87,0.10); color: var(--primary);
+}
+.pf-stat__value { font-size: 26px; font-weight: 800; letter-spacing: -0.5px; flex: 1; color: var(--primary); }
+.pf-stat__label { font-size: 12px; font-weight: 600; color: var(--text-sec); margin-top: 4px; }
+
+/* Variante grande de la pantalla Inicio del jugador (HomeScreen.tsx) */
+.pf-bigstats { display: flex; gap: 12px; padding: 0 20px; margin-bottom: 24px; }
+.pf-bigstat {
+  flex: 1; background: var(--primary-soft); padding: 16px;
+  border-radius: var(--r-lg); text-align: center;
+}
+.pf-bigstat__icon {
+  width: 48px; height: 48px; border-radius: 24px; background: #fff;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 12px; color: var(--primary-light);
+}
+.pf-bigstat__label { font-size: 13px; color: var(--text-sec); margin-bottom: 4px; }
+.pf-bigstat__value { font-size: 24px; font-weight: 700; color: #000; }
+
+/* ─── LIST ITEM (ui.tsx › ListItemCard) ───────────────────────────────── */
+.pf-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 4px;
+  border-top: 1px solid var(--border-soft);
+  width: 100%; text-align: left;
+}
+.pf-item:first-of-type { border-top: none; }
+.pf-item__icon {
+  width: 38px; height: 38px; border-radius: 10px; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(4,120,87,0.10); color: var(--primary);
+}
+.pf-item__body { flex: 1; min-width: 0; }
+.pf-item__title {
+  font-size: 14px; font-weight: 700; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pf-item__sub {
+  font-size: 12px; color: var(--text-sec); margin-top: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pf-item__right { font-size: 13px; font-weight: 700; color: var(--primary); flex: none; }
+.pf-item__chev { color: var(--text-muted); flex: none; display: flex; }
+
+/* ─── AVATAR (ui.tsx › Avatar) ────────────────────────────────────────── */
+.pf-avatar {
+  border-radius: var(--r-full); background: var(--primary);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 800; overflow: hidden; flex: none;
+  width: 40px; height: 40px; font-size: 15px;
+}
+.pf-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.pf-avatar--sm { width: 32px; height: 32px; font-size: 12px; }
+.pf-avatar--lg { width: 56px; height: 56px; font-size: 21px; }
+.pf-avatar--xl { width: 80px; height: 80px; font-size: 30px; }
+
+/* ─── BOTONES (ui.tsx › PrimaryButton / SecondaryButton) ──────────────── */
+.pf-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 14px 16px; border-radius: var(--r-lg);
+  font-size: 14px; font-weight: 700;
+  transition: transform .12s, opacity .12s, background .15s;
+}
+.pf-btn:active { transform: scale(0.98); }
+.pf-btn[disabled] { opacity: 0.5; pointer-events: none; }
+.pf-btn--primary { background: var(--primary); color: #fff; box-shadow: var(--sh-primary); }
+.pf-btn--secondary { background: #fff; color: var(--primary); border: 1.5px solid var(--primary); }
+.pf-btn--danger { background: var(--danger); color: #fff; box-shadow: 0 4px 8px rgba(239,68,68,0.25); }
+.pf-btn--ghost { background: var(--border-soft); color: var(--text); }
+.pf-btn--block { display: flex; width: 100%; }
+
+/* Botones grandes de "Acciones Rápidas" (HomeScreen.tsx) */
+.pf-action {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--primary-light); color: #fff;
+  padding: 18px 20px; border-radius: var(--r-lg); margin-bottom: 12px;
+  font-size: 16px; font-weight: 600; width: 100%;
+}
+.pf-action--sec {
+  background: #fff; color: #000;
+  border: 1px solid var(--border);
+}
+
+/* ─── PILL (ui.tsx › Pill) ────────────────────────────────────────────── */
+.pf-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px; border-radius: 10px;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.3px;
+  background: rgba(4,120,87,0.10); color: var(--primary);
+}
+.pf-pill--warning { background: var(--warning-bg); color: #b45309; }
+.pf-pill--danger  { background: var(--danger-bg);  color: #b91c1c; }
+.pf-pill--info    { background: var(--info-bg);    color: #1d4ed8; }
+.pf-pill--purple  { background: var(--purple-bg);  color: #6d28d9; }
+.pf-pill--muted   { background: var(--border-soft); color: var(--text-sec); }
+
+/* ─── EMPTY STATE (ui.tsx › EmptyState) ───────────────────────────────── */
+.pf-empty { display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 32px; margin: 8px 0; text-align: center; }
+.pf-empty__icon {
+  width: 72px; height: 72px; border-radius: 36px; background: var(--border-soft);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 12px; color: var(--text-muted);
+}
+.pf-empty__title { font-size: 18px; font-weight: 700; letter-spacing: -0.2px; margin: 0 0 6px; }
+.pf-empty__text { font-size: 13px; color: var(--text-sec); line-height: 19px; margin: 0; max-width: 320px; }
+
+/* ─── BARRA DE PESTAÑAS ───────────────────────────────────────────────── */
+/* Réplica de PlayerTabNavigator / CoachTabNavigator. En ancho de celular usamos
+   la variante NATIVA (la que se ve en la app), no la variante web. */
+.pf-tabbar {
+  position: fixed; z-index: 300;
+  display: flex; align-items: stretch;
+  background: #fff;
+  border-top: 1px solid var(--border);
+}
+
+/* Jugador (nativo): barra FLOTANTE redondeada */
+.pf-tabbar--player {
+  left: 10px; right: 10px;
+  bottom: calc(30px + env(safe-area-inset-bottom, 0px));
+  height: 60px; padding: 5px 0;
+  border-radius: 15px;
+  box-shadow: 0 2px 3.84px rgba(0,0,0,0.10);
+}
+
+/* Entrenador (nativo): barra PLANA alta pegada abajo */
+.pf-tabbar--coach {
+  left: 0; right: 0; bottom: 0;
+  height: calc(90px + env(safe-area-inset-bottom, 0px));
+  padding: 10px 0 calc(30px + env(safe-area-inset-bottom, 0px));
+}
+
+.pf-tab {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px;
+  color: var(--text-sec);
+  transition: color .15s;
+}
+.pf-tab__icon { display: flex; margin-top: 2px; }
+.pf-tab__label {
+  font-size: 11px; font-weight: 600; margin-bottom: 2px;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pf-tab.is-active { color: var(--primary-light); }
+.pf-tab:active { opacity: 0.6; }
+
+/* Pantallas tipo asistente ocultan la barra (ROUTES_HIDE_TAB_BAR) */
+.pf-tabbar.is-hidden { display: none; }
+
+/* En escritorio, la app usa la variante web: barra plana de 64px centrada */
+@media (min-width: 1024px) {
+  .pf-tabbar--player, .pf-tabbar--coach {
+    left: 0; right: 0; bottom: 0;
+    height: 64px; padding: 8px 0;
+    border-radius: 0;
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.04);
+  }
+  .pf-tabbar__inner { max-width: 900px; margin: 0 auto; width: 100%; display: flex; }
+  .pf-tab__label { font-size: 12px; }
+  .pf-scroll { padding-bottom: 96px; }
+}
+
+.pf-tabbar__inner { display: flex; width: 100%; }
+
+/* ─── HOJA INFERIOR "⋯ Ver más" (WebModalSheet) ───────────────────────── */
+.pf-sheet-back {
+  position: fixed; inset: 0; z-index: 400;
+  background: rgba(15,23,42,0.45);
+  opacity: 0; pointer-events: none;
+  transition: opacity .22s ease;
+  backdrop-filter: blur(2px);
+}
+.pf-sheet-back.is-open { opacity: 1; pointer-events: auto; }
+
+.pf-sheet {
+  position: fixed; z-index: 401; left: 0; right: 0; bottom: 0;
+  background: #fff;
+  border-radius: var(--r-xxl) var(--r-xxl) 0 0;
+  box-shadow: var(--sh-lg);
+  transform: translateY(100%);
+  transition: transform .28s cubic-bezier(.32,.72,0,1);
+  max-height: 86vh; display: flex; flex-direction: column;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.pf-sheet.is-open { transform: translateY(0); }
+
+.pf-sheet__grip {
+  width: 40px; height: 4px; border-radius: 2px; background: var(--border);
+  margin: 10px auto 4px; flex: none;
+}
+.pf-sheet__head { padding: 6px 20px 12px; flex: none; }
+.pf-sheet__title { font-size: 18px; font-weight: 700; letter-spacing: -0.2px; margin: 0; }
+.pf-sheet__sub { font-size: 12px; color: var(--text-sec); margin: 3px 0 0; }
+.pf-sheet__body { overflow-y: auto; padding: 0 12px 16px; -webkit-overflow-scrolling: touch; }
+
+.pf-sheet__group {
+  font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
+  color: var(--text-muted); padding: 14px 12px 6px;
+}
+.pf-sheet__link {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px; border-radius: var(--r-lg);
+  transition: background .15s;
+}
+.pf-sheet__link:active { background: var(--border-soft); }
+.pf-sheet__emoji {
+  width: 38px; height: 38px; border-radius: 10px; flex: none;
+  background: var(--primary-faint);
+  display: flex; align-items: center; justify-content: center; font-size: 18px;
+}
+.pf-sheet__label { font-size: 14px; font-weight: 700; }
+.pf-sheet__desc { font-size: 12px; color: var(--text-sec); margin-top: 1px; }
+
+@media (min-width: 1024px) {
+  /* Separada del borde inferior: hay que desplazarla su alto MÁS ese hueco,
+     o de lo contrario asomaría por abajo estando cerrada. */
+  .pf-sheet { left: 50%; right: auto; width: 460px;
+              border-radius: var(--r-xxl); bottom: 24px;
+              transform: translate(-50%, calc(100% + 24px)); }
+  .pf-sheet.is-open { transform: translate(-50%, 0); }
+}
+
+/* ─── FORMULARIOS ─────────────────────────────────────────────────────── */
+.pf-field { margin-bottom: 14px; }
+.pf-label {
+  display: block; font-size: 12px; font-weight: 700; color: var(--text-sec);
+  margin-bottom: 6px;
+}
+.pf-input, .pf-select, .pf-textarea {
+  width: 100%; padding: 13px 14px;
+  background: #fff; border: 1px solid var(--border); border-radius: var(--r-lg);
+  font-size: 15px; color: var(--text);
+  transition: border-color .15s, box-shadow .15s;
+  /* 16px real en móvil evita el zoom automático de iOS al enfocar */
+}
+.pf-input:focus, .pf-select:focus, .pf-textarea:focus {
+  outline: none; border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(4,120,87,0.12);
+}
+.pf-textarea { resize: vertical; min-height: 88px; line-height: 1.5; }
+.pf-select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+             background-repeat: no-repeat; background-position: right 12px center; padding-right: 38px; }
+@media (max-width: 1023px) {
+  .pf-input, .pf-select, .pf-textarea { font-size: 16px; }
+}
+
+/* ─── BARRA DE PROGRESO ───────────────────────────────────────────────── */
+.pf-bar { height: 8px; background: var(--border-soft); border-radius: 4px; overflow: hidden; }
+.pf-bar__fill {
+  height: 100%; border-radius: 4px;
+  background: linear-gradient(90deg, var(--primary-light), var(--primary));
+  transition: width .6s cubic-bezier(.32,.72,0,1);
+}
+
+/* ─── AVISOS (flash de Flask) ─────────────────────────────────────────── */
+.pf-flash {
+  display: flex; align-items: flex-start; gap: 10px;
+  margin: 12px 16px 0; padding: 12px 14px;
+  border-radius: var(--r-lg); font-size: 13px; font-weight: 600;
+}
+.pf-flash--error   { background: var(--danger-bg);  color: #991b1b; }
+.pf-flash--success { background: var(--success-bg); color: #065f46; }
+.pf-flash--info    { background: var(--info-bg);    color: #1e40af; }
+.pf-flash--warning { background: var(--warning-bg); color: #92400e; }
+
+/* ─── UTILIDADES ──────────────────────────────────────────────────────── */
+.pf-row { display: flex; align-items: center; gap: 8px; }
+.pf-row--between { justify-content: space-between; }
+.pf-col { display: flex; flex-direction: column; }
+.pf-grow { flex: 1; min-width: 0; }
+.pf-gap-8 { gap: 8px; } .pf-gap-12 { gap: 12px; }
+.pf-mt-8 { margin-top: 8px; } .pf-mt-12 { margin-top: 12px; } .pf-mt-16 { margin-top: 16px; }
+.pf-mt-24 { margin-top: 24px; }
+.pf-mb-8 { margin-bottom: 8px; } .pf-mb-12 { margin-bottom: 12px; } .pf-mb-16 { margin-bottom: 16px; }
+.pf-px-16 { padding: 0 16px; } .pf-px-20 { padding: 0 20px; }
+.pf-center { text-align: center; }
+.pf-truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pf-hide { display: none !important; }
+
+/* Iconos Feather en línea: tamaño uniforme y trazo de la app */
+.pf-ico { width: 22px; height: 22px; stroke-width: 2; flex: none; }
+.pf-ico--sm { width: 18px; height: 18px; }
+.pf-ico--xs { width: 14px; height: 14px; }
+.pf-ico--lg { width: 24px; height: 24px; }
+.pf-ico--xxl { width: 36px; height: 36px; }
+
+/* Animación de entrada de las tarjetas */
+@keyframes pfFadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.pf-fade { animation: pfFadeUp .34s ease both; }
+@media (prefers-reduced-motion: reduce) {
+  .pf-fade, .pf-sheet, .pf-sheet-back, .pf-bar__fill { animation: none !important; transition: none !important; }
+}

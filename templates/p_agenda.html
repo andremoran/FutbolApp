@@ -1,0 +1,129 @@
+{% extends '_shell.html' %}
+{% block title %}Agenda · ProFoot{% endblock %}
+
+{% block hero_label %}<div class="pf-hero__label">Mi calendario</div>{% endblock %}
+{% block hero_title %}Agenda{% endblock %}
+{% block hero_subtitle %}
+  {% if entrenador %}
+    <div class="pf-hero__subtitle">{{ entrenador.name }} · tu entrenador</div>
+  {% else %}
+    <div class="pf-hero__subtitle">Aún sin equipo</div>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+
+{% if not entrenador %}
+  <div class="pf-empty">
+    <div class="pf-empty__icon"><i data-ico="calendar" class="pf-ico--xxl"></i></div>
+    <h2 class="pf-empty__title">Todavía no tienes agenda</h2>
+    <p class="pf-empty__text">
+      Cuando te unas al equipo de tu entrenador con su código, aquí verás los
+      entrenamientos, partidos y reuniones.
+    </p>
+  </div>
+
+{% elif not eventos %}
+  <div class="pf-empty">
+    <div class="pf-empty__icon"><i data-ico="calendar" class="pf-ico--xxl"></i></div>
+    <h2 class="pf-empty__title">Sin eventos próximos</h2>
+    <p class="pf-empty__text">Tu entrenador todavía no ha agendado nada. Te avisaremos aquí.</p>
+  </div>
+
+{% else %}
+  <div class="pf-card">
+    <div class="pf-card__head">
+      <h2 class="pf-card__title">Próximos</h2>
+      <span class="pf-card__badge">{{ eventos|length }}</span>
+    </div>
+
+    {% for e in eventos %}
+    <div class="pf-item" style="align-items:flex-start">
+      <span class="pf-item__icon" style="flex-direction:column;gap:0;
+        {% if e.tipo == 'partido' %}background:rgba(239,68,68,.10);color:var(--danger)
+        {% elif e.tipo == 'reunion' %}background:rgba(59,130,246,.10);color:var(--info)
+        {% endif %}">
+        {% if e._fecha %}
+          <span style="font-size:15px;font-weight:800;line-height:1">{{ e._fecha.day }}</span>
+          <span style="font-size:8px;font-weight:700;text-transform:uppercase;line-height:1.2">
+            {{ ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][e._fecha.month - 1] }}
+          </span>
+        {% else %}
+          <i data-ico="calendar" class="pf-ico--sm"></i>
+        {% endif %}
+      </span>
+
+      <span class="pf-item__body">
+        <span class="pf-item__title">{{ e.titulo }}</span>
+        <span class="pf-item__sub">
+          {%- if e._hoy %}Hoy{% endif -%}
+          {%- if e.hora %}{% if e._hoy %} · {% endif %}{{ e.hora[:5] }}{% endif -%}
+          {%- if e.lugar %} · {{ e.lugar }}{% endif -%}
+        </span>
+        {% if e.descripcion %}
+        <span class="pf-item__sub" style="white-space:normal">{{ e.descripcion }}</span>
+        {% endif %}
+
+        {# Confirmar asistencia — el gesto que el entrenador espera del jugador #}
+        <span style="display:flex;gap:6px;margin-top:9px" data-asist="{{ e.id }}">
+          {% for clave, texto in [('asiste','Voy'), ('duda','Quizá'), ('falta','No voy')] %}
+          <button type="button" class="pf-asist-btn {{ 'is-on' if e._asistencia == clave }}"
+                  data-estado="{{ clave }}" data-evento="{{ e.id }}">{{ texto }}</button>
+          {% endfor %}
+        </span>
+      </span>
+    </div>
+    {% endfor %}
+  </div>
+{% endif %}
+
+{% if pasados %}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Ya pasaron</h2></div>
+  {% for e in pasados %}
+  <div class="pf-item" style="opacity:.6">
+    <span class="pf-item__icon" style="background:var(--border-soft);color:var(--text-muted)">
+      <i data-ico="check" class="pf-ico--sm"></i>
+    </span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">{{ e.titulo }}</span>
+      <span class="pf-item__sub">{{ e.fecha }}</span>
+    </span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block head %}
+<style>
+  .pf-asist-btn {
+    padding: 6px 12px; border-radius: 100px; font-size: 12px; font-weight: 700;
+    background: var(--border-soft); color: var(--text-sec);
+    border: 1px solid transparent; transition: all .15s;
+  }
+  .pf-asist-btn.is-on { background: var(--primary); color: #fff; }
+  .pf-asist-btn:active { transform: scale(.95); }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.querySelectorAll('.pf-asist-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var estado = btn.dataset.estado, evento = btn.dataset.evento;
+      PF.api('{{ url_for("futbol.api_asistencia") }}', { event_id: evento, estado: estado })
+        .then(function () {
+          // Solo un botón activo por evento
+          document.querySelectorAll('[data-asist="' + evento + '"] .pf-asist-btn')
+            .forEach(function (b) { b.classList.toggle('is-on', b === btn); });
+          PF.toast(estado === 'asiste' ? 'Confirmaste tu asistencia'
+                 : estado === 'falta'  ? 'Avisaste que no vas'
+                                       : 'Marcado como "quizá"');
+        })
+        .catch(function (e) { PF.toast(e.message, 'error'); });
+    });
+  });
+</script>
+{% endblock %}

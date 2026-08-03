@@ -1,0 +1,114 @@
+{# Estilos y comportamiento del chat con la IA. Compartidos por las dos pestañas. #}
+<style>
+  .ia-msg {
+    max-width: 84%; padding: 11px 14px; border-radius: 16px;
+    font-size: 14px; line-height: 1.5; margin-bottom: 10px;
+    white-space: pre-wrap; word-wrap: break-word;
+  }
+  .ia-msg--yo {
+    margin-left: auto; background: var(--primary); color: #fff;
+    border-bottom-right-radius: 5px;
+  }
+  .ia-msg--ia {
+    margin-right: auto; background: #fff; color: var(--text);
+    border: 1px solid var(--border-soft); border-bottom-left-radius: 5px;
+    box-shadow: var(--sh-sm);
+  }
+  .ia-msg--pensando { color: var(--text-muted); font-style: italic; }
+
+  .ia-sug {
+    padding: 8px 13px; border-radius: 100px; font-size: 12.5px; font-weight: 600;
+    background: #fff; border: 1px solid var(--border); color: var(--text-sec);
+    transition: all .15s;
+  }
+  .ia-sug:active { background: var(--primary-soft); border-color: var(--primary); color: var(--primary); }
+
+  /* Barra de escritura anclada encima de la barra de pestañas */
+  .ia-bar {
+    position: fixed; left: 0; right: 0; z-index: 250;
+    bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+    background: rgba(249,250,251,.94); backdrop-filter: blur(10px);
+    border-top: 1px solid var(--border-soft);
+  }
+  .pf-tabbar--coach ~ * .ia-bar { bottom: calc(90px + env(safe-area-inset-bottom, 0px)); }
+  @media (min-width: 1024px) {
+    .ia-bar { bottom: 64px; }
+  }
+  /* El hilo necesita aire para que la barra no tape el último mensaje */
+  .pf-scroll { padding-bottom: calc(190px + env(safe-area-inset-bottom, 0px)); }
+</style>
+
+<script>
+(function () {
+  var hilo = document.getElementById('chat-hilo');
+  var input = document.getElementById('chat-input');
+  var enviar = document.getElementById('chat-enviar');
+  var sugerencias = document.getElementById('chat-sugerencias');
+  var ocupado = false;
+
+  function alFinal() {
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+  }
+
+  function burbuja(texto, clase) {
+    var d = document.createElement('div');
+    d.className = 'ia-msg ' + clase;
+    d.textContent = texto;
+    hilo.appendChild(d);
+    return d;
+  }
+
+  function preguntar(texto) {
+    if (ocupado || !texto) return;
+    ocupado = true;
+    enviar.disabled = true;
+
+    // Al primer mensaje desaparecen el estado vacío y las sugerencias
+    var vacio = hilo.querySelector('.pf-empty');
+    if (vacio) vacio.remove();
+    if (sugerencias) sugerencias.style.display = 'none';
+
+    burbuja(texto, 'ia-msg--yo');
+    var esperando = burbuja('Pensando…', 'ia-msg--ia ia-msg--pensando');
+    alFinal();
+
+    PF.api('{{ url_for("futbol.api_ia") }}', { mensaje: texto })
+      .then(function (r) {
+        esperando.classList.remove('ia-msg--pensando');
+        esperando.textContent = r.respuesta;
+        alFinal();
+      })
+      .catch(function (e) {
+        esperando.classList.remove('ia-msg--pensando');
+        esperando.textContent = e.message;
+        esperando.style.color = 'var(--danger)';
+      })
+      .finally(function () { ocupado = false; enviar.disabled = false; });
+  }
+
+  enviar.addEventListener('click', function () {
+    var t = input.value.trim();
+    if (!t) { input.focus(); return; }
+    input.value = '';
+    input.style.height = 'auto';
+    preguntar(t);
+  });
+
+  // Enter envía; Shift+Enter salta de línea (como en cualquier chat)
+  input.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar.click(); }
+  });
+
+  // La caja crece con el texto
+  input.addEventListener('input', function () {
+    input.style.height = 'auto';
+    input.style.height = Math.min(120, input.scrollHeight) + 'px';
+  });
+
+  document.querySelectorAll('.ia-sug').forEach(function (b) {
+    b.addEventListener('click', function () { preguntar(b.textContent.trim()); });
+  });
+
+  alFinal();
+})();
+</script>

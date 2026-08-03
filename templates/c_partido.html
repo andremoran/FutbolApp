@@ -1,0 +1,112 @@
+{% extends '_shell.html' %}
+{% block title %}{{ partido.rival }} · ProFoot{% endblock %}
+
+{# screens/MatchStatsScreen.tsx: apuntar minutos, goles y asistencias por jugador.
+   Cada campo se guarda solo al salir, para no perder nada a medio llenar. #}
+
+{% set gf = partido.goles_favor|default(0) %}
+{% set gc = partido.goles_contra|default(0) %}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_partidos') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}
+<div class="pf-hero__label">{{ 'Local' if partido.local else 'Visitante' }} · {{ partido.fecha }}</div>
+{% endblock %}
+{% block hero_title %}{{ 'vs' if partido.local else '@' }} {{ partido.rival }}{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle" style="font-size:20px;font-weight:800">
+  {{ gf }} – {{ gc }}
+  <span style="font-size:13px;font-weight:600;opacity:.85">
+    {{ 'Victoria' if gf > gc else ('Derrota' if gf < gc else 'Empate') }}
+  </span>
+</div>
+{% endblock %}
+
+{% block head %}
+<style>
+  .st-tabla { width:100%; }
+  .st-fila { display:flex; align-items:center; gap:8px; padding:10px 0;
+             border-top:1px solid var(--border-soft); }
+  .st-fila:first-of-type { border-top:none; }
+  .st-nombre { flex:1; min-width:0; font-size:13.5px; font-weight:700;
+               white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .st-num { width:52px; flex:none; padding:7px 6px; font-size:13px; text-align:center; }
+  .st-cab { display:flex; gap:8px; padding:0 0 6px; font-size:10px; font-weight:800;
+            letter-spacing:.5px; text-transform:uppercase; color:var(--text-muted); }
+  .st-cab span:first-child { flex:1; }
+  .st-cab span:not(:first-child) { width:52px; text-align:center; flex:none; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Estadísticas por jugador</h2></div>
+
+  {% if jugadores %}
+  <div class="st-cab pf-mt-12">
+    <span>Jugador</span><span>Min</span><span>Gol</span><span>Asis</span>
+  </div>
+
+  <div class="st-tabla">
+    {% for j in jugadores %}
+    <div class="st-fila">
+      <span class="pf-avatar pf-avatar--sm" style="width:28px;height:28px;font-size:11px">
+        {%- if j.profile_photo %}<img src="{{ j.profile_photo }}" alt="">
+        {%- else %}{{ (j.name or '?')[:1]|upper }}{% endif -%}
+      </span>
+      <span class="st-nombre">{{ j.name }}</span>
+      {% for campo, valor in [('minutos', j._stats.get('minutos')),
+                              ('goles', j._stats.get('goles')),
+                              ('asistencias', j._stats.get('asistencias'))] %}
+      <input class="pf-input st-num st-input" type="number" inputmode="numeric" min="0"
+             data-jugador="{{ j.id }}" data-campo="{{ campo }}"
+             value="{{ valor if valor is not none else '' }}" placeholder="0"
+             aria-label="{{ campo }} de {{ j.name }}">
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <p style="font-size:12px;color:var(--text-muted);margin:14px 0 0;line-height:1.5">
+    Cada número se guarda solo al salir del campo. Lo que apuntes aquí aparece en
+    la pestaña Partidos de cada jugador.
+  </p>
+
+  {% else %}
+  <div class="pf-empty" style="padding:22px 8px">
+    <div class="pf-empty__icon"><i data-ico="users" class="pf-ico--xxl"></i></div>
+    <h3 class="pf-empty__title">Sin jugadores</h3>
+    <p class="pf-empty__text">Suma jugadores a tu plantilla para poder apuntar estadísticas.</p>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.st-input').forEach(function (input) {
+  var previo = input.value;
+  input.addEventListener('change', function () {
+    if (input.value === previo) return;
+
+    // Se manda la fila entera del jugador: el endpoint hace upsert.
+    var datos = { player_id: input.dataset.jugador };
+    document.querySelectorAll('[data-jugador="' + input.dataset.jugador + '"]')
+      .forEach(function (i) { datos[i.dataset.campo] = i.value || 0; });
+
+    PF.api('/api/partido/{{ partido.id }}/stats', datos)
+      .then(function () {
+        previo = input.value;
+        input.style.borderColor = 'var(--primary)';
+        setTimeout(function () { input.style.borderColor = ''; }, 900);
+      })
+      .catch(function (e) { PF.toast(e.message, 'error'); input.value = previo; });
+  });
+});
+</script>
+{% endblock %}

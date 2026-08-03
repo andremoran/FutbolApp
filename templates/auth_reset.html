@@ -1,0 +1,39 @@
+{% extends '_shell.html' %}
+{% block title %}Nueva contraseña · ProFoot{% endblock %}
+{% block hero %}{% endblock %}
+
+{% block head %}
+<style>
+  .auth-wrap { max-width:420px; margin:0 auto; padding:0 22px; }
+  .auth-top { text-align:center; padding:calc(48px + env(safe-area-inset-top,0px)) 0 26px; }
+  .auth-logo { width:108px; height:auto; margin:0 auto 14px; display:block; }
+  .auth-title { font-size:25px; font-weight:800; letter-spacing:-.5px; margin:0 0 8px; }
+  .auth-sub { font-size:15px; color:var(--text-sec); margin:0; }
+  .auth-card { background:#fff; border:1px solid var(--border-soft); border-radius:var(--r-xl);
+               padding:20px; box-shadow:var(--sh-md); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="auth-wrap">
+  <div class="auth-top">
+    <img class="auth-logo" src="{{ url_for('static', filename='logo.svg') }}" alt="ProFoot Assistant">
+    <h1 class="auth-title">Crea tu nueva contraseña</h1>
+    <p class="auth-sub">Mínimo 8 caracteres.</p>
+  </div>
+
+  <form class="auth-card" method="POST" action="{{ url_for('auth.restablecer', token=token) }}">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+
+    <div class="pf-field">
+      <label class="pf-label" for="password">Nueva contraseña</label>
+      <input class="pf-input" id="password" name="password" type="password" required
+             minlength="8" autocomplete="new-password" placeholder="••••••••">
+    </div>
+
+    <button class="pf-btn pf-btn--primary pf-btn--block pf-mt-8" type="submit">
+      <i data-ico="check" class="pf-ico--sm"></i> Guardar contraseña
+    </button>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,66 @@
+{% extends '_shell.html' %}
+{% block title %}Editar equipo · ProFoot{% endblock %}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_inicio') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Configuración</div>{% endblock %}
+{% block hero_title %}Mi equipo{% endblock %}
+
+{% block content %}
+
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Datos del equipo</h2></div>
+
+  <div class="pf-field pf-mt-12">
+    <label class="pf-label" for="eq-nombre">Nombre</label>
+    <input class="pf-input" id="eq-nombre" type="text" maxlength="80"
+           value="{{ '' if equipo._provisional else equipo.nombre }}"
+           placeholder="Ej. Deportivo Los Andes">
+  </div>
+
+  <div class="pf-field">
+    <label class="pf-label" for="eq-cat">Categoría</label>
+    <input class="pf-input" id="eq-cat" type="text" maxlength="60"
+           value="{{ equipo.categoria or '' }}" placeholder="Ej. Sub-17 masculino">
+  </div>
+
+  <button class="pf-btn pf-btn--primary pf-btn--block" type="button" id="btn-equipo">
+    <i data-ico="save" class="pf-ico--sm"></i> Guardar
+  </button>
+</div>
+
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Código de acceso</h2></div>
+  <p style="font-size:13px;color:var(--text-sec);line-height:1.55;margin:10px 0 0">
+    El código con el que tus jugadores se unen es
+    <strong style="color:var(--primary);letter-spacing:2px">{{ equipo.codigo or '—' }}</strong>
+    y va ligado a tu cuenta, así que no se puede cambiar desde aquí. Si necesitas
+    uno nuevo, pídeselo al administrador de la plataforma.
+  </p>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('btn-equipo').addEventListener('click', function () {
+  var nombre = document.getElementById('eq-nombre').value.trim();
+  if (!nombre) { document.getElementById('eq-nombre').focus(); return; }
+
+  PF.api('{{ url_for("futbol.api_equipo_guardar") }}', {
+    nombre: nombre,
+    categoria: document.getElementById('eq-cat').value.trim()
+  })
+    .then(function () {
+      PF.toast('Equipo guardado');
+      setTimeout(function () {
+        window.location.href = '{{ url_for("futbol.c_inicio") }}';
+      }, 700);
+    })
+    .catch(function (e) { PF.toast(e.message, 'error'); });
+});
+</script>
+{% endblock %}

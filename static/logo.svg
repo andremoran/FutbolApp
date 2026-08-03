@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 330" fill="none">
+  <!-- Shield outer border -->
+  <path d="M 28,18 L 272,18 L 272,185 Q 272,235 150,272 Q 28,235 28,185 Z"
+        stroke="#1B5E20" stroke-width="9" stroke-linejoin="round" fill="white"/>
+  <!-- Shield inner border -->
+  <path d="M 42,32 L 258,32 L 258,184 Q 258,226 150,258 Q 42,226 42,184 Z"
+        stroke="#1B5E20" stroke-width="3.5" stroke-linejoin="round"/>
+
+  <!-- ── CAP ── -->
+  <!-- Cap dome -->
+  <path d="M 90,85 Q 90,58 122,58 Q 154,58 154,85" fill="#1B5E20"/>
+  <!-- Cap brim (horizontal bar) -->
+  <rect x="78" y="84" width="80" height="10" rx="4" fill="#1B5E20"/>
+
+  <!-- ── HEAD ── -->
+  <circle cx="122" cy="106" r="22" fill="#1B5E20"/>
+  <!-- Face highlight (makes it look like a silhouette face) -->
+  <ellipse cx="122" cy="108" rx="14" ry="15" fill="white" opacity="0.18"/>
+
+  <!-- ── BODY / JACKET ── -->
+  <!-- Neck -->
+  <rect x="115" y="126" width="14" height="10" rx="2" fill="#1B5E20"/>
+  <!-- Jacket body -->
+  <path d="M 72,148 Q 68,140 90,133 L 105,128 Q 115,148 122,148 Q 129,148 139,128 L 154,133
+           Q 176,140 172,148 L 168,198 Q 162,208 122,208 Q 82,208 76,198 Z" fill="#1B5E20"/>
+  <!-- Collar V -->
+  <path d="M 105,128 L 115,148 L 122,140 L 129,148 L 139,128" fill="white" opacity="0.25"/>
+
+  <!-- ── LEFT ARM (down at side) ── -->
+  <path d="M 74,150 Q 65,165 68,185 Q 70,192 76,192 Q 82,192 84,185 L 82,158"
+        fill="#1B5E20"/>
+
+  <!-- ── RIGHT ARM (holding clipboard) ── -->
+  <path d="M 170,150 Q 180,158 186,168 Q 190,175 185,182 Q 180,188 175,184 L 168,175"
+        fill="#1B5E20"/>
+
+  <!-- ── CLIPBOARD ── -->
+  <!-- Clipboard body -->
+  <rect x="178" y="92" width="56" height="76" rx="5" fill="white" stroke="#1B5E20" stroke-width="5"/>
+  <!-- Clip top -->
+  <rect x="196" y="85" width="20" height="12" rx="4" fill="#1B5E20"/>
+  <!-- Paper lines -->
+  <line x1="188" y1="112" x2="226" y2="112" stroke="#1B5E20" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- X mark (tactical player) -->
+  <line x1="190" y1="124" x2="202" y2="136" stroke="#1B5E20" stroke-width="3.5" stroke-linecap="round"/>
+  <line x1="202" y1="124" x2="190" y2="136" stroke="#1B5E20" stroke-width="3.5" stroke-linecap="round"/>
+  <!-- Second X -->
+  <line x1="212" y1="124" x2="224" y2="136" stroke="#1B5E20" stroke-width="3.5" stroke-linecap="round"/>
+  <line x1="224" y1="124" x2="212" y2="136" stroke="#1B5E20" stroke-width="3.5" stroke-linecap="round"/>
+  <!-- Arrow (tactical move) -->
+  <path d="M 188,152 Q 200,145 218,152" fill="none" stroke="#1B5E20" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M 213,147 L 218,152 L 213,157" fill="none" stroke="#1B5E20" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- ── SOCCER BALL ── -->
+  <circle cx="103" cy="202" r="26" fill="none" stroke="#1B5E20" stroke-width="4.5"/>
+  <!-- Pentagon patch top -->
+  <polygon points="103,178 110,185 107,194 99,194 96,185" fill="none" stroke="#1B5E20" stroke-width="2.5"/>
+  <!-- Left patch -->
+  <polygon points="77,194 84,188 91,194 88,203 78,204" fill="none" stroke="#1B5E20" stroke-width="2"/>
+  <!-- Right patch -->
+  <polygon points="115,195 122,190 128,196 126,206 116,207" fill="none" stroke="#1B5E20" stroke-width="2"/>
+  <!-- Bottom patch -->
+  <polygon points="96,214 103,208 110,214 108,224 98,224" fill="none" stroke="#1B5E20" stroke-width="2"/>
+
+  <!-- ── GRASS ── -->
+  <path d="M 52,218 Q 56,208 60,218 Q 64,208 68,218" stroke="#1B5E20" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+  <path d="M 68,222 Q 72,212 76,222 Q 80,212 84,222" stroke="#1B5E20" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <path d="M 130,222 Q 134,212 138,222 Q 142,212 146,222" stroke="#1B5E20" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <path d="M 148,218 Q 152,208 156,218 Q 160,208 164,218" stroke="#1B5E20" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+
+  <!-- ── TEXT ── -->
+  <text x="150" y="302"
+        font-family="'Arial Black', Arial, sans-serif"
+        font-size="38"
+        font-weight="900"
+        text-anchor="middle"
+        fill="#1B5E20"
+        letter-spacing="2">PROFOOT</text>
+  <text x="150" y="325"
+        font-family="'Arial Black', Arial, sans-serif"
+        font-size="20"
+        font-weight="900"
+        text-anchor="middle"
+        fill="#1B5E20"
+        letter-spacing="6">ASSISTANT</text>
+</svg>

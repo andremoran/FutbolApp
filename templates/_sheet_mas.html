@@ -1,0 +1,144 @@
+{# Hoja inferior "⋯ Ver más".
+   En la app independiente solo tiene lo de la cuenta y los atajos del equipo:
+   las herramientas de ElectroBiomed se quitaron a propósito porque sacaban al
+   usuario de ProFoot. #}
+<div class="pf-sheet-back" id="pf-sheet-mas-back"></div>
+
+<aside class="pf-sheet" id="pf-sheet-mas" role="dialog" aria-modal="true" aria-labelledby="pf-sheet-mas-title">
+  <div class="pf-sheet__grip"></div>
+
+  <div class="pf-sheet__head">
+    <div class="pf-row pf-row--between">
+      <div>
+        <h2 class="pf-sheet__title" id="pf-sheet-mas-title">Ver más</h2>
+        <p class="pf-sheet__sub">Tu cuenta y tu equipo</p>
+      </div>
+      <button type="button" class="pf-hero__btn" style="background:var(--border-soft);color:var(--text-sec)"
+              onclick="PF.closeSheet('pf-sheet-mas')" aria-label="Cerrar">
+        <i data-ico="x" class="pf-ico--sm"></i>
+      </button>
+    </div>
+  </div>
+
+  <div class="pf-sheet__body">
+
+    {% if current_user.is_authenticated %}
+
+      {% if fut_es_entrenador %}
+      <div class="pf-sheet__group">Mi equipo</div>
+
+      <a class="pf-sheet__link" href="{{ url_for('futbol.c_equipo') }}">
+        <span class="pf-sheet__emoji">👥</span>
+        <span class="pf-grow">
+          <span class="pf-sheet__label" style="display:block">Plantilla</span>
+          <span class="pf-sheet__desc">Tus jugadores y sus fichas</span>
+        </span>
+        <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+      </a>
+
+      <a class="pf-sheet__link" href="{{ url_for('futbol.c_mental') }}">
+        <span class="pf-sheet__emoji">💚</span>
+        <span class="pf-grow">
+          <span class="pf-sheet__label" style="display:block">Salud mental</span>
+          <span class="pf-sheet__desc">Semáforos de bienestar del equipo</span>
+        </span>
+        <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+      </a>
+
+      <a class="pf-sheet__link" href="{{ url_for('futbol.c_partidos') }}">
+        <span class="pf-sheet__emoji">⚽</span>
+        <span class="pf-grow">
+          <span class="pf-sheet__label" style="display:block">Partidos</span>
+          <span class="pf-sheet__desc">Resultados y estadísticas</span>
+        </span>
+        <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+      </a>
+
+      <a class="pf-sheet__link" href="{{ url_for('futbol.c_tests') }}">
+        <span class="pf-sheet__emoji">📊</span>
+        <span class="pf-grow">
+          <span class="pf-sheet__label" style="display:block">Pruebas físicas</span>
+          <span class="pf-sheet__desc">Marcas y ranking del equipo</span>
+        </span>
+        <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+      </a>
+
+      <a class="pf-sheet__link" href="{{ url_for('futbol.c_mensajes') }}">
+        <span class="pf-sheet__emoji">✉️</span>
+        <span class="pf-grow">
+          <span class="pf-sheet__label" style="display:block">Mensajes</span>
+          <span class="pf-sheet__desc">Escribe a tu plantilla</span>
+        </span>
+        <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+      </a>
+
+      {% else %}
+      <div class="pf-sheet__group">Mi progreso</div>
+
+      <a class="pf-sheet__link" href="{{ url_for('futbol.mensajes') }}">
+        <span class="pf-sheet__emoji">✉️</span>
+        <span class="pf-grow">
+          <span class="pf-sheet__label" style="display:block">Mensajes del coach</span>
+          <span class="pf-sheet__desc">Lo que te escribe tu entrenador</span>
+        </span>
+        <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+      </a>
+
+      <a class="pf-sheet__link" href="{{ url_for('futbol.checkin') }}">
+        <span class="pf-sheet__emoji">💚</span>
+        <span class="pf-grow">
+          <span class="pf-sheet__label" style="display:block">Check-in de bienestar</span>
+          <span class="pf-sheet__desc">2 minutos, confidencial</span>
+        </span>
+        <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+      </a>
+
+      <a class="pf-sheet__link" href="{{ url_for('futbol.mis_tests') }}">
+        <span class="pf-sheet__emoji">📊</span>
+        <span class="pf-grow">
+          <span class="pf-sheet__label" style="display:block">Mis pruebas físicas</span>
+          <span class="pf-sheet__desc">Tus marcas y tu puesto</span>
+        </span>
+        <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+      </a>
+      {% endif %}
+
+      <div class="pf-sheet__group">Mi cuenta</div>
+
+      <a class="pf-sheet__link" href="{{ url_for('futbol.perfil') }}">
+        <span class="pf-sheet__emoji">👤</span>
+        <span class="pf-grow">
+          <span class="pf-sheet__label" style="display:block">Mi perfil</span>
+          <span class="pf-sheet__desc">Datos y ficha deportiva</span>
+        </span>
+        <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+      </a>
+
+      <a class="pf-sheet__link" href="{{ url_for('futbol.planes') }}">
+        <span class="pf-sheet__emoji">⭐</span>
+        <span class="pf-grow">
+          <span class="pf-sheet__label" style="display:block">Planes y pagos</span>
+          <span class="pf-sheet__desc">Básico, Pro y Club</span>
+        </span>
+        <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+      </a>
+
+      <a class="pf-sheet__link" href="{{ url_for('auth.logout') }}" style="color:var(--danger)">
+        <span class="pf-sheet__emoji" style="background:var(--danger-bg)">🚪</span>
+        <span class="pf-grow">
+          <span class="pf-sheet__label" style="display:block">Cerrar sesión</span>
+        </span>
+      </a>
+
+    {% else %}
+      <a class="pf-sheet__link" href="{{ url_for('auth.entrar') }}">
+        <span class="pf-sheet__emoji">🔑</span>
+        <span class="pf-grow"><span class="pf-sheet__label">Iniciar sesión</span></span>
+      </a>
+    {% endif %}
+
+    <p class="pf-center pf-mt-16" style="font-size:11px;color:var(--text-muted);padding-bottom:8px">
+      ProFoot Assistant
+    </p>
+  </div>
+</aside>

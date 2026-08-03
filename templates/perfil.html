@@ -1,0 +1,184 @@
+{% extends '_shell.html' %}
+{% block title %}Mi perfil · ProFoot{% endblock %}
+
+{# screens/ProfileScreen.tsx / CoachProfileScreen.tsx.
+   Los datos personales se editan en /profile, la pantalla de la plataforma que
+   ya gestiona foto, peso y contraseña. Aquí va lo específico de fútbol. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.home') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}
+<div class="pf-hero__label">{{ 'Entrenador' if es_coach else 'Jugador' }}</div>
+{% endblock %}
+{% block hero_title %}{{ current_user.name }}{% endblock %}
+{% block hero_actions %}{% endblock %}
+
+{% block hero_extra %}
+<div style="display:flex;align-items:center;gap:14px;margin-top:16px">
+  <span class="pf-avatar pf-avatar--xl" style="background:#fff;color:var(--primary)">
+    {%- if current_user.profile_photo %}<img src="{{ current_user.profile_photo }}" alt="">
+    {%- else %}{{ (current_user.name or '?')[:1]|upper }}{% endif -%}
+  </span>
+  <div>
+    {% if es_coach %}
+      <div style="font-size:13px;color:rgba(255,255,255,.9)">{{ equipo.nombre }}</div>
+      <div style="font-size:13px;color:rgba(255,255,255,.75);margin-top:3px">
+        {{ n_jugadores }} jugador{{ '' if n_jugadores == 1 else 'es' }}
+      </div>
+    {% else %}
+      <div style="font-size:13px;color:rgba(255,255,255,.9)">
+        {{ perfil.posicion|capitalize if perfil.posicion else 'Sin posición' }}
+        {%- if perfil.dorsal %} · Dorsal {{ perfil.dorsal }}{% endif %}
+      </div>
+      <div style="font-size:13px;color:rgba(255,255,255,.75);margin-top:3px">
+        Valoración {{ media }} · 🔥 {{ racha }} día{{ '' if racha == 1 else 's' }}
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+
+{% if es_coach %}
+  {# ── Código del equipo ── #}
+  <div class="pf-card">
+    <div class="pf-card__head"><h2 class="pf-card__title">Código del equipo</h2></div>
+    <div style="font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:24px;
+                font-weight:800;letter-spacing:5px;color:var(--primary);
+                text-align:center;padding:12px 0">{{ codigo or '—' }}</div>
+    {% if codigo %}
+    <button class="pf-btn pf-btn--secondary pf-btn--block" type="button"
+            onclick="PF.copy({{ codigo|tojson }}, 'Código copiado')">
+      <i data-ico="copy" class="pf-ico--sm"></i> Copiar código
+    </button>
+    {% endif %}
+  </div>
+
+{% else %}
+  {# ── Ficha deportiva del jugador ── #}
+  <div class="pf-card">
+    <div class="pf-card__head"><h2 class="pf-card__title">Ficha deportiva</h2></div>
+
+    <div class="pf-row pf-mt-12" style="gap:10px">
+      <div class="pf-grow">
+        <label class="pf-label" for="p-pos">Posición</label>
+        <select class="pf-select" id="p-pos">
+          {% for p in ['', 'portero', 'defensa', 'lateral', 'medio', 'extremo', 'delantero'] %}
+          <option value="{{ p }}" {{ 'selected' if perfil.posicion == p }}>
+            {{ p|capitalize if p else 'Sin asignar' }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="width:96px;flex:none">
+        <label class="pf-label" for="p-dorsal">Dorsal</label>
+        <input class="pf-input" id="p-dorsal" type="number" inputmode="numeric"
+               min="1" max="99" value="{{ perfil.dorsal or '' }}">
+      </div>
+    </div>
+
+    <div class="pf-field pf-mt-12">
+      <label class="pf-label" for="p-pie">Pie hábil</label>
+      <select class="pf-select" id="p-pie">
+        {% for p in ['', 'derecho', 'izquierdo', 'ambidiestro'] %}
+        <option value="{{ p }}" {{ 'selected' if perfil.pie_habil == p }}>
+          {{ p|capitalize if p else 'Sin asignar' }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <button class="pf-btn pf-btn--primary pf-btn--block" type="button" id="btn-perfil">
+      <i data-ico="save" class="pf-ico--sm"></i> Guardar
+    </button>
+  </div>
+
+  {% if entrenador %}
+  <div class="pf-card">
+    <div class="pf-card__head"><h2 class="pf-card__title">Mi equipo</h2></div>
+    <div class="pf-item">
+      <span class="pf-avatar">
+        {%- if entrenador.profile_photo %}<img src="{{ entrenador.profile_photo }}" alt="">
+        {%- else %}{{ (entrenador.name or '?')[:1]|upper }}{% endif -%}
+      </span>
+      <span class="pf-item__body">
+        <span class="pf-item__title">{{ entrenador.name }}</span>
+        <span class="pf-item__sub">Tu entrenador</span>
+      </span>
+    </div>
+  </div>
+  {% endif %}
+{% endif %}
+
+{# ── Cuenta ── #}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Cuenta</h2></div>
+
+  <a class="pf-item" href="{{ url_for('futbol.perfil') }}?eb_back=1">
+    <span class="pf-item__icon"><i data-ico="user" class="pf-ico--sm"></i></span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">Datos personales</span>
+      <span class="pf-item__sub">Foto, contacto y contraseña</span>
+    </span>
+    <span class="pf-item__chev"><i data-ico="chevron-right" class="pf-ico--sm"></i></span>
+  </a>
+
+  <a class="pf-item" href="{{ url_for('futbol.planes') }}">
+    <span class="pf-item__icon" style="background:var(--warning-bg);color:var(--warning)">
+      <i data-ico="star" class="pf-ico--sm"></i>
+    </span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">Planes y pagos</span>
+      <span class="pf-item__sub">
+        {{ 'Cuenta activa' if current_user.activo else 'Cuenta sin activar' }}
+      </span>
+    </span>
+    <span class="pf-item__chev"><i data-ico="chevron-right" class="pf-ico--sm"></i></span>
+  </a>
+
+  <button class="pf-item" type="button" onclick="PF.openSheet('pf-sheet-mas')">
+    <span class="pf-item__icon" style="background:rgba(59,130,246,.10);color:var(--info)">
+      <i data-ico="grid" class="pf-ico--sm"></i>
+    </span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">Herramientas avanzadas</span>
+      <span class="pf-item__sub">Análisis 3D, sensores, atlas muscular…</span>
+    </span>
+    <span class="pf-item__chev"><i data-ico="chevron-right" class="pf-ico--sm"></i></span>
+  </button>
+
+  <a class="pf-item" href="{{ url_for('auth.logout') }}">
+    <span class="pf-item__icon" style="background:var(--danger-bg);color:var(--danger)">
+      <i data-ico="log-out" class="pf-ico--sm"></i>
+    </span>
+    <span class="pf-item__body">
+      <span class="pf-item__title" style="color:var(--danger)">Cerrar sesión</span>
+    </span>
+  </a>
+</div>
+
+<p class="pf-center" style="font-size:11px;color:var(--text-muted);padding:6px 20px 30px">
+  ProFoot Assistant
+</p>
+
+{% endblock %}
+
+{% block scripts %}
+{% if not es_coach %}
+<script>
+document.getElementById('btn-perfil').addEventListener('click', function () {
+  PF.api('{{ url_for("futbol.api_perfil_jugador") }}', {
+    posicion: document.getElementById('p-pos').value,
+    dorsal: document.getElementById('p-dorsal').value,
+    pie_habil: document.getElementById('p-pie').value
+  })
+    .then(function () { PF.toast('Perfil guardado'); })
+    .catch(function (e) { PF.toast(e.message, 'error'); });
+});
+</script>
+{% endif %}
+{% endblock %}
