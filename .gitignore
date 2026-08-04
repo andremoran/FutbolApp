@@ -3,6 +3,11 @@
 .env.*
 !.env.example
 planes_paypal.json
+# lleva el token de Vercel dentro
+desplegar_vercel.bat
+
+# Vercel (enlace local del proyecto)
+.vercel/
 
 # Python
 __pycache__/
