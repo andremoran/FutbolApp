@@ -23,6 +23,11 @@ logger = logging.getLogger(__name__)
 
 MODELOS = ('gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash')
 
+# Segundos como máximo para TODA la conversación con Gemini (los 3 modelos y sus
+# reintentos). Debe quedar holgadamente por debajo del límite de la plataforma:
+# 60 s en Vercel, 75 s en gunicorn.
+PRESUPUESTO_S = int(os.getenv('IA_PRESUPUESTO_S', '30'))
+
 
 def _contexto_jugador(user):
     """Datos reales del jugador para que la respuesta no sea genérica."""
@@ -130,14 +135,25 @@ def _gemini(prompt):
         },
     }
 
+    # Presupuesto TOTAL de la llamada. Sin él, encadenar 3 modelos con reintento
+    # podía tardar minutos y morir contra el límite de la función (Vercel) o del
+    # worker (gunicorn). Antes de agotarlo se corta y responde el respaldo.
     import time
+    limite = time.monotonic() + PRESUPUESTO_S
+
     for modelo in MODELOS:
+        restante = limite - time.monotonic()
+        if restante < 4:
+            logger.info('IA: sin tiempo para más modelos, uso el respaldo')
+            break
+
         url = f'https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent?key={api_key}'
         try:
-            r = requests.post(url, json=payload, timeout=40)
-            if r.status_code == 429:
-                time.sleep(3)
-                r = requests.post(url, json=payload, timeout=40)
+            r = requests.post(url, json=payload, timeout=min(20, restante))
+            if r.status_code == 429 and (limite - time.monotonic()) > 8:
+                time.sleep(2)
+                r = requests.post(url, json=payload,
+                                  timeout=min(20, max(4, limite - time.monotonic())))
             if r.status_code == 429:
                 logger.info('IA: cuota por minuto en %s, pruebo el siguiente', modelo)
                 continue

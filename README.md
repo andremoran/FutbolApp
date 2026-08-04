@@ -54,7 +54,36 @@ python app.py           # http://localhost:5000
 
 ---
 
-## Despliegue en Dokploy
+## Despliegue en Vercel (el camino corto)
+
+El repo trae `vercel.json` y `api/index.py`, así que no hay nada que preparar.
+
+**Opción A — desde la web (sin instalar nada):**
+1. [vercel.com/new](https://vercel.com/new) → *Import Git Repository* → elige `FutbolApp`.
+2. Framework Preset: **Other**. No toques Build Command ni Output Directory.
+3. *Environment Variables*: pega las de tu `.env` (mínimo `SUPABASE_URL`,
+   `SUPABASE_KEY`, `SECRET_KEY`, `CODIGOS_ENTRENADOR`; para pagos e IA añade
+   `PAYPAL_*` y `GEMINI_API_KEY`).
+4. **Deploy**. Sale en `https://<proyecto>.vercel.app` con HTTPS ya puesto.
+
+**Opción B — desde la terminal:**
+```bash
+npm i -g vercel
+vercel --prod
+```
+
+### Qué tener en cuenta
+
+- **HTTPS viene incluido**, así que el cobro con tarjeta funciona sin dominio propio.
+- **Las funciones tienen límite de tiempo.** Por eso la IA lleva un presupuesto de
+  30 s (`IA_PRESUPUESTO_S`): si Gemini tarda, corta y responde con el análisis
+  calculado en vez de agotar la función.
+- **No hay disco persistente**, pero da igual: todo el estado vive en Supabase.
+- El dominio propio se conecta después en *Settings → Domains*, sin redesplegar.
+
+---
+
+## Despliegue en Dokploy (VPS propio)
 
 El VPS ya tiene Dokploy con Traefik: emite el certificado HTTPS solo.
 
