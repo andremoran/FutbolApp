@@ -2,7 +2,12 @@
 .env
 .env.*
 !.env.example
-planes_paypal.json
+# planes_paypal.json NO va aquí: los IDs de los billing plans son
+# identificadores públicos (viajan en el HTML del checkout, el SDK de PayPal
+# los necesita en el navegador). Ignorarlos hacía que nunca llegaran al
+# servidor y que el botón de tarjeta muriera con «ese plan aún no está dado de
+# alta» sin llegar siquiera a PayPal. Los secretos son CLIENT_ID y SECRET, y
+# esos van en el entorno.
 # lleva el token de Vercel dentro
 desplegar_vercel.bat
 
