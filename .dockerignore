@@ -1,7 +1,9 @@
 .env
 .env.*
 !.env.example
-planes_paypal.json
+# planes_paypal.json SÍ entra en la imagen: los IDs de los billing plans son
+# públicos (el SDK de PayPal los necesita en el navegador) y sin ellos dentro
+# del contenedor el botón de tarjeta muere antes de llegar a PayPal.
 .git
 .gitignore
 __pycache__
