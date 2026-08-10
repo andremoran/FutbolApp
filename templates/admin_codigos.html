@@ -1,0 +1,242 @@
+{% extends '_admin.html' %}
+{% block title %}Códigos · Panel ProFoot{% endblock %}
+{% block encabezado %}Códigos de suscripción{% endblock %}
+{% block encabezado_sub %}
+  Un código regala meses de Pro sin pasar por la tarjeta. Sirve para pruebas,
+  clubes y acuerdos comerciales.
+{% endblock %}
+
+{% block content %}
+
+<div class="adm-grid adm-grid--4 adm-mb">
+  <div class="adm-kpi">
+    <div class="adm-kpi__ico">🎟️</div>
+    <div><div class="adm-kpi__n">{{ codigos|length }}</div>
+         <div class="adm-kpi__t">Códigos creados</div></div>
+  </div>
+  <div class="adm-kpi adm-kpi--ok">
+    <div class="adm-kpi__ico">✅</div>
+    <div><div class="adm-kpi__n">{{ vigentes }}</div>
+         <div class="adm-kpi__t">Vigentes</div></div>
+  </div>
+  <div class="adm-kpi">
+    <div class="adm-kpi__ico">🎫</div>
+    <div><div class="adm-kpi__n">{{ cupos }}</div>
+         <div class="adm-kpi__t">Cupos libres</div></div>
+  </div>
+  <div class="adm-kpi">
+    <div class="adm-kpi__ico">🤝</div>
+    <div><div class="adm-kpi__n">{{ canjes|length }}</div>
+         <div class="adm-kpi__t">Canjes</div></div>
+  </div>
+</div>
+
+<div class="adm-grid" style="grid-template-columns:minmax(0,1fr);gap:16px">
+
+  {# ══════════════════ CREAR ══════════════════ #}
+  <div class="adm-card">
+    <div class="adm-card__head">
+      <h2 class="adm-card__title">➕ Crear código</h2>
+    </div>
+    <div class="adm-card__body">
+      <div class="adm-fila">
+        <div class="adm-campo">
+          <label class="adm-lbl" for="c-codigo">Código</label>
+          <input class="adm-in" id="c-codigo" placeholder="CLUB-QUITO" maxlength="32"
+                 style="text-transform:uppercase">
+          <p class="adm-ayuda">Déjalo vacío y se genera solo.</p>
+        </div>
+        <div class="adm-campo">
+          <label class="adm-lbl" for="c-prefijo">Prefijo</label>
+          <input class="adm-in" id="c-prefijo" value="PRO" maxlength="10"
+                 style="text-transform:uppercase">
+          <p class="adm-ayuda">Para los generados: PRO-K7M2X9.</p>
+        </div>
+        <div class="adm-campo">
+          <label class="adm-lbl" for="c-meses">Duración</label>
+          <select class="adm-sel" id="c-meses">
+            <option value="1">1 mes</option>
+            <option value="3" selected>3 meses</option>
+            <option value="6">6 meses</option>
+            <option value="12">12 meses</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="adm-fila">
+        <div class="adm-campo">
+          <label class="adm-lbl" for="c-usos">Cupos</label>
+          <input class="adm-in" id="c-usos" type="number" value="1" min="1" max="999">
+          <p class="adm-ayuda">Cuánta gente puede usar ESTE código.</p>
+        </div>
+        <div class="adm-campo">
+          <label class="adm-lbl" for="c-cantidad">Cuántos crear</label>
+          <input class="adm-in" id="c-cantidad" type="number" value="1" min="1" max="50">
+          <p class="adm-ayuda">Más de uno los genera automáticamente.</p>
+        </div>
+        <div class="adm-campo">
+          <label class="adm-lbl" for="c-rol">Para quién</label>
+          <select class="adm-sel" id="c-rol">
+            <option value="cualquiera">Cualquiera</option>
+            <option value="especialista">Solo entrenadores</option>
+            <option value="paciente">Solo jugadores</option>
+          </select>
+        </div>
+        <div class="adm-campo">
+          <label class="adm-lbl" for="c-vence">Caduca el</label>
+          <input class="adm-in" id="c-vence" type="date">
+          <p class="adm-ayuda">Opcional: el código deja de servir ese día.</p>
+        </div>
+      </div>
+
+      <div class="adm-campo">
+        <label class="adm-lbl" for="c-nota">Nota interna</label>
+        <input class="adm-in" id="c-nota" maxlength="300"
+               placeholder="Club San Martín · acuerdo de agosto">
+      </div>
+
+      <button class="adm-btn adm-btn--pri" id="c-crear">Crear código</button>
+    </div>
+  </div>
+
+  {# ══════════════════ LISTA ══════════════════ #}
+  <div class="adm-card">
+    <div class="adm-card__head">
+      <h2 class="adm-card__title">Códigos</h2>
+      <div class="adm-grow"></div>
+      <input class="adm-in" type="search" style="max-width:240px" placeholder="Buscar…"
+             oninput="ADM.filtrar(this, '#tabla-codigos tbody tr')">
+    </div>
+    {% if codigos %}
+    <div class="adm-tabla-scroll">
+      <table class="adm-tabla" id="tabla-codigos">
+        <thead><tr>
+          <th>Código</th><th>Duración</th><th>Cupos</th><th>Para</th>
+          <th>Estado</th><th>Nota</th><th class="adm-der">Acciones</th>
+        </tr></thead>
+        <tbody>
+        {% for c in codigos %}
+          <tr>
+            <td>
+              <div class="adm-flex">
+                <span class="adm-cod">{{ c.codigo }}</span>
+                <button class="adm-btn adm-btn--sm adm-btn--icon" title="Copiar"
+                        onclick="ADM.copiar('{{ c.codigo }}', this)">⧉</button>
+              </div>
+              <div class="adm-xs adm-mut" style="margin-top:3px">
+                {{ c._fecha.strftime('%d/%m/%Y') if c._fecha else '' }}
+              </div>
+            </td>
+            <td class="adm-nowrap">{{ c.meses }} mes{{ '' if c.meses == 1 else 'es' }}</td>
+            <td style="min-width:110px">
+              <div class="adm-xs">{{ c.usos }} / {{ c.max_usos }}</div>
+              <div class="adm-barra" style="margin-top:5px">
+                <i style="width:{{ (100 * c.usos / c.max_usos)|round|int if c.max_usos else 0 }}%"></i>
+              </div>
+            </td>
+            <td class="adm-xs adm-sec adm-nowrap">
+              {{ {'cualquiera': 'Cualquiera', 'especialista': 'Entrenadores',
+                  'paciente': 'Jugadores'}.get(c.para_rol, 'Cualquiera') }}
+            </td>
+            <td class="adm-nowrap">
+              {% if c._vigente %}
+                <span class="adm-tag adm-tag--ok">Vigente</span>
+              {% elif c._agotado %}
+                <span class="adm-tag adm-tag--free">Agotado</span>
+              {% elif c._caducado %}
+                <span class="adm-tag adm-tag--warn">Caducado</span>
+              {% else %}
+                <span class="adm-tag adm-tag--mal">Apagado</span>
+              {% endif %}
+            </td>
+            <td class="adm-xs adm-mut" style="max-width:200px">{{ c.nota or '—' }}</td>
+            <td class="adm-der">
+              <div class="adm-acciones" style="justify-content:flex-end">
+                <button class="adm-btn adm-btn--sm"
+                        onclick="ADM.accion(this, '/admin/api/codigo/{{ c.id }}', {activo:{{ 'false' if c.activo else 'true' }}})">
+                  {{ 'Apagar' if c.activo else 'Encender' }}
+                </button>
+                <button class="adm-btn adm-btn--sm adm-btn--mal"
+                        onclick="borrarCodigo('{{ c.id }}', '{{ c.codigo }}')">🗑</button>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <div class="adm-vacio">
+        <div class="adm-vacio__e">🎟️</div>
+        <p>Todavía no hay códigos.<br>Crea el primero con el formulario de arriba.</p>
+      </div>
+    {% endif %}
+  </div>
+
+  {# ══════════════════ CANJES ══════════════════ #}
+  <div class="adm-card">
+    <div class="adm-card__head">
+      <h2 class="adm-card__title">🤝 Quién canjeó qué</h2>
+    </div>
+    {% if canjes %}
+    <div class="adm-tabla-scroll">
+      <table class="adm-tabla">
+        <thead><tr>
+          <th>Persona</th><th>Código</th><th>Canjeado</th><th>Vale hasta</th><th>Estado</th>
+        </tr></thead>
+        <tbody>
+        {% for c in canjes %}
+          <tr>
+            <td>
+              <div class="adm-persona__n">{{ c._usuario.nombre or '—' }}</div>
+              <div class="adm-persona__m">{{ c._usuario.correo or '' }}</div>
+            </td>
+            <td><span class="adm-cod">{{ c.codigo }}</span></td>
+            <td class="adm-xs adm-mut adm-nowrap">
+              {{ c._fecha.strftime('%d/%m/%Y') if c._fecha else '—' }}
+            </td>
+            <td class="adm-xs adm-nowrap">
+              {{ c._hasta.strftime('%d/%m/%Y') if c._hasta else '—' }}
+            </td>
+            <td>
+              <span class="adm-tag adm-tag--{{ 'ok' if c._vigente else 'free' }}">
+                {{ 'Activo' if c._vigente else 'Vencido' }}
+              </span>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <div class="adm-vacio"><div class="adm-vacio__e">🤝</div>
+        <p>Nadie ha canjeado un código todavía.</p></div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('c-crear').onclick = function () {
+  const v = id => document.getElementById(id).value;
+  ADM.accion(this, '/admin/api/codigo', {
+    codigo:   v('c-codigo').trim().toUpperCase(),
+    prefijo:  v('c-prefijo').trim().toUpperCase(),
+    meses:    +v('c-meses'),
+    max_usos: +v('c-usos'),
+    cantidad: +v('c-cantidad'),
+    para_rol: v('c-rol'),
+    vence:    v('c-vence') || null,
+    nota:     v('c-nota'),
+  });
+};
+
+function borrarCodigo(cid, codigo) {
+  if (!confirm('¿Borrar el código ' + codigo + '?\n\n' +
+               'Quien ya lo canjeó conserva sus meses; solo deja de poder usarse.')) return;
+  ADM.accion(null, '/admin/api/codigo/' + cid + '/borrar', {});
+}
+</script>
+{% endblock %}

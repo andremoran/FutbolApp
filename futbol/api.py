@@ -244,10 +244,21 @@ def api_evento_borrar(eid):
 @bp.route('/api/asistencia', methods=['POST'])
 @api
 def api_asistencia():
+    """Marca la asistencia de UNA persona a UN evento.
+
+    Los nombres viejos ('asiste'/'falta'/'duda') se siguen aceptando y se
+    traducen: hay clientes ya instalados como PWA que los mandan.
+    """
+    from .calendario import ESTADOS_ASISTENCIA
+
     d = body()
     eid = d.get('event_id')
     estado = (d.get('estado') or '').strip()
-    if not eid or estado not in ('asiste', 'falta', 'duda'):
+    estado = {'asiste': 'presente', 'falta': 'ausente',
+              'duda': 'pendiente'}.get(estado, estado)
+
+    validos = {c for c, _, _, _ in ESTADOS_ASISTENCIA}
+    if not eid or estado not in validos:
         return jsonify({'error': 'Datos incompletos.'}), 400
 
     # El entrenador puede pasar lista por un jugador suyo; el jugador solo por sí mismo.
@@ -259,12 +270,15 @@ def api_asistencia():
     existente = db.one('fut_attendance', 'asist', event_id=eid, player_id=pid)
     if existente:
         db.update('fut_attendance',
-                  {'estado': estado, 'motivo': (d.get('motivo') or '')[:200]},
+                  {'estado': estado, 'motivo': (d.get('motivo') or '')[:200],
+                   'actualizado': ahora()},
                   'asist up', id=existente['id'])
     else:
         db.insert('fut_attendance', {
             'event_id': eid, 'player_id': pid, 'estado': estado,
-            'motivo': (d.get('motivo') or '')[:200], 'creado': ahora(),
+            'motivo': (d.get('motivo') or '')[:200],
+            'registrado_por': current_user.id,
+            'creado': ahora(), 'actualizado': ahora(),
         })
     return jsonify({'ok': True, 'estado': estado})
 

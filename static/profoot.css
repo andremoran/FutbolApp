@@ -482,3 +482,235 @@ img, svg { max-width: 100%; }
 @media (prefers-reduced-motion: reduce) {
   .pf-fade, .pf-sheet, .pf-sheet-back, .pf-bar__fill { animation: none !important; transition: none !important; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   COMPONENTES v2 — evaluaciones, calendario y candados del plan Pro.
+
+   Se añaden al final para no tocar una línea de lo que ya estaba: la fidelidad
+   con la app nativa costó demasiado como para arriesgarla por un componente
+   nuevo.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Nivel alcanzado en una prueba ────────────────────────────────────── */
+.pf-nivel {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 11px; border-radius: 100px; white-space: nowrap;
+  font-size: 11px; font-weight: 800; letter-spacing: .3px;
+}
+.pf-nivel--elite     { background: #d1fae5; color: #047857; }
+.pf-nivel--bueno     { background: #ccfbf1; color: #0f766e; }
+.pf-nivel--promedio  { background: #f1f5f9; color: #475569; }
+.pf-nivel--debil     { background: #fef3c7; color: #b45309; }
+.pf-nivel--muy_debil { background: #fee2e2; color: #b91c1c; }
+
+/* Barra de puntaje 0-100 */
+.pf-punt { display: flex; align-items: center; gap: 10px; }
+.pf-punt__n {
+  font-size: 21px; font-weight: 800; letter-spacing: -.7px;
+  min-width: 40px; text-align: right;
+}
+.pf-punt__bar {
+  flex: 1; height: 8px; border-radius: 4px;
+  background: var(--border-soft); overflow: hidden;
+}
+.pf-punt__bar > i {
+  display: block; height: 100%; border-radius: 4px;
+  background: linear-gradient(90deg, #34d399, #047857);
+  transition: width .5s ease;
+}
+
+/* ─── Medida suelta de una prueba ──────────────────────────────────────── */
+.pf-medida {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 0; border-bottom: 1px solid var(--border-soft);
+}
+.pf-medida:last-child { border-bottom: none; }
+.pf-medida__et { font-size: 13px; color: var(--text-sec); flex: 1; }
+.pf-medida__v { font-size: 17px; font-weight: 800; letter-spacing: -.4px; }
+.pf-medida__u { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.pf-baremo {
+  font-size: 11px; color: var(--text-muted); line-height: 1.6;
+  margin-top: 5px; padding-left: 2px;
+}
+
+/* ─── Rejilla del calendario ───────────────────────────────────────────── */
+.pf-cal { margin: 0 16px; }
+.pf-cal__cab {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 4px;
+}
+.pf-cal__cab span {
+  text-align: center; padding: 7px 0;
+  font-size: 10.5px; font-weight: 800; letter-spacing: .8px;
+  color: var(--text-muted); text-transform: uppercase;
+}
+.pf-cal__sem { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin-bottom: 3px; }
+.pf-cal__dia {
+  position: relative; min-height: 54px; padding: 5px 3px 4px;
+  border-radius: 10px; background: #fff; border: 1px solid var(--border-soft);
+  cursor: pointer; text-align: center;
+  transition: background .15s, border-color .15s, transform .12s;
+}
+.pf-cal__dia:active { transform: scale(.96); }
+.pf-cal__dia:hover  { background: var(--primary-faint); }
+.pf-cal__dia--fuera { opacity: .38; }
+.pf-cal__dia--finde { background: var(--border-soft); }
+.pf-cal__dia--hoy   { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
+.pf-cal__n { font-size: 13px; font-weight: 700; line-height: 1.5; }
+.pf-cal__dia--hoy .pf-cal__n { color: var(--primary); }
+.pf-cal__puntos {
+  display: flex; gap: 3px; justify-content: center;
+  flex-wrap: wrap; margin-top: 3px; min-height: 7px;
+}
+.pf-cal__punto { width: 6px; height: 6px; border-radius: 50%; }
+.pf-cal__mini {
+  font-size: 8.5px; font-weight: 700; line-height: 1.25;
+  color: var(--text-sec); margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* Navegación de mes */
+.pf-mes {
+  display: flex; align-items: center; gap: 10px;
+  margin: 16px 16px 10px;
+}
+.pf-mes__t {
+  flex: 1; text-align: center; margin: 0;
+  font-size: 17px; font-weight: 800; letter-spacing: -.3px;
+}
+.pf-mes__b {
+  width: 36px; height: 36px; flex: none; border-radius: 50%;
+  display: grid; place-items: center; cursor: pointer;
+  background: #fff; border: 1px solid var(--border);
+  color: var(--text-sec);
+}
+.pf-mes__b:active { transform: scale(.92); }
+
+/* ─── Evento del calendario ────────────────────────────────────────────── */
+.pf-ev {
+  display: flex; gap: 11px; align-items: flex-start;
+  padding: 12px 14px; border-radius: var(--r-lg);
+  background: #fff; border: 1px solid var(--border-soft);
+  margin-bottom: 8px;
+}
+.pf-ev__bar { width: 4px; align-self: stretch; border-radius: 2px; flex: none; }
+.pf-ev__t { font-weight: 700; font-size: 14.5px; letter-spacing: -.2px; }
+.pf-ev__s { font-size: 12px; color: var(--text-sec); margin-top: 3px; line-height: 1.5; }
+.pf-ev--pasado { opacity: .62; }
+
+/* ─── Carga semanal ────────────────────────────────────────────────────── */
+.pf-carga { display: flex; align-items: center; gap: 14px; }
+.pf-carga__n { font-size: 30px; font-weight: 800; letter-spacing: -1.4px; line-height: 1; }
+.pf-carga__reparto { display: flex; height: 9px; border-radius: 5px; overflow: hidden; gap: 2px; }
+.pf-carga__reparto > i { display: block; height: 100%; }
+
+.pf-alerta {
+  display: flex; gap: 9px; align-items: flex-start;
+  padding: 10px 13px; border-radius: var(--r-md);
+  font-size: 12.5px; line-height: 1.55; margin-top: 8px;
+}
+.pf-alerta--warn { background: var(--warning-bg); color: #92400e; }
+.pf-alerta--mal  { background: var(--danger-bg);  color: #991b1b; }
+.pf-alerta--info { background: var(--info-bg);    color: #1e40af; }
+
+/* ─── Asistencia ───────────────────────────────────────────────────────── */
+.pf-asis { display: flex; gap: 5px; }
+.pf-asis__b {
+  flex: 1; padding: 9px 4px; border-radius: 10px; cursor: pointer;
+  border: 1.5px solid var(--border); background: #fff;
+  font-family: inherit; font-size: 11px; font-weight: 700; color: var(--text-sec);
+  transition: all .15s;
+}
+.pf-asis__b:active { transform: scale(.95); }
+.pf-asis__b.on { color: #fff; border-color: transparent; }
+.pf-asis__b.on[data-e="presente"]    { background: #10b981; }
+.pf-asis__b.on[data-e="ausente"]     { background: #ef4444; }
+.pf-asis__b.on[data-e="tarde"]       { background: #f59e0b; }
+.pf-asis__b.on[data-e="justificado"] { background: #6366f1; }
+
+/* ─── Radar por familias de prueba ─────────────────────────────────────── */
+.pf-radar { display: flex; flex-direction: column; gap: 10px; }
+.pf-radar__f { display: flex; align-items: center; gap: 10px; }
+.pf-radar__et { width: 108px; flex: none; font-size: 12.5px; font-weight: 600; }
+.pf-radar__bar {
+  flex: 1; height: 9px; border-radius: 5px;
+  background: var(--border-soft); overflow: hidden;
+}
+.pf-radar__bar > i {
+  display: block; height: 100%; border-radius: 5px;
+  background: linear-gradient(90deg, #34d399, #047857);
+}
+.pf-radar__n { width: 30px; text-align: right; font-size: 13px; font-weight: 800; }
+
+/* ─── Gráfica de evolución (SVG a mano, sin librerías) ─────────────────── */
+.pf-grafica { width: 100%; height: 128px; display: block; overflow: visible; }
+.pf-grafica__linea { fill: none; stroke: var(--primary); stroke-width: 2.5;
+                     stroke-linejoin: round; stroke-linecap: round; }
+.pf-grafica__area  { fill: var(--primary); opacity: .09; }
+.pf-grafica__punto { fill: #fff; stroke: var(--primary); stroke-width: 2.5; }
+.pf-grafica__et    { font-size: 9px; fill: var(--text-muted); }
+
+/* ─── Candado del plan Pro ─────────────────────────────────────────────── */
+.pf-pro {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 100px;
+  background: linear-gradient(120deg, #047857, #0891b2); color: #fff;
+  font-size: 9.5px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase;
+}
+.pf-bloq { position: relative; border-radius: var(--r-xl); overflow: hidden; }
+.pf-bloq__velo {
+  position: absolute; inset: 0; z-index: 2;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; padding: 20px; text-align: center;
+  background: rgba(255, 255, 255, .93); backdrop-filter: blur(3px);
+}
+.pf-bloq__c { filter: blur(3px); pointer-events: none; user-select: none; }
+
+/* ─── Rejilla de tarjetas ──────────────────────────────────────────────── */
+.pf-rej { display: grid; gap: 10px; margin: 0 16px; }
+.pf-rej--2 { grid-template-columns: repeat(2, 1fr); }
+.pf-rej--3 { grid-template-columns: repeat(3, 1fr); }
+.pf-rej--auto { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+
+.pf-tarjeta {
+  display: block; padding: 14px; border-radius: var(--r-lg);
+  background: #fff; border: 1px solid var(--border-soft);
+  box-shadow: var(--sh-sm); cursor: pointer; color: inherit; text-decoration: none;
+  transition: transform .14s, box-shadow .14s;
+}
+.pf-tarjeta:active { transform: scale(.975); }
+.pf-tarjeta__e { font-size: 22px; line-height: 1; margin-bottom: 7px; }
+.pf-tarjeta__t { font-size: 13.5px; font-weight: 700; letter-spacing: -.2px; line-height: 1.35; }
+.pf-tarjeta__s { font-size: 11px; color: var(--text-muted); margin-top: 4px; line-height: 1.45; }
+
+/* ─── Fila de jugador con dato ─────────────────────────────────────────── */
+.pf-jug {
+  display: flex; align-items: center; gap: 11px;
+  padding: 11px 0; border-bottom: 1px solid var(--border-soft);
+}
+.pf-jug:last-child { border-bottom: none; }
+.pf-jug__n { font-weight: 650; font-size: 14px; }
+.pf-jug__s { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
+.pf-jug__puesto {
+  width: 26px; height: 26px; flex: none; border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 12px; font-weight: 800;
+  background: var(--border-soft); color: var(--text-sec);
+}
+.pf-jug__puesto--1 { background: #fef3c7; color: #b45309; }
+.pf-jug__puesto--2 { background: #f1f5f9; color: #475569; }
+.pf-jug__puesto--3 { background: #fed7aa; color: #9a3412; }
+
+/* ─── Segmentos (filtro de categoría) ──────────────────────────────────── */
+.pf-segs {
+  display: flex; gap: 6px; overflow-x: auto; padding: 0 16px 4px;
+  scrollbar-width: none; -webkit-overflow-scrolling: touch;
+}
+.pf-segs::-webkit-scrollbar { display: none; }
+.pf-seg {
+  flex: none; padding: 8px 14px; border-radius: 100px; cursor: pointer;
+  background: #fff; border: 1px solid var(--border);
+  font-family: inherit; font-size: 12.5px; font-weight: 650; color: var(--text-sec);
+  white-space: nowrap; text-decoration: none;
+}
+.pf-seg.on { background: var(--primary); border-color: var(--primary); color: #fff; }

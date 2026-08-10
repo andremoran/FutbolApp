@@ -1,0 +1,117 @@
+{% extends '_shell.html' %}
+{% block title %}Ranking · {{ test.nombre }}{% endblock %}
+
+{# El ranking usa la MEJOR marca de cada jugador, no la última: un ranking es
+   de marcas, y castigar a alguien por haber repetido la prueba con lluvia
+   sería absurdo. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_eval_catalogo') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Ranking del equipo</div>{% endblock %}
+{% block hero_title %}{{ test.nombre }}{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {{ tabla|length }} jugador{{ '' if tabla|length == 1 else 'es' }}
+  {%- if media %} · media {{ '%g'|format(media) }} {{ unidad }}{% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+
+{% if resumen %}
+<div class="pf-card">
+  <div class="pf-label">El listón de tu categoría</div>
+  <div class="pf-baremo">{{ resumen }}</div>
+  <p style="margin:7px 0 0;font-size:10.5px;color:var(--text-muted);font-style:italic">
+    {{ test.fuente }}
+  </p>
+</div>
+{% endif %}
+
+{% if tabla %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">
+      {{ 'Del más rápido al más lento' if menor_mejor else 'De mayor a menor' }}
+    </h2>
+  </div>
+
+  {% for r in tabla %}
+  <a class="pf-jug" href="{{ url_for('futbol.c_eval_resultado', rid=r.id) }}"
+     style="text-decoration:none;color:inherit">
+    <div class="pf-jug__puesto {{ 'pf-jug__puesto--' ~ r._puesto if r._puesto <= 3 }}">
+      {{ r._puesto }}
+    </div>
+    <div class="pf-grow">
+      <div class="pf-jug__n">{{ r.jugador_nombre or 'Jugador' }}</div>
+      <div class="pf-jug__s">
+        {{ r._fecha.strftime('%d/%m/%Y') if r._fecha else '' }}
+        {%- if r.puntaje is not none %} · {{ r.puntaje }}/100{% endif %}
+      </div>
+    </div>
+    <div style="text-align:right">
+      <div class="pf-medida__v">
+        {{ '%g'|format(r._valor) }}<span class="pf-medida__u"> {{ unidad }}</span>
+      </div>
+      {% if r._nivel_meta %}
+        <span class="pf-nivel pf-nivel--{{ r._nivel }}" style="margin-top:4px">
+          {{ r._nivel_meta.etiqueta }}
+        </span>
+      {% endif %}
+    </div>
+  </a>
+  {% endfor %}
+</div>
+
+{# ── Reparto por nivel ── #}
+{% set niveles_orden = ['elite', 'bueno', 'promedio', 'debil', 'muy_debil'] %}
+{% set etiquetas = {'elite': 'Élite', 'bueno': 'Bueno', 'promedio': 'Promedio',
+                    'debil': 'A mejorar', 'muy_debil': 'Bajo'} %}
+{% set con_nivel = tabla|selectattr('_nivel')|list %}
+{% if con_nivel %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Cómo está el grupo</h2>
+  </div>
+  {% for n in niveles_orden %}
+    {% set cuantos = con_nivel|selectattr('_nivel', 'equalto', n)|list|length %}
+    {% if cuantos %}
+    <div class="pf-radar__f">
+      <div class="pf-radar__et">
+        <span class="pf-nivel pf-nivel--{{ n }}">{{ etiquetas[n] }}</span>
+      </div>
+      <div class="pf-radar__bar">
+        <i style="width:{{ (100 * cuantos / con_nivel|length)|round|int }}%"></i>
+      </div>
+      <div class="pf-radar__n">{{ cuantos }}</div>
+    </div>
+    {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="pf-card">
+  <div class="pf-empty">
+    <div class="pf-empty__icon">📊</div>
+    <div class="pf-empty__title">Nadie ha hecho esta prueba</div>
+    <div class="pf-empty__text">Tómala al equipo y aquí sale el ranking.</div>
+    <a class="pf-btn pf-btn--primary pf-mt-16"
+       href="{{ url_for('futbol.c_eval_aplicar', clave=test.clave) }}">
+      Tomar la prueba
+    </a>
+  </div>
+</div>
+{% endif %}
+
+<div class="pf-px-16 pf-mt-16" style="padding-bottom:34px">
+  <a class="pf-btn pf-btn--secondary pf-btn--block"
+     href="{{ url_for('futbol.c_eval_aplicar', clave=test.clave) }}">
+    <i data-ico="plus" class="pf-ico--sm"></i> Volver a tomarla
+  </a>
+</div>
+
+{% endblock %}

@@ -14,6 +14,18 @@
 
 {% block content %}
 
+{# ── Lista o calendario ──
+   La pestaña Agenda de la barra inferior es réplica de la app nativa y no se
+   toca; el salto al calendario mensual se ofrece aquí dentro. #}
+<div class="pf-segs pf-mt-16">
+  <span class="pf-seg on">📋 Lista</span>
+  <a class="pf-seg" href="{{ url_for('futbol.c_calendario') }}">📅 Calendario</a>
+  <a class="pf-seg" href="{{ url_for('futbol.c_asistencia') }}">✅ Asistencia</a>
+  <a class="pf-seg" href="{{ url_for('futbol.c_planes') }}">
+    📝 Planes{% if not fut_es_pro %} 🔒{% endif %}
+  </a>
+</div>
+
 {# ── Nuevo evento ── #}
 <div class="pf-card">
   <div class="pf-card__head"><h2 class="pf-card__title">Agendar</h2></div>

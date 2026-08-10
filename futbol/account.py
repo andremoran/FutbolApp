@@ -1,12 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-futbol/account.py — Perfil y planes.
+futbol/account.py — Perfil, planes y canje de códigos.
 
 La pantalla de planes solo muestra; el cobro con tarjeta vive en pagos.py
-(PayPal Subscriptions), al que enlaza el botón de cada plan.
+(PayPal Subscriptions) y el cobro por transferencia también (DeUna), al que
+enlaza el botón de cada plan.
 """
-from flask import render_template, redirect, url_for
-from flask_login import login_required, current_user
+from flask import jsonify, redirect, render_template, request, url_for
+from flask_login import current_user, login_required
+
+import roles
+import suscripciones as subs
 
 from . import bp, db
 
@@ -33,19 +37,63 @@ def perfil():
                            tab_activa='',
                            hide_tabbar=True,
                            es_coach=es_coach,
+                           dias_pro=subs.dias_restantes(current_user),
+                           caduca_pronto=subs.caduca_pronto(current_user),
                            **datos)
 
 
 @bp.route('/planes')
 @login_required
 def planes():
-    """Pantalla de planes (screens/PremiumScreen.tsx) con la piel de ProFoot.
+    """Los planes con la piel de ProFoot.
 
-    Los tres planes son los de ProFoot; el botón lleva al checkout real de la
-    plataforma, que resuelve el cobro y la activación de la cuenta.
+    Los precios y el aviso salen de los ajustes del panel, no del código: el
+    administrador tiene que poder montar una promoción sin redesplegar.
     """
-    activo = bool(getattr(current_user, 'activo', False))
+    from admin import ajustes as ajustes_app
+    import pagos
+
+    cfg = ajustes_app()
     return render_template('planes.html',
                            tab_activa='',
                            hide_tabbar=True,
-                           cuenta_activa=activo)
+                           cuenta_activa=roles.es_pro(current_user),
+                           dias_pro=subs.dias_restantes(current_user),
+                           ajustes=cfg,
+                           deuna_activo=bool(cfg.get('deuna_activo')
+                                             and (cfg.get('deuna_telefono')
+                                                  or cfg.get('deuna_qr'))),
+                           tarjeta_activa=pagos.configurado(),
+                           permisos=roles.PERMISOS_PRO)
+
+
+@bp.route('/canjear')
+@login_required
+def canjear():
+    """Pantalla para meter un código de suscripción."""
+    uid = current_user.id
+    previo = db.one('fut_promo_uses', 'mi canje', user_id=uid)
+    if previo:
+        previo['_hasta'] = db.parse_fecha(previo.get('pro_hasta'))
+        previo['_fecha'] = db.parse_fecha(previo.get('creado'))
+    return render_template('canjear.html',
+                           tab_activa='', hide_tabbar=True,
+                           canje=previo,
+                           es_pro=roles.es_pro(current_user),
+                           dias_pro=subs.dias_restantes(current_user))
+
+
+@bp.route('/api/canjear', methods=['POST'])
+@login_required
+def api_canjear():
+    from .api import csrf_ok
+    if not csrf_ok():
+        return jsonify({'error': 'La sesión expiró. Recarga la página.'}), 400
+
+    codigo = ((request.get_json(silent=True) or {}).get('codigo') or '').strip()
+    meses, error = subs.canjear(current_user, codigo)
+    if error:
+        return jsonify({'error': error}), 400
+    return jsonify({'ok': True, 'meses': meses,
+                    'mensaje': f'¡Listo! Tienes {meses} mes(es) de Pro.',
+                    'redirect': url_for('futbol.home')})

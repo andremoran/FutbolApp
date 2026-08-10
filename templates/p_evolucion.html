@@ -1,0 +1,113 @@
+{% extends '_shell.html' %}
+{% block title %}Mi evolución · ProFoot{% endblock %}
+
+{# Solo las pruebas con DOS o más tomas: una toma suelta no es evolución, y
+   enseñarla como si lo fuera es engañar al jugador. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.p_evaluaciones') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Mi progreso</div>{% endblock %}
+{% block hero_title %}Evolución{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {{ series|length }} prueba{{ '' if series|length == 1 else 's' }} con seguimiento
+  {%- if media %} · {{ media }}/100{% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+
+{% if media %}
+<div class="pf-card pf-center" style="padding:20px 18px">
+  <div style="font-size:12px;color:var(--text-muted);letter-spacing:.5px;
+              text-transform:uppercase;font-weight:700">Tu nivel general</div>
+  <div class="pf-medida__v" style="font-size:42px;margin-top:4px">
+    {{ media }}<span class="pf-medida__u" style="font-size:17px">/100</span>
+  </div>
+  <div class="pf-punt__bar pf-mt-12"><i style="width:{{ media }}%"></i></div>
+</div>
+{% endif %}
+
+{% if radar %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Tu perfil</h2>
+  </div>
+  <div class="pf-radar">
+    {% for f in radar %}
+    <div class="pf-radar__f">
+      <div class="pf-radar__et">{{ f.emoji }} {{ f.etiqueta }}</div>
+      <div class="pf-radar__bar"><i style="width:{{ f.puntaje }}%"></i></div>
+      <div class="pf-radar__n">{{ f.puntaje }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if series %}
+  {% for s in series %}
+  <div class="pf-card">
+    <div class="pf-card__head">
+      <h2 class="pf-card__title">{{ s.test.nombre }}</h2>
+      <span class="pf-pill {{ 'pf-pill--info' if s.mejora else 'pf-pill--muted' }}">
+        {{ '↑' if s.mejora else '↓' }}
+        {{ '%g'|format(s.delta|abs) }} {{ s.unidad }}
+      </span>
+    </div>
+
+    <div class="pf-row pf-row--between" style="margin-bottom:10px">
+      <div>
+        <div style="font-size:11px;color:var(--text-muted)">Primera toma</div>
+        <div class="pf-medida__v" style="font-size:16px">
+          {{ '%g'|format(s.primero._valor) }}<span class="pf-medida__u"> {{ s.unidad }}</span>
+        </div>
+        <div style="font-size:10.5px;color:var(--text-muted)">
+          {{ s.primero._fecha.strftime('%d/%m/%y') if s.primero._fecha else '' }}
+        </div>
+      </div>
+      <i data-ico="arrow-right" class="pf-ico--sm" style="color:var(--text-muted)"></i>
+      <div style="text-align:right">
+        <div style="font-size:11px;color:var(--text-muted)">Última</div>
+        <div class="pf-medida__v" style="font-size:16px;
+             color:{{ 'var(--success)' if s.mejora else 'var(--text)' }}">
+          {{ '%g'|format(s.ultimo._valor) }}<span class="pf-medida__u"> {{ s.unidad }}</span>
+        </div>
+        <div style="font-size:10.5px;color:var(--text-muted)">
+          {{ s.ultimo._fecha.strftime('%d/%m/%y') if s.ultimo._fecha else '' }}
+        </div>
+      </div>
+    </div>
+
+    {% with serie = s.puntos, alto = 120 %}{% include '_grafica.html' %}{% endwith %}
+
+    {% if s.ultimo._nivel_meta %}
+    <div class="pf-center pf-mt-12">
+      <span class="pf-nivel pf-nivel--{{ s.ultimo._nivel }}">
+        Ahora: {{ s.ultimo._nivel_meta.etiqueta }}
+      </span>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+{% else %}
+<div class="pf-card">
+  <div class="pf-empty">
+    <div class="pf-empty__icon">📈</div>
+    <div class="pf-empty__title">Todavía no hay evolución que ver</div>
+    <div class="pf-empty__text">
+      Hace falta que te tomen la misma prueba al menos dos veces. Pídele a tu
+      entrenador que repita el sprint dentro de unas semanas.
+    </div>
+    <a class="pf-btn pf-btn--ghost pf-mt-16"
+       href="{{ url_for('futbol.p_evaluaciones') }}">Ver mis marcas</a>
+  </div>
+</div>
+{% endif %}
+
+<div style="height:34px"></div>
+{% endblock %}

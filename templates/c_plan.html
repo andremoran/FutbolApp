@@ -1,0 +1,182 @@
+{% extends '_shell.html' %}
+{% block title %}{{ plan.nombre }} · ProFoot{% endblock %}
+
+{# El plan y el botón que lo vuelca al calendario. Admite varias fechas de
+   golpe: una pretemporada son doce sesiones iguales, no una. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_planes') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Plan de sesión</div>{% endblock %}
+{% block hero_title %}{{ plan.nombre }}{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {{ plan._minutos or plan.duracion_min }} minutos
+  · {{ plan._bloques|length }} bloque{{ '' if plan._bloques|length == 1 else 's' }}
+  {%- if plan.veces_usado %} · usado {{ plan.veces_usado }} vez{{ '' if plan.veces_usado == 1 else 'es' }}{% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+
+{% if plan.objetivo %}
+<div class="pf-card">
+  <div class="pf-label">Objetivo</div>
+  <p style="margin:5px 0 0;font-size:14px;line-height:1.65">{{ plan.objetivo }}</p>
+</div>
+{% endif %}
+
+{# ══════════ BLOQUES ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">La sesión</h2>
+  </div>
+
+  {% for b in plan._bloques %}
+  <div style="padding:13px 0;border-bottom:1px solid var(--border-soft)">
+    <div class="pf-row pf-row--between">
+      <span style="font-weight:700;font-size:14px">
+        {{ loop.index }}. {{ b.nombre }}
+      </span>
+      <span class="pf-pill pf-pill--muted">{{ b.minutos }}′</span>
+    </div>
+    {% if b.descripcion %}
+    <p style="margin:6px 0 0;font-size:13px;line-height:1.65;color:var(--text-sec)">
+      {{ b.descripcion }}
+    </p>
+    {% endif %}
+    {% if b.material %}
+    <p style="margin:4px 0 0;font-size:11.5px;color:var(--text-muted)">
+      🎒 {{ b.material }}
+    </p>
+    {% endif %}
+  </div>
+  {% else %}
+  <p style="margin:0;font-size:13px;color:var(--text-muted)">
+    Este plan no tiene bloques detallados.
+  </p>
+  {% endfor %}
+
+  {% if plan.material %}
+  <div class="pf-mt-12">
+    <div class="pf-label">Material</div>
+    <p style="margin:4px 0 0;font-size:13px;color:var(--text-sec)">{{ plan.material }}</p>
+  </div>
+  {% endif %}
+</div>
+
+{# ══════════ AGENDAR ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Llevarlo al calendario</h2>
+  </div>
+  <p style="margin:0 0 12px;font-size:12.5px;color:var(--text-sec);line-height:1.6">
+    Añade una fecha o varias: se crea un entrenamiento por cada una con este
+    plan dentro.
+  </p>
+
+  <div class="pf-row" style="gap:8px;align-items:flex-end">
+    <div class="pf-grow">
+      <label class="pf-label" for="a-fecha">Fecha</label>
+      <input class="pf-input" id="a-fecha" type="date" value="{{ hoy }}">
+    </div>
+    <div style="width:104px;flex:none">
+      <label class="pf-label" for="a-hora">Hora</label>
+      <input class="pf-input" id="a-hora" type="time">
+    </div>
+    <button class="pf-btn pf-btn--ghost" type="button" style="padding:11px 14px"
+            onclick="anadirFecha()">+</button>
+  </div>
+
+  <div id="fechas" class="pf-mt-12"></div>
+
+  <div class="pf-field pf-mt-12">
+    <label class="pf-label" for="a-lugar">Lugar</label>
+    <input class="pf-input" id="a-lugar" maxlength="120" placeholder="Cancha municipal">
+  </div>
+
+  <button class="pf-btn pf-btn--primary pf-btn--block pf-mt-16" type="button" id="btn-agendar">
+    <i data-ico="calendar" class="pf-ico--sm"></i> Agendar
+  </button>
+</div>
+
+<div class="pf-px-16 pf-mt-16" style="padding-bottom:34px">
+  <button class="pf-btn pf-btn--danger pf-btn--block" type="button" id="btn-borrar">
+    Borrar este plan
+  </button>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const fechas = [];
+
+function pintar() {
+  const caja = document.getElementById('fechas');
+  caja.innerHTML = '';
+  if (!fechas.length) {
+    caja.innerHTML = '<p style="margin:0;font-size:12px;color:var(--text-muted)">' +
+      'Sin fechas añadidas: se usará la de arriba.</p>';
+    return;
+  }
+  fechas.forEach((f, i) => {
+    const d = document.createElement('div');
+    d.className = 'pf-row pf-row--between';
+    d.style.cssText = 'padding:7px 0;border-bottom:1px solid var(--border-soft)';
+    const [a, m, dd] = f.split('-');
+    d.innerHTML = '<span style="font-size:13.5px">📅 ' + dd + '/' + m + '/' + a + '</span>';
+    const b = document.createElement('button');
+    b.className = 'pf-btn pf-btn--ghost';
+    b.style.cssText = 'padding:4px 10px;font-size:12px';
+    b.textContent = '✕';
+    b.onclick = () => { fechas.splice(i, 1); pintar(); };
+    d.appendChild(b);
+    caja.appendChild(d);
+  });
+}
+
+function anadirFecha() {
+  const f = document.getElementById('a-fecha').value;
+  if (!f) { PF.toast('Elige una fecha.', 'error'); return; }
+  if (fechas.indexOf(f) !== -1) { PF.toast('Esa fecha ya está.', 'error'); return; }
+  fechas.push(f);
+  fechas.sort();
+  pintar();
+}
+
+pintar();
+
+document.getElementById('btn-agendar').onclick = function () {
+  const boton = this;
+  const lista = fechas.length ? fechas : [document.getElementById('a-fecha').value];
+  if (!lista[0]) { PF.toast('Elige al menos una fecha.', 'error'); return; }
+
+  boton.disabled = true;
+  PF.api('/api/plan/{{ plan.id }}/agendar', {
+    fechas: lista,
+    hora: document.getElementById('a-hora').value || null,
+    lugar: document.getElementById('a-lugar').value,
+  }).then(j => {
+    PF.toast(j.mensaje, 'success');
+    setTimeout(() => { location.href = j.redirect; }, 900);
+  }).catch(e => {
+    PF.toast(e.message, 'error');
+    boton.disabled = false;
+  });
+};
+
+document.getElementById('btn-borrar').onclick = function () {
+  if (!confirm('¿Borrar el plan "{{ plan.nombre|e }}"?\n\n' +
+               'Las sesiones que ya agendaste se quedan en el calendario.')) return;
+  PF.api('/api/plan/{{ plan.id }}', {}, 'DELETE')
+    .then(() => {
+      PF.toast('Plan borrado.', 'success');
+      setTimeout(() => { location.href = '{{ url_for("futbol.c_planes") }}'; }, 700);
+    })
+    .catch(e => PF.toast(e.message, 'error'));
+};
+</script>
+{% endblock %}

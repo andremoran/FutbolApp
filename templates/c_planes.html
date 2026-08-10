@@ -1,0 +1,194 @@
+{% extends '_shell.html' %}
+{% block title %}Planes de sesión · ProFoot{% endblock %}
+
+{# Una sesión se arma una vez y se vuelca al calendario cuantas veces haga
+   falta. Es como se trabaja de verdad una pretemporada de doce semanas. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_calendario') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Planificación</div>{% endblock %}
+{% block hero_title %}Planes de sesión{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {{ planes|length }} plan{{ '' if planes|length == 1 else 'es' }} guardado{{ '' if planes|length == 1 else 's' }}
+</div>
+{% endblock %}
+
+{% block content %}
+
+{# ══════════ CREAR ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Nuevo plan</h2>
+  </div>
+
+  <div class="pf-field">
+    <label class="pf-label" for="p-nombre">Nombre</label>
+    <input class="pf-input" id="p-nombre" maxlength="120"
+           placeholder="Ej. Sesión de fuerza + finalización">
+  </div>
+
+  <div class="pf-field pf-mt-12">
+    <label class="pf-label" for="p-objetivo">Objetivo</label>
+    <input class="pf-input" id="p-objetivo" maxlength="400"
+           placeholder="Qué se busca con esta sesión">
+  </div>
+
+  <div class="pf-row pf-mt-12" style="gap:10px">
+    <div class="pf-grow">
+      <label class="pf-label" for="p-tipo">Trabajo</label>
+      <select class="pf-select" id="p-tipo">
+        {% for clave, etiqueta, color in tipos_entreno %}
+          <option value="{{ clave }}" {{ 'selected' if clave == 'mixto' }}>{{ etiqueta }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="pf-grow">
+      <label class="pf-label" for="p-intensidad">Intensidad</label>
+      <select class="pf-select" id="p-intensidad">
+        {% for clave, etiqueta, factor in intensidades %}
+          <option value="{{ clave }}" {{ 'selected' if clave == 'media' }}>{{ etiqueta }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+
+  <div class="pf-mt-16">
+    <div class="pf-row pf-row--between" style="margin-bottom:8px">
+      <span class="pf-label" style="margin:0">Bloques de la sesión</span>
+      <span class="pf-pill pf-pill--muted" id="total-min">0 min</span>
+    </div>
+    <div id="bloques"></div>
+    <button class="pf-btn pf-btn--ghost pf-btn--block pf-mt-8" type="button" id="btn-bloque">
+      <i data-ico="plus" class="pf-ico--sm"></i> Añadir bloque
+    </button>
+  </div>
+
+  <div class="pf-field pf-mt-12">
+    <label class="pf-label" for="p-material">Material</label>
+    <input class="pf-input" id="p-material" maxlength="400"
+           placeholder="Conos, petos, escalera, 6 balones…">
+  </div>
+
+  <button class="pf-btn pf-btn--primary pf-btn--block pf-mt-16" type="button" id="btn-crear">
+    <i data-ico="save" class="pf-ico--sm"></i> Guardar el plan
+  </button>
+</div>
+
+{# ══════════ LOS QUE HAY ══════════ #}
+{% if planes %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Tus planes</h2>
+  </div>
+  {% for p in planes %}
+  <a class="pf-jug" href="{{ url_for('futbol.c_plan', plid=p.id) }}"
+     style="text-decoration:none;color:inherit">
+    <div class="pf-grow">
+      <div class="pf-jug__n">{{ p.nombre }}</div>
+      <div class="pf-jug__s">
+        {{ p._meta.etiqueta }} · {{ p._minutos or p.duracion_min }}′
+        · {{ p._bloques|length }} bloque{{ '' if p._bloques|length == 1 else 's' }}
+        {%- if p.veces_usado %} · usado {{ p.veces_usado }} vez{{ '' if p.veces_usado == 1 else 'es' }}{% endif %}
+      </div>
+    </div>
+    <span class="pf-pill pf-pill--muted" style="background:{{ p._meta.color }}22;
+          color:{{ p._meta.color }}">{{ p._meta.etiqueta }}</span>
+    <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="pf-card">
+  <div class="pf-empty">
+    <div class="pf-empty__icon">📋</div>
+    <div class="pf-empty__title">Sin planes todavía</div>
+    <div class="pf-empty__text">
+      Arma arriba tu sesión tipo y podrás volcarla al calendario en un toque,
+      tantas veces como quieras.
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div style="height:34px"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let n = 0;
+
+function sumarMinutos() {
+  let total = 0;
+  document.querySelectorAll('[data-bloque] [data-k="minutos"]').forEach(i => {
+    total += +i.value || 0;
+  });
+  document.getElementById('total-min').textContent = total + ' min';
+}
+
+function anadirBloque(nombre, minutos) {
+  n++;
+  const div = document.createElement('div');
+  div.dataset.bloque = '1';
+  div.style.cssText = 'padding:12px 0;border-top:1px solid var(--border-soft)';
+  div.innerHTML = `
+    <div class="pf-row" style="gap:8px;align-items:flex-end">
+      <div class="pf-grow">
+        <label class="pf-label">Bloque ${n}</label>
+        <input class="pf-input" data-k="nombre" maxlength="100"
+               placeholder="Ej. Activación" value="${nombre || ''}">
+      </div>
+      <div style="width:78px;flex:none">
+        <label class="pf-label">Min</label>
+        <input class="pf-input" data-k="minutos" type="number" min="0" max="180"
+               value="${minutos || 15}" oninput="sumarMinutos()">
+      </div>
+      <button class="pf-btn pf-btn--ghost" type="button" style="padding:11px"
+              onclick="this.closest('[data-bloque]').remove(); sumarMinutos()">✕</button>
+    </div>
+    <textarea class="pf-textarea pf-mt-8" data-k="descripcion" rows="2" maxlength="800"
+              placeholder="Qué se hace, con qué espacio y cuántos jugadores"></textarea>`;
+  document.getElementById('bloques').appendChild(div);
+  sumarMinutos();
+}
+
+/* Arranca con la estructura clásica de una sesión: nadie parte de cero. */
+['Activación', 'Parte principal', 'Vuelta a la calma'].forEach((b, i) =>
+  anadirBloque(b, [15, 60, 15][i]));
+
+document.getElementById('btn-bloque').onclick = () => anadirBloque();
+
+document.getElementById('btn-crear').onclick = function () {
+  const boton = this;
+  const bloques = [];
+  document.querySelectorAll('[data-bloque]').forEach(d => {
+    const v = k => (d.querySelector('[data-k="' + k + '"]') || {}).value || '';
+    if (v('nombre').trim()) {
+      bloques.push({
+        nombre: v('nombre'), minutos: +v('minutos') || 0,
+        descripcion: v('descripcion'),
+      });
+    }
+  });
+
+  boton.disabled = true;
+  PF.api('/api/plan', {
+    nombre:     document.getElementById('p-nombre').value,
+    objetivo:   document.getElementById('p-objetivo').value,
+    tipo:       document.getElementById('p-tipo').value,
+    intensidad: document.getElementById('p-intensidad').value,
+    material:   document.getElementById('p-material').value,
+    bloques:    bloques,
+  }).then(j => {
+    PF.toast(j.mensaje, 'success');
+    setTimeout(() => { location.href = j.redirect; }, 700);
+  }).catch(e => {
+    PF.toast(e.message, 'error');
+    boton.disabled = false;
+  });
+};
+</script>
+{% endblock %}

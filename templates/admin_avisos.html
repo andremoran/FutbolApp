@@ -1,0 +1,62 @@
+{% extends '_admin.html' %}
+{% block title %}Avisos · Panel ProFoot{% endblock %}
+{% block encabezado %}Bandeja de avisos{% endblock %}
+{% block encabezado_sub %}
+  Cada alta, cada pago y cada canje deja constancia aquí. El correo puede irse
+  a spam; esto no.
+{% endblock %}
+
+{% block content %}
+
+<div class="adm-card">
+  <div class="adm-card__head">
+    <h2 class="adm-card__title">Novedades</h2>
+    {% if sin_leer %}<span class="adm-tag adm-tag--mal">{{ sin_leer }} sin leer</span>{% endif %}
+    <div class="adm-grow"></div>
+    <input class="adm-in" type="search" style="max-width:240px" placeholder="Buscar…"
+           oninput="ADM.filtrar(this, '.adm-aviso')">
+    {% if sin_leer %}
+      <button class="adm-btn adm-btn--sm" id="leer-todo">Marcar todo como leído</button>
+    {% endif %}
+  </div>
+
+  {% if avisos %}
+    {% for a in avisos %}
+    <div class="adm-aviso {{ 'adm-aviso--nuevo' if not a.leida }}">
+      <div class="adm-aviso__ico">{{ a._icono }}</div>
+      <div class="adm-grow">
+        <div class="adm-aviso__t">
+          {{ a.titulo }}
+          {% if not a.leida %}<span class="adm-tag adm-tag--ok" style="margin-left:6px">nuevo</span>{% endif %}
+        </div>
+        {% if a.detalle %}<div class="adm-aviso__d">{{ a.detalle }}</div>{% endif %}
+        <div class="adm-aviso__f">
+          {{ a._fecha.strftime('%d/%m/%Y') if a._fecha else '' }}
+          {%- if a.importe %} · <b>{{ a.importe }}</b>{% endif %}
+          · {{ a.tipo }}
+        </div>
+      </div>
+      {% if not a.leida %}
+      <button class="adm-btn adm-btn--sm" title="Marcar como leído"
+              onclick="ADM.accion(this, '/admin/api/avisos/leer', {ids:['{{ a.id }}']})">✓</button>
+      {% endif %}
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="adm-vacio">
+      <div class="adm-vacio__e">🔕</div>
+      <p>Sin avisos todavía.<br>Aparecerán en cuanto alguien se dé de alta o pague.</p>
+    </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const btn = document.getElementById('leer-todo');
+if (btn) btn.onclick = function () {
+  ADM.accion(this, '/admin/api/avisos/leer', { todos: true });
+};
+</script>
+{% endblock %}

@@ -1,0 +1,163 @@
+{% extends '_shell.html' %}
+{% block title %}Solicitudes · ProFoot{% endblock %}
+
+{# El código de equipo circula por grupos de WhatsApp y acaba entrando quien
+   no debe. Con esto el jugador pide y el entrenador decide. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_equipo') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Plantilla</div>{% endblock %}
+{% block hero_title %}Solicitudes{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {% if pendientes %}
+    {{ pendientes|length }} esperando respuesta
+  {% else %}
+    Ninguna pendiente
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+
+{# ══════════ EL CÓDIGO ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Tu código de equipo</h2>
+  </div>
+  <p style="margin:0 0 12px;font-size:12.5px;color:var(--text-sec);line-height:1.6">
+    Pásaselo a tus jugadores. Con él te mandan una solicitud y tú decides.
+  </p>
+  <div class="pf-center" style="padding:16px;border-radius:var(--r-lg);
+              background:var(--primary-faint);border:1px dashed var(--primary-light)">
+    <div style="font-family:monospace;font-size:30px;font-weight:800;
+                letter-spacing:5px;color:var(--primary)">{{ codigo or '—' }}</div>
+  </div>
+  {% if codigo %}
+  <button class="pf-btn pf-btn--ghost pf-btn--block pf-mt-12" type="button"
+          onclick="copiar()">
+    <i data-ico="copy" class="pf-ico--sm"></i> Copiar el código
+  </button>
+  {% endif %}
+</div>
+
+{% if llena %}
+<div class="pf-card" style="border-color:var(--warning)">
+  <div class="pf-alerta pf-alerta--warn" style="margin-top:0">
+    <i data-ico="alert-triangle" class="pf-ico--xs"></i>
+    <span>Tu plantilla llegó a {{ tope }} jugadores, el tope del plan gratuito.
+      Pásate a Coach Pro para aceptar más.
+      <a href="{{ url_for('futbol.planes') }}"
+         style="color:inherit;font-weight:700">Ver planes</a></span>
+  </div>
+</div>
+{% endif %}
+
+{# ══════════ PENDIENTES ══════════ #}
+{% if pendientes %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Esperando tu respuesta</h2>
+    <span class="pf-pill pf-pill--warning">{{ pendientes|length }}</span>
+  </div>
+
+  {% for s in pendientes %}
+  <div style="padding:14px 0;border-bottom:1px solid var(--border-soft)">
+    <div class="pf-row" style="gap:11px;margin-bottom:9px">
+      <div class="pf-avatar pf-avatar--sm">
+        {%- if s._jugador.profile_photo %}<img src="{{ s._jugador.profile_photo }}" alt="">
+        {%- else %}{{ (s._jugador.name or '?')[:1]|upper }}{% endif -%}
+      </div>
+      <div class="pf-grow">
+        <div class="pf-jug__n">{{ s._jugador.name or 'Jugador' }}</div>
+        <div class="pf-jug__s">
+          {{ s.posicion or 'Sin posición' }}
+          {%- if s._jugador.anio_nacimiento %} · {{ s._jugador.anio_nacimiento }}{% endif %}
+          {%- if s._fecha %} · {{ s._fecha.strftime('%d/%m/%Y') }}{% endif %}
+        </div>
+      </div>
+    </div>
+
+    {% if s.mensaje %}
+    <p style="margin:0 0 10px;font-size:13px;line-height:1.6;color:var(--text-sec);
+              background:var(--border-soft);padding:10px 12px;border-radius:var(--r-md)">
+      "{{ s.mensaje }}"
+    </p>
+    {% endif %}
+
+    <div class="pf-row" style="gap:8px">
+      <button class="pf-btn pf-btn--primary pf-grow" type="button"
+              onclick="resolver('{{ s.id }}', 'aceptar', this)">
+        <i data-ico="check" class="pf-ico--sm"></i> Aceptar
+      </button>
+      <button class="pf-btn pf-btn--ghost pf-grow" type="button"
+              onclick="resolver('{{ s.id }}', 'rechazar', this)">
+        Rechazar
+      </button>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="pf-card">
+  <div class="pf-empty">
+    <div class="pf-empty__icon">📬</div>
+    <div class="pf-empty__title">Sin solicitudes pendientes</div>
+    <div class="pf-empty__text">
+      Cuando alguien use tu código para pedir entrar, aparecerá aquí.
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ══════════ HISTÓRICO ══════════ #}
+{% if resueltas %}
+<details class="pf-card">
+  <summary style="display:flex;align-items:center;gap:9px;cursor:pointer;list-style:none">
+    <span style="font-weight:700;font-size:14px;flex:1">
+      Ya resueltas ({{ resueltas|length }})
+    </span>
+    <i data-ico="chevron-down" class="pf-ico--sm pf-item__chev"></i>
+  </summary>
+  {% for s in resueltas %}
+  <div class="pf-medida">
+    <span class="pf-medida__et">{{ s._jugador.name or 'Jugador' }}</span>
+    <span class="pf-pill {{ 'pf-pill--info' if s.estado == 'aceptada' else 'pf-pill--muted' }}">
+      {{ 'Aceptada' if s.estado == 'aceptada' else 'Rechazada' }}
+    </span>
+  </div>
+  {% endfor %}
+</details>
+{% endif %}
+
+<div style="height:34px"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function copiar() {
+  const t = '{{ codigo }}';
+  navigator.clipboard.writeText(t)
+    .then(() => PF.toast('Código copiado: ' + t, 'success'))
+    .catch(() => PF.toast('Copia el código a mano: ' + t, 'info'));
+}
+
+function resolver(sid, accion, boton) {
+  if (accion === 'rechazar' &&
+      !confirm('¿Rechazar la solicitud?\n\nEl jugador podrá volver a pedirlo.')) return;
+  boton.disabled = true;
+  PF.api('/api/solicitud/' + sid, { accion: accion })
+    .then(j => {
+      PF.toast(j.mensaje, 'success');
+      setTimeout(() => location.reload(), 700);
+    })
+    .catch(e => {
+      PF.toast(e.message, 'error');
+      boton.disabled = false;
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,198 @@
+{% extends '_shell.html' %}
+{% block title %}Calendario · ProFoot{% endblock %}
+
+{# El mismo calendario que ve el entrenador, en modo lectura, y con lo único
+   que el jugador puede tocar: confirmar si va o no. #}
+
+{% block hero_label %}<div class="pf-hero__label">Mi equipo</div>{% endblock %}
+{% block hero_title %}Calendario{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {% if entrenador %}Equipo de {{ entrenador.name }}{% else %}Sin equipo todavía{% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+
+{% if not entrenador %}
+<div class="pf-card">
+  <div class="pf-empty">
+    <div class="pf-empty__icon">👥</div>
+    <div class="pf-empty__title">Todavía no estás en un equipo</div>
+    <div class="pf-empty__text">
+      Pídele el código a tu entrenador y únete: el calendario, los
+      entrenamientos y las evaluaciones vienen de ahí.
+    </div>
+    <a class="pf-btn pf-btn--primary pf-mt-16"
+       href="{{ url_for('futbol.p_unirme') }}">Unirme a un equipo</a>
+  </div>
+</div>
+{% else %}
+
+<div class="pf-mes">
+  <a class="pf-mes__b" href="{{ url_for('futbol.p_calendario', a=mes_ant.a, m=mes_ant.m) }}"
+     aria-label="Mes anterior"><i data-ico="chevron-left" class="pf-ico--sm"></i></a>
+  <h2 class="pf-mes__t">{{ nombre_mes }} {{ anio }}</h2>
+  <a class="pf-mes__b" href="{{ url_for('futbol.p_calendario', a=mes_sig.a, m=mes_sig.m) }}"
+     aria-label="Mes siguiente"><i data-ico="chevron-right" class="pf-ico--sm"></i></a>
+</div>
+
+<div class="pf-cal">
+  <div class="pf-cal__cab">
+    {% for d in dias_cortos %}<span>{{ d }}</span>{% endfor %}
+  </div>
+  {% for semana in semanas %}
+  <div class="pf-cal__sem">
+    {% for c in semana %}
+    <div class="pf-cal__dia
+                {{ 'pf-cal__dia--fuera' if not c.del_mes }}
+                {{ 'pf-cal__dia--finde' if c.finde and c.del_mes }}
+                {{ 'pf-cal__dia--hoy' if c.hoy }}"
+         onclick="verDia('{{ c.iso }}')" role="button" tabindex="0">
+      <div class="pf-cal__n">{{ c.dia }}</div>
+      <div class="pf-cal__puntos">
+        {% for col in c.colores %}
+          <span class="pf-cal__punto" style="background:{{ col }}"></span>
+        {% endfor %}
+      </div>
+      {% if c.eventos and c.del_mes %}
+        <div class="pf-cal__mini">{{ c.eventos[0].titulo }}</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+</div>
+
+{# ══════════ LO QUE VIENE ══════════ #}
+<div class="pf-card pf-mt-16">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Lo que viene</h2>
+  </div>
+
+  {% if proximos %}
+    {% for e in proximos %}
+    <div class="pf-ev">
+      <div class="pf-ev__bar" style="background:{{ e._color }}"></div>
+      <div class="pf-grow">
+        <div class="pf-ev__t">
+          {{ e._meta.emoji }}
+          {{ ('vs ' ~ e.rival) if e.tipo == 'partido' and e.rival else e.titulo }}
+        </div>
+        <div class="pf-ev__s">
+          {{ e._etiqueta }}
+          {%- if e._fecha %} · {{ e._fecha.strftime('%d/%m') }}{% endif %}
+          {%- if e.hora %} · {{ e.hora[:5] }}{% endif %}
+          {%- if e.lugar %} · {{ e.lugar }}{% endif %}
+        </div>
+
+        {% if e.tipo in ('entreno', 'partido') %}
+        <div class="pf-asis pf-mt-8" data-evento="{{ e.id }}">
+          {% for clave, etiqueta, emoji, color in estados %}
+            {% if clave != 'pendiente' and clave != 'justificado' %}
+            <button type="button" class="pf-asis__b {{ 'on' if e._mi_estado == clave }}"
+                    data-e="{{ clave }}"
+                    onclick="marcar('{{ e.id }}', '{{ clave }}', this)">
+              {{ emoji }} {{ etiqueta }}
+            </button>
+            {% endif %}
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% if e._dias is not none %}
+      <div class="pf-pill pf-pill--muted" style="flex:none">
+        {% if e._dias == 0 %}hoy{% elif e._dias == 1 %}mañana{% else %}{{ e._dias }} d{% endif %}
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="pf-empty">
+      <div class="pf-empty__icon">📅</div>
+      <div class="pf-empty__title">Nada agendado</div>
+      <div class="pf-empty__text">
+        Tu entrenador todavía no ha puesto entrenamientos ni partidos.
+      </div>
+    </div>
+  {% endif %}
+</div>
+
+<p class="pf-center" style="font-size:11.5px;color:var(--text-muted);
+          padding:4px 26px 30px;line-height:1.6">
+  Confirmar si vas ayuda a tu entrenador a preparar la sesión.
+</p>
+
+{# ══════════ HOJA: DÍA ══════════ #}
+<div class="pf-sheet-back" id="pf-sheet-dia-back"></div>
+<aside class="pf-sheet" id="pf-sheet-dia" role="dialog" aria-modal="true">
+  <div class="pf-sheet__grip"></div>
+  <div class="pf-sheet__head">
+    <div class="pf-row pf-row--between">
+      <div>
+        <h2 class="pf-sheet__title" id="dia-titulo">Día</h2>
+        <p class="pf-sheet__sub" id="dia-sub"></p>
+      </div>
+      <button type="button" class="pf-hero__btn"
+              style="background:var(--border-soft);color:var(--text-sec)"
+              onclick="PF.closeSheet('pf-sheet-dia')" aria-label="Cerrar">
+        <i data-ico="x" class="pf-ico--sm"></i>
+      </button>
+    </div>
+  </div>
+  <div class="pf-sheet__body"><div id="dia-eventos"></div><div style="height:14px"></div></div>
+</aside>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+const EVENTOS = {{ eventos_json|default([], true)|tojson }};
+
+function escapar(s) {
+  const d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
+
+function verDia(iso) {
+  const delDia = EVENTOS.filter(e => String(e.fecha).slice(0, 10) === iso);
+  document.getElementById('dia-titulo').textContent =
+    iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4);
+  document.getElementById('dia-sub').textContent = delDia.length
+    ? delDia.length + (delDia.length === 1 ? ' evento' : ' eventos')
+    : 'Sin nada agendado';
+
+  const caja = document.getElementById('dia-eventos');
+  caja.innerHTML = delDia.length ? '' :
+    '<p style="color:var(--text-muted);font-size:13px;margin:0">Nada este día.</p>';
+  delDia.forEach(e => {
+    const div = document.createElement('div');
+    div.className = 'pf-ev';
+    div.innerHTML =
+      '<div class="pf-ev__bar" style="background:' + (e._color || '#94a3b8') + '"></div>' +
+      '<div class="pf-grow"><div class="pf-ev__t">' + escapar(e.titulo) + '</div>' +
+      '<div class="pf-ev__s">' + escapar(e._etiqueta) +
+      (e.hora ? ' · ' + String(e.hora).slice(0, 5) : '') +
+      (e.lugar ? ' · ' + escapar(e.lugar) : '') +
+      (e.descripcion ? '<br>' + escapar(e.descripcion) : '') + '</div></div>';
+    caja.appendChild(div);
+  });
+  PF.openSheet('pf-sheet-dia');
+}
+
+function marcar(eventoId, estado, boton) {
+  const grupo = boton.closest('[data-evento]');
+  grupo.querySelectorAll('.pf-asis__b').forEach(b => b.classList.remove('on'));
+  boton.classList.add('on');
+  PF.api('/api/asistencia', { event_id: eventoId, estado: estado })
+    .then(() => PF.toast(estado === 'presente' ? 'Confirmado, ahí estarás.'
+                                               : 'Avisado. Tu entrenador lo verá.', 'success'))
+    .catch(e => {
+      PF.toast(e.message, 'error');
+      grupo.querySelectorAll('.pf-asis__b').forEach(b => b.classList.remove('on'));
+    });
+}
+</script>
+{% endblock %}

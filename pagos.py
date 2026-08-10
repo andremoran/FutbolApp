@@ -1,13 +1,23 @@
 # -*- coding: utf-8 -*-
 """
-pagos.py — Cobro con tarjeta en FutbolApp (PayPal Subscriptions).
+pagos.py — Cobrar en FutbolApp: tarjeta (PayPal) y transferencia (DeUna).
 
-PayPal cobra con tarjeta sin que el usuario necesite cuenta de PayPal, y el
-número de la tarjeta nunca pasa por nuestro servidor: lo captura el SDK de
-PayPal. Nosotros solo verificamos la suscripción contra su API y activamos.
+Dos vías porque el público es de Ecuador y no todo el mundo tiene tarjeta:
 
-Los Billing Plans se crean UNA vez con `python crear_planes_paypal.py`; sus IDs
-quedan en planes_paypal.json.
+  TARJETA · PayPal Subscriptions
+    Cobra con tarjeta sin que el usuario necesite cuenta de PayPal, y el
+    número nunca pasa por nuestro servidor: lo captura el SDK de PayPal.
+    Nosotros verificamos la suscripción contra su API y activamos. Es
+    automático y se renueva solo, pero PayPal se queda una comisión.
+
+  TRANSFERENCIA · DeUna
+    El usuario paga desde su banco al número de la cuenta y sube el
+    comprobante. No hay comisión, pero un administrador tiene que mirarlo:
+    hasta que lo apruebe, la cuenta NO se activa. Nunca se activa sola con
+    lo que diga el navegador.
+
+Los Billing Plans de PayPal se crean UNA vez con `python crear_planes_paypal.py`;
+sus IDs quedan en planes_paypal.json.
 """
 import json
 import logging
@@ -17,6 +27,9 @@ from datetime import datetime, timezone
 import requests
 from flask import Blueprint, Response, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+
+import avisos
+import suscripciones as subs
 
 logger = logging.getLogger(__name__)
 bp = Blueprint('pagos', __name__, url_prefix='/pagos')
@@ -94,24 +107,32 @@ def _ahora():
 
 
 def activar_usuario(user_id, plan_clave, sub):
-    """Marca la cuenta como activa y guarda el comprobante."""
+    """Marca la cuenta como Pro, guarda el comprobante y avisa a los admins."""
     from futbol import db
-    db.update('usuarios', {
-        'activo': True,
-        'plan': plan_clave,
-        'suscripcion_id': sub.get('id'),
-        'suscripcion_estado': sub.get('status'),
-        'suscripcion_desde': _ahora(),
-    }, 'activar', id=user_id)
+
+    meta = PLANES.get(plan_clave, {})
+    subs.activar(user_id, meses=1, origen='paypal', plan=plan_clave,
+                 suscripcion_id=sub.get('id'), estado=sub.get('status'))
     db.insert('fut_pagos', {
         'user_id': user_id,
         'plan': plan_clave,
         'suscripcion_id': sub.get('id'),
         'estado': sub.get('status'),
         'proveedor': 'paypal',
+        'importe': meta.get('precio'),
+        'moneda': 'USD',
+        'meses': 1,
+        'referencia': sub.get('id'),
         'bruto': json.dumps(sub)[:8000],
         'creado': _ahora(),
     }, 'registro pago')
+
+    usuario = db.one('usuarios', 'pagador', id=user_id) or {}
+    avisos.aviso_pago(
+        type('U', (), {'name': usuario.get('nombre', '?'),
+                       'correo': usuario.get('correo', ''), 'id': user_id})(),
+        meta.get('nombre', plan_clave), meta.get('precio', ''), 'PayPal (tarjeta)',
+        sub.get('id', ''))
     logger.info('Cuenta %s activada con %s (%s)', user_id, plan_clave, sub.get('id'))
 
 
@@ -120,8 +141,8 @@ def desactivar_por_suscripcion(sub_id, estado):
     fila = db.one('usuarios', 'por suscripcion', suscripcion_id=sub_id)
     if not fila:
         return
-    db.update('usuarios', {'activo': False, 'suscripcion_estado': estado},
-              'desactivar', id=fila['id'])
+    subs.desactivar(fila['id'], estado)
+    avisos.aviso_baja(fila, estado)
     logger.info('Cuenta %s desactivada (%s)', fila['id'], estado)
 
 
@@ -162,6 +183,114 @@ def checkout(plan):
 @login_required
 def listo():
     return render_template('pago_listo.html', hide_tabbar=True)
+
+
+# ═══════════════════════ DEUNA (transferencia) ═══════════════════════
+def deuna_disponible():
+    """DeUna solo se ofrece si el administrador puso los datos de la cuenta."""
+    from admin import ajustes
+    cfg = ajustes()
+    return bool(cfg.get('deuna_activo')
+                and (cfg.get('deuna_telefono') or cfg.get('deuna_qr'))), cfg
+
+
+@bp.route('/deuna/<plan>')
+@login_required
+def deuna(plan):
+    meta = PLANES.get(plan)
+    if not meta:
+        flash('Ese plan no existe.', 'error')
+        return redirect(url_for('futbol.planes'))
+
+    activo, cfg = deuna_disponible()
+    if not activo:
+        flash('El pago por transferencia todavía no está disponible. '
+              'Puedes pagar con tarjeta.', 'warning')
+        return redirect(url_for('futbol.planes'))
+
+    from futbol import db
+    precio = {'jugador_pro': cfg.get('precio_jugador'),
+              'entrenador_pro': cfg.get('precio_entrenador'),
+              'club': cfg.get('precio_club')}.get(plan) or meta['precio']
+
+    pendiente = None
+    for p in (db.rows('fut_pagos', 'pendiente deuna', user_id=current_user.id,
+                      _order='creado', _desc=True, _limit=5) or []):
+        if (p.get('estado') or '').lower() == 'pendiente':
+            pendiente = p
+            pendiente['_fecha'] = db.parse_fecha(p.get('creado'))
+            break
+
+    return render_template('pago_deuna.html',
+                           hide_tabbar=True,
+                           plan=plan, meta=meta, precio=precio,
+                           cfg=cfg, pendiente=pendiente)
+
+
+@bp.route('/api/deuna', methods=['POST'])
+@login_required
+def api_deuna():
+    """Registra el comprobante. NO activa: eso lo hace un administrador.
+
+    Es la diferencia entera con la tarjeta. Aquí lo único que se sabe es que
+    alguien dice haber pagado; hasta que un humano mire el movimiento, la
+    cuenta sigue en el plan gratuito.
+    """
+    from app import csrf_ok
+    from futbol import db
+
+    if not csrf_ok():
+        return jsonify({'error': 'La sesión expiró. Recarga la página.'}), 400
+
+    activo, cfg = deuna_disponible()
+    if not activo:
+        return jsonify({'error': 'El pago por transferencia no está disponible.'}), 400
+
+    d = request.get_json(silent=True) or {}
+    plan = (d.get('plan') or '').strip()
+    meta = PLANES.get(plan)
+    if not meta:
+        return jsonify({'error': 'Ese plan no existe.'}), 400
+
+    referencia = (d.get('referencia') or '').strip()
+    comprobante = (d.get('comprobante') or '').strip()
+    if not referencia and not comprobante:
+        return jsonify({'error': 'Pon el número del comprobante o sube la captura.'}), 400
+
+    ya = [p for p in (db.rows('fut_pagos', 'pendientes', user_id=current_user.id) or [])
+          if (p.get('estado') or '').lower() == 'pendiente']
+    if ya:
+        return jsonify({'error': 'Ya tienes un comprobante esperando revisión. '
+                                 'Te avisaremos en cuanto lo verifiquemos.'}), 400
+
+    precio = {'jugador_pro': cfg.get('precio_jugador'),
+              'entrenador_pro': cfg.get('precio_entrenador'),
+              'club': cfg.get('precio_club')}.get(plan) or meta['precio']
+    meses = max(1, min(24, int(d.get('meses') or 1)))
+
+    fila = db.insert('fut_pagos', {
+        'user_id': current_user.id,
+        'plan': plan,
+        'estado': 'pendiente',
+        'proveedor': 'deuna',
+        'importe': str(precio),
+        'moneda': 'USD',
+        'meses': meses,
+        'referencia': referencia[:80],
+        # La imagen se guarda como data URI: sin bucket que configurar ni
+        # permisos que revisar, y el comprobante rara vez pasa de 200 kB.
+        'comprobante': comprobante[:600000],
+        'creado': _ahora(),
+    }, 'pago deuna')
+
+    if not fila:
+        return jsonify({'error': 'No se pudo registrar el comprobante.'}), 500
+
+    avisos.aviso_deuna_pendiente(current_user, meta['nombre'], precio, referencia)
+    return jsonify({'ok': True,
+                    'mensaje': 'Comprobante recibido. Lo revisamos y activamos '
+                               'tu cuenta; suele tardar unas horas.',
+                    'redirect': url_for('pagos.listo', pendiente=1)})
 
 
 # ═══════════════════════ API ═══════════════════════

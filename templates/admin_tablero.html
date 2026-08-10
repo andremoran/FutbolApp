@@ -1,0 +1,231 @@
+{% extends '_admin.html' %}
+{% block title %}Tablero · Panel ProFoot{% endblock %}
+{% block encabezado %}Tablero{% endblock %}
+{% block encabezado_sub %}
+  {{ metricas.total }} cuenta{{ '' if metricas.total == 1 else 's' }} ·
+  {{ metricas.pro }} con plan Pro
+  {%- if metricas.nuevos_30 %} · {{ metricas.nuevos_30 }} de alta este mes{% endif %}
+{% endblock %}
+
+{% block content %}
+
+{# ══════════════════ MÉTRICAS ══════════════════ #}
+<div class="adm-grid adm-grid--4 adm-mb">
+  <div class="adm-kpi">
+    <div class="adm-kpi__ico">👥</div>
+    <div><div class="adm-kpi__n">{{ metricas.total }}</div>
+         <div class="adm-kpi__t">Cuentas en total</div></div>
+  </div>
+  <div class="adm-kpi adm-kpi--ok">
+    <div class="adm-kpi__ico">⭐</div>
+    <div><div class="adm-kpi__n">{{ metricas.pro }}</div>
+         <div class="adm-kpi__t">Con plan Pro</div></div>
+  </div>
+  <div class="adm-kpi">
+    <div class="adm-kpi__ico">📋</div>
+    <div><div class="adm-kpi__n">{{ metricas.entrenadores }}</div>
+         <div class="adm-kpi__t">Entrenadores</div></div>
+  </div>
+  <div class="adm-kpi">
+    <div class="adm-kpi__ico">⚽</div>
+    <div><div class="adm-kpi__n">{{ metricas.jugadores }}</div>
+         <div class="adm-kpi__t">Jugadores</div></div>
+  </div>
+</div>
+
+{% if pendientes or metricas.caducan_7 or metricas.bloqueados %}
+<div class="adm-grid adm-grid--3 adm-mb">
+  {% if pendientes %}
+  <a class="adm-kpi adm-kpi--warn" href="{{ url_for('admin.pagos') }}">
+    <div class="adm-kpi__ico">📲</div>
+    <div><div class="adm-kpi__n">{{ pendientes|length }}</div>
+         <div class="adm-kpi__t">Comprobante{{ '' if pendientes|length == 1 else 's' }} por revisar</div></div>
+  </a>
+  {% endif %}
+  {% if metricas.caducan_7 %}
+  <div class="adm-kpi adm-kpi--warn">
+    <div class="adm-kpi__ico">⏳</div>
+    <div><div class="adm-kpi__n">{{ metricas.caducan_7 }}</div>
+         <div class="adm-kpi__t">Vencen esta semana</div></div>
+  </div>
+  {% endif %}
+  {% if metricas.bloqueados %}
+  <div class="adm-kpi adm-kpi--mal">
+    <div class="adm-kpi__ico">🚫</div>
+    <div><div class="adm-kpi__n">{{ metricas.bloqueados }}</div>
+         <div class="adm-kpi__t">Cuentas bloqueadas</div></div>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="adm-grid adm-grid--2">
+
+  {# ══════════════════ COMPROBANTES PENDIENTES ══════════════════ #}
+  {% if pendientes %}
+  <div class="adm-card" style="grid-column:1/-1">
+    <div class="adm-card__head">
+      <h2 class="adm-card__title">📲 Comprobantes DeUna por revisar</h2>
+      <span class="adm-tag adm-tag--warn">{{ pendientes|length }}</span>
+      <div class="adm-grow"></div>
+      <a class="adm-btn adm-btn--sm" href="{{ url_for('admin.pagos') }}">Ver todos</a>
+    </div>
+    <div class="adm-tabla-scroll">
+      <table class="adm-tabla">
+        <thead><tr>
+          <th>Usuario</th><th>Plan</th><th>Importe</th><th>Referencia</th>
+          <th>Fecha</th><th class="adm-der">Acción</th>
+        </tr></thead>
+        <tbody>
+        {% for p in pendientes %}
+          <tr>
+            <td>
+              <div class="adm-persona__n">{{ p._usuario.nombre or '—' }}</div>
+              <div class="adm-persona__m">{{ p._usuario.correo or '' }}</div>
+            </td>
+            <td>{{ p.plan or '—' }}</td>
+            <td class="adm-b">{{ p.importe or '—' }}</td>
+            <td class="adm-xs adm-mut">{{ p.referencia or '—' }}</td>
+            <td class="adm-xs adm-mut adm-nowrap">
+              {{ p._fecha.strftime('%d/%m/%Y') if p._fecha else '—' }}
+            </td>
+            <td class="adm-der">
+              <a class="adm-btn adm-btn--sm adm-btn--pri"
+                 href="{{ url_for('admin.pagos') }}#pago-{{ p.id }}">Revisar</a>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ══════════════════ ÚLTIMAS ALTAS ══════════════════ #}
+  <div class="adm-card">
+    <div class="adm-card__head">
+      <h2 class="adm-card__title">🆕 Últimas altas</h2>
+      <div class="adm-grow"></div>
+      <a class="adm-btn adm-btn--sm" href="{{ url_for('admin.usuarios') }}">Ver todos</a>
+    </div>
+    {% if recientes %}
+    <div class="adm-tabla-scroll">
+      <table class="adm-tabla">
+        <tbody>
+        {% for u in recientes %}
+          <tr>
+            <td>
+              <div class="adm-persona">
+                <div class="adm-av">{{ (u.nombre or '?')[:1]|upper }}</div>
+                <div class="adm-grow adm-corta">
+                  <div class="adm-persona__n adm-corta">{{ u.nombre }}</div>
+                  <div class="adm-persona__m adm-corta">{{ u.correo }}</div>
+                </div>
+              </div>
+            </td>
+            <td class="adm-der adm-nowrap">
+              <span class="adm-tag adm-tag--{{ 'admin' if u._rol == 'admin' else ('pro' if u._pro_vigente else 'free') }}">
+                {{ u._rol_emoji }} {{ u._rol_etiqueta }}
+              </span>
+              <div class="adm-xs adm-mut adm-mt-s">
+                {{ u._alta.strftime('%d/%m/%Y') if u._alta else '' }}
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <div class="adm-vacio"><div class="adm-vacio__e">👤</div>
+        <p>Todavía no hay cuentas.</p></div>
+    {% endif %}
+  </div>
+
+  {# ══════════════════ SUSCRIPCIONES QUE VENCEN ══════════════════ #}
+  <div class="adm-card">
+    <div class="adm-card__head">
+      <h2 class="adm-card__title">⏳ Vencen en 14 días</h2>
+    </div>
+    {% if caducan %}
+    <div class="adm-tabla-scroll">
+      <table class="adm-tabla">
+        <tbody>
+        {% for u in caducan %}
+          <tr>
+            <td>
+              <div class="adm-persona__n">{{ u.nombre }}</div>
+              <div class="adm-persona__m">{{ u.correo }}</div>
+            </td>
+            <td class="adm-der adm-nowrap">
+              <span class="adm-tag adm-tag--{{ 'mal' if u._dias <= 3 else 'warn' }}">
+                {{ u._dias }} día{{ '' if u._dias == 1 else 's' }}
+              </span>
+              <div class="adm-xs adm-mut adm-mt-s">
+                {{ u._pro_hasta.strftime('%d/%m/%Y') if u._pro_hasta else '' }}
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <div class="adm-vacio"><div class="adm-vacio__e">✅</div>
+        <p>Ninguna suscripción vence en las próximas dos semanas.</p></div>
+    {% endif %}
+  </div>
+
+  {# ══════════════════ CÓDIGOS ══════════════════ #}
+  <div class="adm-card">
+    <div class="adm-card__head">
+      <h2 class="adm-card__title">🎟️ Códigos de suscripción</h2>
+      <div class="adm-grow"></div>
+      <a class="adm-btn adm-btn--sm" href="{{ url_for('admin.codigos') }}">Gestionar</a>
+    </div>
+    {% if codigos %}
+    <div class="adm-card__body" style="display:flex;flex-direction:column;gap:9px">
+      {% for c in codigos %}
+      <div class="adm-flex adm-flex--between">
+        <span class="adm-cod">{{ c.codigo }}</span>
+        <span class="adm-tag adm-tag--{{ 'ok' if c._vigente else 'free' }}">
+          {{ c._restantes }}/{{ c.max_usos }} · {{ c.meses }} mes{{ '' if c.meses == 1 else 'es' }}
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+      <div class="adm-vacio"><div class="adm-vacio__e">🎟️</div>
+        <p>Sin códigos todavía.<br>Crea uno para regalar meses de Pro.</p></div>
+    {% endif %}
+  </div>
+
+  {# ══════════════════ AVISOS ══════════════════ #}
+  <div class="adm-card">
+    <div class="adm-card__head">
+      <h2 class="adm-card__title">🔔 Últimos avisos</h2>
+      {% if sin_leer %}<span class="adm-tag adm-tag--mal">{{ sin_leer }} sin leer</span>{% endif %}
+      <div class="adm-grow"></div>
+      <a class="adm-btn adm-btn--sm" href="{{ url_for('admin.bandeja') }}">Bandeja</a>
+    </div>
+    {% if avisos %}
+      {% for a in avisos %}
+      <div class="adm-aviso {{ 'adm-aviso--nuevo' if not a.leida }}">
+        <div class="adm-aviso__ico">{{ a._icono }}</div>
+        <div class="adm-grow">
+          <div class="adm-aviso__t">{{ a.titulo }}</div>
+          <div class="adm-aviso__f">
+            {{ a._fecha.strftime('%d/%m/%Y') if a._fecha else '' }}
+            {%- if a.importe %} · {{ a.importe }}{% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="adm-vacio"><div class="adm-vacio__e">🔕</div>
+        <p>Sin novedades.</p></div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,207 @@
+{% extends '_admin.html' %}
+{% block title %}Ajustes · Panel ProFoot{% endblock %}
+{% block encabezado %}Ajustes{% endblock %}
+{% block encabezado_sub %}
+  Lo que se puede cambiar sin tocar el código ni volver a desplegar.
+{% endblock %}
+
+{% block content %}
+
+<div class="adm-grid adm-grid--2">
+
+  {# ══════════════════ ADMINISTRADORES ══════════════════ #}
+  <div class="adm-card" style="grid-column:1/-1">
+    <div class="adm-card__head">
+      <h2 class="adm-card__title">🛡️ Administradores</h2>
+      <span class="adm-tag adm-tag--admin">{{ administradores|length }} de 3</span>
+    </div>
+    <div class="adm-card__body">
+      <p class="adm-ayuda adm-mb" style="margin-top:0">
+        Los administradores ven este panel y reciben por correo todos los avisos
+        de altas, pagos y canjes. El máximo son tres.
+      </p>
+
+      {% if administradores %}
+      <div class="adm-mb" style="display:flex;flex-direction:column;gap:9px">
+        {% for a in administradores %}
+        <div class="adm-flex adm-flex--between adm-card--pad"
+             style="background:rgba(252,211,77,.06);border:1px solid rgba(252,211,77,.18);
+                    border-radius:12px;padding:12px 15px">
+          <div class="adm-persona">
+            <div class="adm-av" style="background:linear-gradient(135deg,#fcd34d,#f59e0b)">
+              {{ (a.nombre or '?')[:1]|upper }}
+            </div>
+            <div>
+              <div class="adm-persona__n">{{ a.nombre }}</div>
+              <div class="adm-persona__m">{{ a.correo }}</div>
+            </div>
+          </div>
+          {% if a.id != current_user.id %}
+            <button class="adm-btn adm-btn--sm adm-btn--mal"
+                    onclick="ADM.accion(this, '/admin/api/usuario/{{ a.id }}', {accion:'admin', valor:false})">
+              Quitar
+            </button>
+          {% else %}
+            <span class="adm-tag adm-tag--admin">tú</span>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if administradores|length < 3 %}
+      <div class="adm-fila">
+        <div class="adm-campo">
+          <label class="adm-lbl" for="nuevo-admin">Nombrar administrador</label>
+          <select class="adm-sel" id="nuevo-admin">
+            <option value="">Elige una cuenta…</option>
+            {% for u in candidatos %}
+              <option value="{{ u.id }}">{{ u.nombre }} — {{ u.correo }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="adm-campo" style="flex:0 0 auto;display:flex;align-items:flex-end">
+          <button class="adm-btn adm-btn--pri" id="btn-admin">Nombrar</button>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if correos_env %}
+      <p class="adm-ayuda">
+        Arranque en frío desde el archivo de entorno:
+        <b>{{ correos_env|join(', ') }}</b>. Estas direcciones entran al panel
+        aunque nadie las haya nombrado aquí — sirve para no quedarse fuera
+        el primer día.
+      </p>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ══════════════════ DEUNA ══════════════════ #}
+  <div class="adm-card">
+    <div class="adm-card__head">
+      <h2 class="adm-card__title">📲 Cobro con DeUna</h2>
+    </div>
+    <div class="adm-card__body">
+      <p class="adm-ayuda adm-mb" style="margin-top:0">
+        DeUna es transferencia directa: no cobra comisión, pero alguien tiene que
+        mirar el comprobante. Al activarlo, a los usuarios se les ofrece junto a
+        la tarjeta y su pago cae en <b>Pagos → Por revisar</b>.
+      </p>
+
+      <label class="adm-check adm-mb">
+        <input type="checkbox" id="s-deuna_activo" {{ 'checked' if ajustes.deuna_activo }}>
+        <span>Ofrecer DeUna como forma de pago</span>
+      </label>
+
+      <div class="adm-fila">
+        <div class="adm-campo">
+          <label class="adm-lbl" for="s-deuna_titular">Titular de la cuenta</label>
+          <input class="adm-in" id="s-deuna_titular" maxlength="120"
+                 value="{{ ajustes.deuna_titular }}" placeholder="Nombre completo">
+        </div>
+        <div class="adm-campo">
+          <label class="adm-lbl" for="s-deuna_documento">Cédula o RUC</label>
+          <input class="adm-in" id="s-deuna_documento" maxlength="20"
+                 value="{{ ajustes.deuna_documento }}">
+        </div>
+      </div>
+
+      <div class="adm-fila">
+        <div class="adm-campo">
+          <label class="adm-lbl" for="s-deuna_telefono">Teléfono DeUna</label>
+          <input class="adm-in" id="s-deuna_telefono" maxlength="30"
+                 value="{{ ajustes.deuna_telefono }}" placeholder="09xxxxxxxx">
+        </div>
+        <div class="adm-campo">
+          <label class="adm-lbl" for="s-deuna_banco">Banco</label>
+          <input class="adm-in" id="s-deuna_banco" maxlength="60"
+                 value="{{ ajustes.deuna_banco }}">
+        </div>
+      </div>
+
+      <div class="adm-campo">
+        <label class="adm-lbl" for="s-deuna_qr">Enlace del código QR</label>
+        <input class="adm-in" id="s-deuna_qr" maxlength="600"
+               value="{{ ajustes.deuna_qr }}" placeholder="https://…/qr-deuna.png">
+        <p class="adm-ayuda">
+          Sube la imagen del QR a cualquier sitio (Storage de Supabase, Drive
+          público) y pega aquí el enlace directo. Si lo dejas vacío se muestran
+          solo los datos escritos.
+        </p>
+      </div>
+
+      <div class="adm-campo">
+        <label class="adm-lbl" for="s-deuna_instrucciones">Instrucciones para el usuario</label>
+        <textarea class="adm-ta" id="s-deuna_instrucciones"
+                  maxlength="600">{{ ajustes.deuna_instrucciones }}</textarea>
+      </div>
+
+      <button class="adm-btn adm-btn--pri" onclick="guardar(this)">Guardar</button>
+    </div>
+  </div>
+
+  {# ══════════════════ PRECIOS Y AVISO ══════════════════ #}
+  <div class="adm-card">
+    <div class="adm-card__head">
+      <h2 class="adm-card__title">💲 Precios y aviso</h2>
+    </div>
+    <div class="adm-card__body">
+      <p class="adm-ayuda adm-mb" style="margin-top:0">
+        Estos precios son los que se <b>muestran</b>. Lo que cobra la tarjeta lo
+        fija el plan dado de alta en PayPal: si cambias uno, cambia el otro o
+        habrá una discrepancia difícil de explicar.
+      </p>
+
+      <div class="adm-fila">
+        <div class="adm-campo">
+          <label class="adm-lbl" for="s-precio_jugador">Jugador Pro / mes</label>
+          <input class="adm-in" id="s-precio_jugador" value="{{ ajustes.precio_jugador }}">
+        </div>
+        <div class="adm-campo">
+          <label class="adm-lbl" for="s-precio_entrenador">Coach Pro / mes</label>
+          <input class="adm-in" id="s-precio_entrenador" value="{{ ajustes.precio_entrenador }}">
+        </div>
+        <div class="adm-campo">
+          <label class="adm-lbl" for="s-precio_club">Club / mes</label>
+          <input class="adm-in" id="s-precio_club" value="{{ ajustes.precio_club }}">
+        </div>
+      </div>
+
+      <div class="adm-campo">
+        <label class="adm-lbl" for="s-aviso_panel">Aviso en la pantalla de planes</label>
+        <textarea class="adm-ta" id="s-aviso_panel" maxlength="600"
+                  placeholder="Promoción de pretemporada: 3 meses al precio de 2">{{ ajustes.aviso_panel }}</textarea>
+        <p class="adm-ayuda">Se ve dentro de la app, encima de los planes. Vacío = no se muestra nada.</p>
+      </div>
+
+      <button class="adm-btn adm-btn--pri" onclick="guardar(this)">Guardar</button>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const CAMPOS = ['deuna_titular', 'deuna_documento', 'deuna_telefono', 'deuna_banco',
+                'deuna_qr', 'deuna_instrucciones', 'precio_jugador',
+                'precio_entrenador', 'precio_club', 'aviso_panel'];
+
+function guardar(boton) {
+  const datos = { deuna_activo: document.getElementById('s-deuna_activo').checked };
+  CAMPOS.forEach(c => {
+    const el = document.getElementById('s-' + c);
+    if (el) datos[c] = el.value;
+  });
+  ADM.accion(boton, '/admin/api/ajustes', datos, { recargar: false });
+}
+
+const btnAdmin = document.getElementById('btn-admin');
+if (btnAdmin) btnAdmin.onclick = function () {
+  const uid = document.getElementById('nuevo-admin').value;
+  if (!uid) { ADM.toast('Elige una cuenta primero.', 'mal'); return; }
+  ADM.accion(this, '/admin/api/usuario/' + uid, { accion: 'admin', valor: true });
+};
+</script>
+{% endblock %}

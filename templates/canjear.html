@@ -1,0 +1,92 @@
+{% extends '_shell.html' %}
+{% block title %}Canjear código · ProFoot{% endblock %}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.planes') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Suscripción</div>{% endblock %}
+{% block hero_title %}Canjear código{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {% if es_pro %}Ya tienes el plan Pro{% else %}Meses de Pro sin pasar por la tarjeta{% endif %}
+</div>
+{% endblock %}
+{% block hero_actions %}{% endblock %}
+
+{% block content %}
+
+{% if canje and canje._hasta %}
+<div class="pf-card">
+  <div class="pf-alerta pf-alerta--info" style="margin-top:0">
+    <i data-ico="check-circle" class="pf-ico--xs"></i>
+    <span>
+      Canjeaste <b>{{ canje.codigo }}</b>
+      {%- if canje._fecha %} el {{ canje._fecha.strftime('%d/%m/%Y') }}{% endif %}.
+      Te vale hasta el <b>{{ canje._hasta.strftime('%d/%m/%Y') }}</b>.
+    </span>
+  </div>
+</div>
+{% endif %}
+
+{% if es_pro and dias_pro %}
+<div class="pf-card pf-center" style="padding:22px 18px">
+  <div style="font-size:38px;line-height:1">⭐</div>
+  <div class="pf-medida__v" style="font-size:32px;margin-top:8px">{{ dias_pro }}</div>
+  <div style="font-size:13px;color:var(--text-sec)">
+    día{{ '' if dias_pro == 1 else 's' }} de Pro por delante
+  </div>
+</div>
+{% endif %}
+
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Tu código</h2>
+  </div>
+  <p style="margin:0 0 12px;font-size:12.5px;color:var(--text-sec);line-height:1.6">
+    Si tu club o tu entrenador te dio un código, mételo aquí. Los meses se
+    suman a lo que ya tengas.
+  </p>
+
+  <div class="pf-field">
+    <input class="pf-input" id="c-codigo" maxlength="32" autocomplete="off"
+           placeholder="PRO-K7M2X9"
+           style="text-transform:uppercase;font-family:monospace;font-size:19px;
+                  letter-spacing:2.5px;text-align:center;font-weight:800">
+  </div>
+
+  <button class="pf-btn pf-btn--primary pf-btn--block pf-mt-16" type="button" id="btn-canjear">
+    <i data-ico="award" class="pf-ico--sm"></i> Canjear
+  </button>
+</div>
+
+<p class="pf-center" style="font-size:12px;color:var(--text-muted);
+          padding:6px 26px 34px;line-height:1.65">
+  Los códigos los emiten los administradores de ProFoot. Si el tuyo no
+  funciona, revisa mayúsculas y guiones antes de escribirnos.
+</p>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const campo = document.getElementById('c-codigo');
+campo.addEventListener('keydown', e => { if (e.key === 'Enter') canjear(); });
+
+function canjear() {
+  const boton = document.getElementById('btn-canjear');
+  boton.disabled = true;
+  PF.api('/api/canjear', { codigo: campo.value })
+    .then(j => {
+      PF.toast(j.mensaje, 'success');
+      setTimeout(() => { location.href = j.redirect; }, 1200);
+    })
+    .catch(e => {
+      PF.toast(e.message, 'error');
+      boton.disabled = false;
+    });
+}
+document.getElementById('btn-canjear').onclick = canjear;
+</script>
+{% endblock %}

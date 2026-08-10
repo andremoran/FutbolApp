@@ -1,7 +1,10 @@
 {# Hoja inferior "⋯ Ver más".
    En la app independiente solo tiene lo de la cuenta y los atajos del equipo:
    las herramientas de ElectroBiomed se quitaron a propósito porque sacaban al
-   usuario de ProFoot. #}
+   usuario de ProFoot.
+
+   Las funciones del plan Pro se ENSEÑAN a todo el mundo con su distintivo: si
+   se escondieran, nadie sabría qué está comprando. #}
 <div class="pf-sheet-back" id="pf-sheet-mas-back"></div>
 
 <aside class="pf-sheet" id="pf-sheet-mas" role="dialog" aria-modal="true" aria-labelledby="pf-sheet-mas-title">
@@ -11,7 +14,13 @@
     <div class="pf-row pf-row--between">
       <div>
         <h2 class="pf-sheet__title" id="pf-sheet-mas-title">Ver más</h2>
-        <p class="pf-sheet__sub">Tu cuenta y tu equipo</p>
+        <p class="pf-sheet__sub">
+          {%- if current_user.is_authenticated -%}
+            {{ fut_rol_etiqueta }} · tu cuenta y tu equipo
+          {%- else -%}
+            Tu cuenta y tu equipo
+          {%- endif -%}
+        </p>
       </div>
       <button type="button" class="pf-hero__btn" style="background:var(--border-soft);color:var(--text-sec)"
               onclick="PF.closeSheet('pf-sheet-mas')" aria-label="Cerrar">
@@ -24,6 +33,18 @@
 
     {% if current_user.is_authenticated %}
 
+      {% if fut_es_admin %}
+      <div class="pf-sheet__group">Administración</div>
+      <a class="pf-sheet__link" href="{{ url_for('admin.tablero') }}">
+        <span class="pf-sheet__emoji">🛡️</span>
+        <span class="pf-grow">
+          <span class="pf-sheet__label" style="display:block">Panel de administración</span>
+          <span class="pf-sheet__desc">Usuarios, pagos y códigos</span>
+        </span>
+        <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+      </a>
+      {% endif %}
+
       {% if fut_es_entrenador %}
       <div class="pf-sheet__group">Mi equipo</div>
 
@@ -32,6 +53,84 @@
         <span class="pf-grow">
           <span class="pf-sheet__label" style="display:block">Plantilla</span>
           <span class="pf-sheet__desc">Tus jugadores y sus fichas</span>
+        </span>
+        <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+      </a>
+
+      <a class="pf-sheet__link" href="{{ url_for('futbol.c_calendario') }}">
+        <span class="pf-sheet__emoji">📅</span>
+        <span class="pf-grow">
+          <span class="pf-sheet__label" style="display:block">Calendario</span>
+          <span class="pf-sheet__desc">Mes completo y carga de trabajo</span>
+        </span>
+        <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+      </a>
+
+      <a class="pf-sheet__link" href="{{ url_for('futbol.c_asistencia') }}">
+        <span class="pf-sheet__emoji">📋</span>
+        <span class="pf-grow">
+          <span class="pf-sheet__label" style="display:block">Asistencia</span>
+          <span class="pf-sheet__desc">Quién viene y quién falta</span>
+        </span>
+        <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+      </a>
+
+      <a class="pf-sheet__link" href="{{ url_for('futbol.c_evaluaciones') }}">
+        <span class="pf-sheet__emoji">📊</span>
+        <span class="pf-grow">
+          <span class="pf-sheet__label" style="display:block">Evaluaciones</span>
+          <span class="pf-sheet__desc">30 pruebas con baremo internacional</span>
+        </span>
+        <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+      </a>
+
+      <a class="pf-sheet__link" href="{{ url_for('futbol.c_planes') }}">
+        <span class="pf-sheet__emoji">📝</span>
+        <span class="pf-grow">
+          <span class="pf-sheet__label" style="display:block">
+            Planes de sesión {% if not fut_es_pro %}<span class="pf-pro">Pro</span>{% endif %}
+          </span>
+          <span class="pf-sheet__desc">Arma una vez, agenda muchas</span>
+        </span>
+        <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+      </a>
+
+      <a class="pf-sheet__link" href="{{ url_for('futbol.c_evolucion') }}">
+        <span class="pf-sheet__emoji">📈</span>
+        <span class="pf-grow">
+          <span class="pf-sheet__label" style="display:block">
+            Evolución del equipo {% if not fut_es_pro %}<span class="pf-pro">Pro</span>{% endif %}
+          </span>
+          <span class="pf-sheet__desc">Si el trabajo está dando resultado</span>
+        </span>
+        <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+      </a>
+
+      <a class="pf-sheet__link" href="{{ url_for('futbol.c_medico') }}">
+        <span class="pf-sheet__emoji">🏥</span>
+        <span class="pf-grow">
+          <span class="pf-sheet__label" style="display:block">
+            Lesiones {% if not fut_es_pro %}<span class="pf-pro">Pro</span>{% endif %}
+          </span>
+          <span class="pf-sheet__desc">Quién está disponible</span>
+        </span>
+        <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+      </a>
+
+      <a class="pf-sheet__link" href="{{ url_for('futbol.c_solicitudes') }}">
+        <span class="pf-sheet__emoji">📬</span>
+        <span class="pf-grow">
+          <span class="pf-sheet__label" style="display:block">Solicitudes de ingreso</span>
+          <span class="pf-sheet__desc">Quién quiere entrar al equipo</span>
+        </span>
+        <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+      </a>
+
+      <a class="pf-sheet__link" href="{{ url_for('futbol.c_manuales') }}">
+        <span class="pf-sheet__emoji">✍️</span>
+        <span class="pf-grow">
+          <span class="pf-sheet__label" style="display:block">Jugadores sin cuenta</span>
+          <span class="pf-sheet__desc">Los que aún no tienen correo</span>
         </span>
         <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
       </a>
@@ -54,11 +153,11 @@
         <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
       </a>
 
-      <a class="pf-sheet__link" href="{{ url_for('futbol.c_tests') }}">
-        <span class="pf-sheet__emoji">📊</span>
+      <a class="pf-sheet__link" href="{{ url_for('futbol.c_observaciones') }}">
+        <span class="pf-sheet__emoji">👁️</span>
         <span class="pf-grow">
-          <span class="pf-sheet__label" style="display:block">Pruebas físicas</span>
-          <span class="pf-sheet__desc">Marcas y ranking del equipo</span>
+          <span class="pf-sheet__label" style="display:block">Observaciones</span>
+          <span class="pf-sheet__desc">Apuntes de cada sesión</span>
         </span>
         <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
       </a>
@@ -74,6 +173,53 @@
 
       {% else %}
       <div class="pf-sheet__group">Mi progreso</div>
+
+      <a class="pf-sheet__link" href="{{ url_for('futbol.p_calendario') }}">
+        <span class="pf-sheet__emoji">📅</span>
+        <span class="pf-grow">
+          <span class="pf-sheet__label" style="display:block">Calendario del equipo</span>
+          <span class="pf-sheet__desc">El mes completo y confirmar asistencia</span>
+        </span>
+        <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+      </a>
+
+      <a class="pf-sheet__link" href="{{ url_for('futbol.p_evaluaciones') }}">
+        <span class="pf-sheet__emoji">📊</span>
+        <span class="pf-grow">
+          <span class="pf-sheet__label" style="display:block">Mis evaluaciones</span>
+          <span class="pf-sheet__desc">Tus marcas y tu nivel</span>
+        </span>
+        <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+      </a>
+
+      <a class="pf-sheet__link" href="{{ url_for('futbol.p_evolucion') }}">
+        <span class="pf-sheet__emoji">📈</span>
+        <span class="pf-grow">
+          <span class="pf-sheet__label" style="display:block">
+            Mi evolución {% if not fut_es_pro %}<span class="pf-pro">Pro</span>{% endif %}
+          </span>
+          <span class="pf-sheet__desc">Cómo vas progresando</span>
+        </span>
+        <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+      </a>
+
+      <a class="pf-sheet__link" href="{{ url_for('futbol.p_tactica') }}">
+        <span class="pf-sheet__emoji">📐</span>
+        <span class="pf-grow">
+          <span class="pf-sheet__label" style="display:block">Jugadas del equipo</span>
+          <span class="pf-sheet__desc">Repasa la táctica en casa</span>
+        </span>
+        <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+      </a>
+
+      <a class="pf-sheet__link" href="{{ url_for('futbol.p_medico') }}">
+        <span class="pf-sheet__emoji">🏥</span>
+        <span class="pf-grow">
+          <span class="pf-sheet__label" style="display:block">Ficha médica</span>
+          <span class="pf-sheet__desc">Contacto de emergencia y lesiones</span>
+        </span>
+        <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+      </a>
 
       <a class="pf-sheet__link" href="{{ url_for('futbol.mensajes') }}">
         <span class="pf-sheet__emoji">✉️</span>
@@ -94,10 +240,19 @@
       </a>
 
       <a class="pf-sheet__link" href="{{ url_for('futbol.mis_tests') }}">
-        <span class="pf-sheet__emoji">📊</span>
+        <span class="pf-sheet__emoji">🏃</span>
         <span class="pf-grow">
           <span class="pf-sheet__label" style="display:block">Mis pruebas físicas</span>
           <span class="pf-sheet__desc">Tus marcas y tu puesto</span>
+        </span>
+        <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+      </a>
+
+      <a class="pf-sheet__link" href="{{ url_for('futbol.p_unirme') }}">
+        <span class="pf-sheet__emoji">🔗</span>
+        <span class="pf-grow">
+          <span class="pf-sheet__label" style="display:block">Unirme a un equipo</span>
+          <span class="pf-sheet__desc">Con el código de tu entrenador</span>
         </span>
         <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
       </a>
@@ -117,8 +272,21 @@
       <a class="pf-sheet__link" href="{{ url_for('futbol.planes') }}">
         <span class="pf-sheet__emoji">⭐</span>
         <span class="pf-grow">
-          <span class="pf-sheet__label" style="display:block">Planes y pagos</span>
-          <span class="pf-sheet__desc">Básico, Pro y Club</span>
+          <span class="pf-sheet__label" style="display:block">
+            {{ 'Mi suscripción' if fut_es_pro else 'Pasar a Pro' }}
+          </span>
+          <span class="pf-sheet__desc">
+            {{ 'Plan activo' if fut_es_pro else 'Gratuito, Pro y Club' }}
+          </span>
+        </span>
+        <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+      </a>
+
+      <a class="pf-sheet__link" href="{{ url_for('futbol.canjear') }}">
+        <span class="pf-sheet__emoji">🎟️</span>
+        <span class="pf-grow">
+          <span class="pf-sheet__label" style="display:block">Canjear un código</span>
+          <span class="pf-sheet__desc">Meses de Pro sin tarjeta</span>
         </span>
         <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
       </a>

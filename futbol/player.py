@@ -13,6 +13,8 @@ from functools import wraps
 from flask import render_template, redirect, url_for, abort
 from flask_login import login_required, current_user
 
+import roles
+
 from . import bp, db
 
 
@@ -337,9 +339,52 @@ def ficha():
                            entrenador=db.entrenador_del_jugador(uid))
 
 
+# ═══════════════════════ JUGADAS DEL ENTRENADOR ═══════════════════════
+@bp.route('/tactica')
+@solo_jugador
+def p_tactica():
+    """Las jugadas de su entrenador, en solo lectura.
+
+    El jugador tiene que poder repasar la jugada en casa; que solo la vea en
+    la pizarra del vestuario es la razón por la que nadie se acuerda el sábado.
+    """
+    uid = current_user.id
+    coach = db.entrenador_del_jugador(uid)
+    jugadas = []
+    if coach:
+        jugadas = db.rows('fut_tactical_plays', 'jugadas jugador',
+                          coach_id=coach['id'], _order='creado', _desc=True) or []
+        for j in jugadas:
+            j['_fecha'] = db.parse_fecha(j.get('creado'))
+            j['_momentos'] = len((j.get('datos') or {}).get('momentos') or [])
+    return render_template('p_tactica.html',
+                           tab_activa='', hide_tabbar=True,
+                           jugadas=jugadas, entrenador=coach)
+
+
+@bp.route('/tactica/<jid>')
+@solo_jugador
+def p_jugada(jid):
+    uid = current_user.id
+    coach = db.entrenador_del_jugador(uid)
+    if not coach:
+        abort(404)
+    # Solo las jugadas de SU entrenador: el id no basta como permiso.
+    jugada = db.one('fut_tactical_plays', 'jugada jugador',
+                    id=jid, coach_id=coach['id'])
+    if not jugada:
+        abort(404)
+    jugada['_fecha'] = db.parse_fecha(jugada.get('creado'))
+    return render_template('p_jugada.html',
+                           tab_activa='', hide_tabbar=True,
+                           jugada=jugada, entrenador=coach,
+                           momentos=len((jugada.get('datos') or {}).get('momentos') or []))
+
+
 # ═══════════════════════ 5. IA COACH ═══════════════════════
 @bp.route('/ia')
 @solo_jugador
+@roles.solo_pro('ia')
 def ia_jugador():
     historial = db.rows('fut_ia_chat', 'chat ia', user_id=current_user.id,
                         _order='creado', _limit=40)

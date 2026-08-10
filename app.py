@@ -79,13 +79,49 @@ def csrf_ok():
 
 @app.context_processor
 def _inyectar():
+    """Lo que toda plantilla puede dar por hecho.
+
+    `fut_es_pro` y `fut_es_admin` gobiernan los candados de la interfaz; la
+    comprobación de verdad la hacen los decoradores de roles.py en el servidor,
+    esto solo decide qué se dibuja.
+    """
+    import roles
+
+    autenticado = bool(getattr(current_user, 'is_authenticated', False))
     return {
         'csrf_token': csrf_token,
-        'fut_es_entrenador': bool(
-            getattr(current_user, 'is_authenticated', False)
-            and getattr(current_user, 'role', '') == 'especialista'
-        ),
+        'fut_es_entrenador': autenticado and getattr(current_user, 'role', '') == 'especialista',
+        'fut_es_pro': roles.es_pro(current_user) if autenticado else False,
+        'fut_es_admin': roles.es_admin(current_user) if autenticado else False,
+        'fut_rol': roles.clave_de(current_user) if autenticado else None,
+        'fut_rol_etiqueta': roles.etiqueta_de(current_user) if autenticado else '',
+        'fut_roles': roles.ROLES,
     }
+
+
+# ─── Cuentas bloqueadas ──────────────────────────────────────────────────────
+@app.before_request
+def _echar_bloqueados():
+    """Corta la sesión de quien el administrador acaba de bloquear.
+
+    `login_user` ya impide entrar a una cuenta bloqueada, pero eso solo actúa
+    al iniciar sesión: sin esto, alguien con la sesión abierta seguiría dentro
+    hasta que cerrara el navegador.
+    """
+    from flask_login import logout_user
+
+    if not getattr(current_user, 'is_authenticated', False):
+        return None
+    if not getattr(current_user, 'bloqueado', False):
+        return None
+    if request.endpoint in ('auth.logout', 'auth.entrar', 'static', 'salud'):
+        return None
+
+    logout_user()
+    session.clear()
+    from flask import flash
+    flash('Tu cuenta está bloqueada. Escríbenos para reactivarla.', 'error')
+    return redirect(url_for('auth.entrar'))
 
 
 # ─── Cabeceras de seguridad ──────────────────────────────────────────────────
@@ -106,12 +142,14 @@ def _cabeceras(resp):
 from usuarios import User, cargar_usuario           # noqa: E402
 from auth import bp as auth_bp                      # noqa: E402
 from pagos import bp as pagos_bp                    # noqa: E402
+from admin import bp as admin_bp                    # noqa: E402
 from futbol import registrar_futbol                 # noqa: E402
 
 login_manager.user_loader(cargar_usuario)
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(pagos_bp)
+app.register_blueprint(admin_bp)
 registrar_futbol(app, supabase)
 
 

@@ -1,0 +1,110 @@
+{% extends '_shell.html' %}
+{% block title %}{{ r.test_nombre }} · ProFoot{% endblock %}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.p_evaluaciones') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Mi marca</div>{% endblock %}
+{% block hero_title %}{{ r.test_nombre }}{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {{ r._fecha.strftime('%d/%m/%Y') if r._fecha else '' }}
+</div>
+{% endblock %}
+
+{% block content %}
+
+<div class="pf-card pf-center" style="padding:22px 18px">
+  <div style="font-size:34px;line-height:1">{{ r._categoria_meta.emoji or '📊' }}</div>
+  <div class="pf-medida__v" style="font-size:38px;margin-top:6px">
+    {{ '%g'|format(r._valor) if r._valor is not none else '—' }}<span
+      class="pf-medida__u" style="font-size:17px"> {{ r._unidad }}</span>
+  </div>
+  <div style="font-size:12.5px;color:var(--text-muted);margin-top:2px">
+    {{ r._etiqueta_valor }}
+  </div>
+
+  {% if es_pro and r._nivel_meta %}
+    <div class="pf-mt-12">
+      <span class="pf-nivel pf-nivel--{{ r._nivel }}"
+            style="font-size:13px;padding:6px 16px">{{ r._nivel_meta.etiqueta }}</span>
+    </div>
+  {% endif %}
+  {% if es_pro and r.puntaje is not none %}
+    <div class="pf-punt pf-mt-16">
+      <div class="pf-punt__bar"><i style="width:{{ r.puntaje }}%"></i></div>
+      <div class="pf-punt__n">{{ r.puntaje }}</div>
+    </div>
+  {% endif %}
+</div>
+
+{% if r._test.descripcion %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Qué mide esta prueba</h2>
+  </div>
+  <p style="margin:0;font-size:13.5px;line-height:1.7">{{ r._test.descripcion }}</p>
+  {% if r._test.protocolo %}
+  <p style="margin:10px 0 0;font-size:12.5px;line-height:1.65;color:var(--text-sec)">
+    {{ r._test.protocolo }}
+  </p>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if r._detalle %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Lo que se midió</h2>
+  </div>
+  {% for d in r._detalle %}
+  <div style="padding:11px 0;border-bottom:1px solid var(--border-soft)">
+    <div class="pf-row" style="gap:10px">
+      <div class="pf-medida__et pf-grow">{{ d.etiqueta }}</div>
+      <div class="pf-medida__v">
+        {{ '%g'|format(d.valor) }}<span class="pf-medida__u"> {{ d.unidad }}</span>
+      </div>
+      {% if d.meta %}
+        <span class="pf-nivel pf-nivel--{{ d.nivel }}">{{ d.meta.etiqueta }}</span>
+      {% endif %}
+    </div>
+    {% if d.resumen %}<div class="pf-baremo">{{ d.resumen }}</div>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if serie and serie|length >= 2 %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Cómo vas progresando</h2>
+  </div>
+  {% with alto = 132 %}{% include '_grafica.html' %}{% endwith %}
+</div>
+{% endif %}
+
+{% if r.notas %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Nota de tu entrenador</h2>
+  </div>
+  <p style="margin:0;font-size:13.5px;line-height:1.7">{{ r.notas }}</p>
+</div>
+{% endif %}
+
+{% if not es_pro %}
+<div class="pf-card">
+  <div class="pf-alerta pf-alerta--info" style="margin-top:0">
+    <i data-ico="lock" class="pf-ico--xs"></i>
+    <span>Con Jugador Pro sabrías si esta marca es de élite, buena o mejorable
+      para tu edad y tu nivel.
+      <a href="{{ url_for('futbol.planes') }}"
+         style="color:inherit;font-weight:700">Ver planes</a></span>
+  </div>
+</div>
+{% endif %}
+
+<div style="height:34px"></div>
+{% endblock %}

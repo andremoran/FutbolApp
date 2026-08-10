@@ -1,0 +1,215 @@
+{% extends '_shell.html' %}
+{% block title %}{{ test.nombre }} · ProFoot{% endblock %}
+
+{# Tomar la prueba a todo el equipo de una sentada: una fila por jugador, con
+   su marca anterior al lado. Comparar en el momento vale mucho más que
+   descubrir la mejora tres semanas después mirando un histórico. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_eval_catalogo') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Tomando prueba</div>{% endblock %}
+{% block hero_title %}{{ test.nombre }}{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">{{ test.subcategoria }}</div>
+{% endblock %}
+
+{% block content %}
+
+{# ══════════ CÓMO SE TOMA ══════════ #}
+{% if test.protocolo %}
+<details class="pf-card" open>
+  <summary style="display:flex;align-items:center;gap:9px;cursor:pointer;list-style:none">
+    <i data-ico="info" class="pf-ico--sm" style="color:var(--primary)"></i>
+    <span style="font-weight:700;font-size:14px;flex:1">Cómo se toma</span>
+    <i data-ico="chevron-down" class="pf-ico--sm pf-item__chev"></i>
+  </summary>
+  <p style="margin:11px 0 0;font-size:13px;line-height:1.7;color:var(--text-sec)">
+    {{ test.protocolo }}
+  </p>
+  {% if baremos and es_pro %}
+    <div class="pf-mt-12" style="border-top:1px solid var(--border-soft);padding-top:11px">
+      <div class="pf-label">El listón de tu categoría</div>
+      {% for b in baremos %}
+        <div class="pf-baremo"><b>{{ b.etiqueta }}:</b> {{ b.resumen }}</div>
+      {% endfor %}
+    </div>
+  {% elif not es_pro %}
+    <div class="pf-alerta pf-alerta--info pf-mt-12">
+      <i data-ico="lock" class="pf-ico--xs"></i>
+      <span>Con el plan Pro cada marca sale ya comparada con el baremo
+        internacional de tu categoría.</span>
+    </div>
+  {% endif %}
+  <p style="margin:9px 0 0;font-size:10.5px;color:var(--text-muted);font-style:italic">
+    {{ test.fuente }}
+  </p>
+</details>
+{% endif %}
+
+{# ══════════ FECHA ══════════ #}
+<div class="pf-card">
+  <label class="pf-label" for="ev-fecha">Fecha de la prueba</label>
+  <input class="pf-input" id="ev-fecha" type="date" value="{{ hoy }}">
+</div>
+
+{# ══════════ JUGADORES ══════════ #}
+{% set todos = jugadores + manuales %}
+{% if todos %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Anota las marcas</h2>
+    <span class="pf-pill pf-pill--muted">{{ todos|length }}</span>
+  </div>
+  <p style="margin:0 0 4px;font-size:12px;color:var(--text-muted);line-height:1.55">
+    Deja en blanco a quien no midas: solo se guardan los que tengan número.
+  </p>
+
+  {% for j in jugadores %}
+    {% set previo = previos.get(j.id) %}
+    <div class="pf-medida" style="display:block;padding:14px 0" data-fila
+         data-pid="{{ j.id }}" data-manual="0">
+      <div class="pf-row" style="gap:10px;margin-bottom:9px">
+        <div class="pf-avatar pf-avatar--sm">
+          {%- if j.profile_photo %}<img src="{{ j.profile_photo }}" alt="">
+          {%- else %}{{ (j.name or '?')[:1]|upper }}{% endif -%}
+        </div>
+        <div class="pf-grow">
+          <div class="pf-jug__n">{{ j.name }}</div>
+          <div class="pf-jug__s">
+            {%- if (j.fut or {}).get('dorsal') %}#{{ j.fut.dorsal }} · {% endif -%}
+            {{ (j.fut or {}).get('posicion') or 'Sin posición' }}
+            {%- if previo %} · antes {{ '%g'|format((previo.valores or {}).values()|list|first)
+                                        if (previo.valores or {}) else '—' }}{% endif -%}
+          </div>
+        </div>
+      </div>
+      <div class="pf-row" style="gap:8px;flex-wrap:wrap">
+        {% for c in test.campos %}
+        <div style="flex:1;min-width:110px">
+          <label class="pf-label" for="v-{{ j.id }}-{{ c.clave }}">
+            {{ c.etiqueta }}{% if c.unidad %} ({{ c.unidad }}){% endif %}
+          </label>
+          <input class="pf-input" id="v-{{ j.id }}-{{ c.clave }}"
+                 data-campo="{{ c.clave }}"
+                 type="number" inputmode="decimal"
+                 step="{{ '1' if c.decimales == 0 else ('0.1' if c.decimales == 1 else '0.01') }}"
+                 {% if c.min is not none %}min="{{ c.min }}"{% endif %}
+                 {% if c.max is not none %}max="{{ c.max }}"{% endif %}
+                 placeholder="{{ c.ejemplo }}">
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endfor %}
+
+  {% for m in manuales %}
+    <div class="pf-medida" style="display:block;padding:14px 0" data-fila
+         data-pid="{{ m.id }}" data-manual="1">
+      <div class="pf-row" style="gap:10px;margin-bottom:9px">
+        <div class="pf-avatar pf-avatar--sm"
+             style="background:var(--purple-bg);color:var(--purple)">
+          {{ (m.nombre or '?')[:1]|upper }}
+        </div>
+        <div class="pf-grow">
+          <div class="pf-jug__n">{{ m.nombre }}</div>
+          <div class="pf-jug__s">
+            {%- if m.dorsal %}#{{ m.dorsal }} · {% endif -%}
+            {{ m.posicion or 'Sin cuenta' }}
+          </div>
+        </div>
+      </div>
+      <div class="pf-row" style="gap:8px;flex-wrap:wrap">
+        {% for c in test.campos %}
+        <div style="flex:1;min-width:110px">
+          <label class="pf-label" for="v-{{ m.id }}-{{ c.clave }}">
+            {{ c.etiqueta }}{% if c.unidad %} ({{ c.unidad }}){% endif %}
+          </label>
+          <input class="pf-input" id="v-{{ m.id }}-{{ c.clave }}"
+                 data-campo="{{ c.clave }}"
+                 type="number" inputmode="decimal"
+                 step="{{ '1' if c.decimales == 0 else ('0.1' if c.decimales == 1 else '0.01') }}"
+                 placeholder="{{ c.ejemplo }}">
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endfor %}
+</div>
+
+<div class="pf-px-16 pf-mt-16" style="padding-bottom:34px">
+  <button class="pf-btn pf-btn--primary pf-btn--block" type="button" id="btn-guardar">
+    <i data-ico="save" class="pf-ico--sm"></i> Guardar las marcas
+  </button>
+  <p class="pf-center" style="font-size:11.5px;color:var(--text-muted);
+            margin:10px 0 0;line-height:1.6">
+    Comparado con <b>{{ contexto_edad|replace('_', '-')|replace('sub-', 'Sub-')|title }}</b>
+    · <b>{{ contexto_nivel|replace('_', ' ')|title }}</b>.
+    <a href="{{ url_for('futbol.c_evaluaciones') }}"
+       style="color:var(--primary)">Cambiar</a>
+  </p>
+</div>
+
+{% else %}
+<div class="pf-card">
+  <div class="pf-empty">
+    <div class="pf-empty__icon">👥</div>
+    <div class="pf-empty__title">Todavía no tienes jugadores</div>
+    <div class="pf-empty__text">
+      Pásales tu código de equipo o apúntalos a mano si aún no tienen cuenta.
+    </div>
+    <a class="pf-btn pf-btn--primary pf-mt-16"
+       href="{{ url_for('futbol.c_manuales') }}">Apuntar jugadores</a>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('btn-guardar').onclick = function () {
+  const boton = this;
+  const fecha = document.getElementById('ev-fecha').value;
+  const resultados = [];
+
+  document.querySelectorAll('[data-fila]').forEach(fila => {
+    const valores = {};
+    let hayAlguno = false;
+    fila.querySelectorAll('input[data-campo]').forEach(inp => {
+      const v = inp.value.trim();
+      if (v !== '') { valores[inp.dataset.campo] = v; hayAlguno = true; }
+    });
+    if (hayAlguno) {
+      resultados.push({
+        player_id: fila.dataset.pid,
+        manual: fila.dataset.manual === '1',
+        valores: valores,
+        fecha: fecha,
+      });
+    }
+  });
+
+  if (!resultados.length) {
+    PF.toast('Anota al menos una marca.', 'error');
+    return;
+  }
+
+  boton.disabled = true;
+  boton.innerHTML = 'Guardando…';
+  PF.api('/api/eval/resultado', { test: '{{ test.clave }}', resultados: resultados })
+    .then(j => {
+      (j.avisos || []).forEach(a => PF.toast(a, 'error'));
+      PF.toast(j.n + ' marca(s) guardada(s).', 'success');
+      setTimeout(() => { location.href = j.redirect; }, 900);
+    })
+    .catch(e => {
+      PF.toast(e.message, 'error');
+      boton.disabled = false;
+      boton.innerHTML = 'Guardar las marcas';
+    });
+};
+</script>
+{% endblock %}

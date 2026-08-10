@@ -1,15 +1,13 @@
 {% extends '_shell.html' %}
 {% block title %}Planes · ProFoot{% endblock %}
 
-{# screens/PremiumScreen.tsx con la piel de ProFoot.
-   Los precios y el checkout son los REALES de la plataforma (paypal_plans.py):
-   los planes propios de ProFoot definidos en pagos.PLANES.
-   El botón lleva al flujo de cobro que ya está en producción. #}
+{# Los precios y el aviso salen de los ajustes del panel, no del código: el
+   administrador tiene que poder montar una promoción sin redesplegar. #}
 
 {% set es_coach = fut_es_entrenador %}
 {% set plan_key = 'entrenador_pro' if es_coach else 'jugador_pro' %}
-{% set plan_precio = '14.99' if es_coach else '4.99' %}
-{% set plan_nombre = 'Entrenador Pro' if es_coach else 'Jugador Pro' %}
+{% set plan_precio = ajustes.precio_entrenador if es_coach else ajustes.precio_jugador %}
+{% set plan_nombre = 'Coach Pro' if es_coach else 'Jugador Pro' %}
 
 {% block hero_back %}
 <a class="pf-hero__btn" href="{{ url_for('futbol.home') }}" aria-label="Volver">
@@ -20,7 +18,11 @@
 {% block hero_title %}Planes{% endblock %}
 {% block hero_subtitle %}
 <div class="pf-hero__subtitle">
-  {{ 'Tu cuenta está activa' if cuenta_activa else 'Desbloquea todo el potencial' }}
+  {% if cuenta_activa %}
+    Tu cuenta es Pro{% if dias_pro %} · {{ dias_pro }} día{{ '' if dias_pro == 1 else 's' }} por delante{% endif %}
+  {% else %}
+    Desbloquea todo el potencial
+  {% endif %}
 </div>
 {% endblock %}
 {% block hero_actions %}{% endblock %}
@@ -49,69 +51,91 @@
 
 {% block content %}
 
-{% if cuenta_activa %}
-<div class="pf-flash pf-flash--success" style="margin:16px">
-  <i data-ico="check-circle" class="pf-ico--sm"></i>
-  <span>Tu cuenta está activa. Tienes acceso completo a ProFoot Assistant.</span>
+{% if ajustes.aviso_panel %}
+<div class="pf-flash pf-flash--info" style="margin:16px">
+  <i data-ico="info" class="pf-ico--sm"></i>
+  <span>{{ ajustes.aviso_panel }}</span>
 </div>
 {% endif %}
 
-{# ── Gratis ── #}
+{% if cuenta_activa %}
+<div class="pf-flash pf-flash--success" style="margin:16px">
+  <i data-ico="check-circle" class="pf-ico--sm"></i>
+  <span>
+    Tu cuenta tiene el plan Pro.
+    {%- if dias_pro is not none %} Te quedan {{ dias_pro }} día{{ '' if dias_pro == 1 else 's' }}.{% endif %}
+  </span>
+</div>
+{% endif %}
+
+{# ── Gratuito ── #}
 <div class="pl-card">
-  <h2 class="pl-nombre">Básico</h2>
+  <h2 class="pl-nombre">{{ 'Entrenador' if es_coach else 'Jugador' }}</h2>
   <div class="pl-precio">$0 <span>/ siempre</span></div>
-  <div style="margin-top:16px">
+  <p style="margin:6px 0 0;font-size:12.5px;color:var(--text-sec);line-height:1.6">
+    Funciona de verdad, no es una demo con reloj.
+  </p>
+  <div style="margin-top:14px">
     <div class="pl-feat"><i data-ico="check" class="pf-ico--sm"></i>
-      <span>{{ 'Hasta 5 jugadores en la plantilla' if es_coach else 'Hábitos, metas y entrenos' }}</span></div>
+      <span>{{ 'Hasta 12 jugadores en la plantilla' if es_coach else 'Hábitos, metas y entrenos' }}</span></div>
     <div class="pl-feat"><i data-ico="check" class="pf-ico--sm"></i>
-      <span>{{ 'Agenda de entrenamientos' if es_coach else 'Agenda del equipo' }}</span></div>
+      <span>{{ 'Calendario y asistencia' if es_coach else 'Calendario del equipo y confirmar asistencia' }}</span></div>
+    <div class="pl-feat"><i data-ico="check" class="pf-ico--sm"></i>
+      <span>{{ 'Tomar pruebas y ver las marcas' if es_coach else 'Tus marcas en las pruebas' }}</span></div>
     <div class="pl-feat"><i data-ico="check" class="pf-ico--sm"></i>
       <span>Check-in de bienestar</span></div>
     <div class="pl-feat pl-feat--no"><i data-ico="x" class="pf-ico--sm"></i>
-      <span>Asistente de IA</span></div>
+      <span>Nivel contra baremos internacionales</span></div>
     <div class="pl-feat pl-feat--no"><i data-ico="x" class="pf-ico--sm"></i>
-      <span>Herramientas de análisis avanzado</span></div>
+      <span>Asistente de IA</span></div>
   </div>
 </div>
 
-{# ── Pro (el que corresponde al rol) ── #}
+{# ── Pro ── #}
 <div class="pl-card pl-card--destacado">
   <span class="pl-tag">Recomendado</span>
   <h2 class="pl-nombre">{{ plan_nombre }}</h2>
   <div class="pl-precio">${{ plan_precio }} <span>/ mes</span></div>
 
-  <div style="margin-top:16px">
+  <div style="margin-top:14px">
     <div class="pl-feat"><i data-ico="check" class="pf-ico--sm"></i>
-      <span>{{ 'Plantilla ilimitada' if es_coach else 'Todo lo del plan Básico' }}</span></div>
-    <div class="pl-feat"><i data-ico="check" class="pf-ico--sm"></i>
-      <span>{{ 'Evaluaciones y perfil dinámico de cada jugador' if es_coach else 'IA Coach con tus datos reales' }}</span></div>
-    <div class="pl-feat"><i data-ico="check" class="pf-ico--sm"></i>
-      <span>{{ 'Pizarra táctica y biblioteca de jugadas' if es_coach else 'Pruebas físicas y ranking del equipo' }}</span></div>
-    <div class="pl-feat"><i data-ico="check" class="pf-ico--sm"></i>
-      <span>{{ 'Asistente de IA para planificación' if es_coach else 'Tu ficha completa con evaluaciones' }}</span></div>
-    <div class="pl-feat"><i data-ico="check" class="pf-ico--sm"></i>
-      <span>Análisis 3D de video, sensores y atlas muscular</span></div>
-    <div class="pl-feat"><i data-ico="check" class="pf-ico--sm"></i>
-      <span>Videollamadas con resumen automático</span></div>
+      <span>{{ 'Plantilla sin límite' if es_coach else 'Todo lo del plan gratuito' }}</span></div>
+    {% for clave, nombre in permisos.items() %}
+    <div class="pl-feat"><i data-ico="check" class="pf-ico--sm"></i><span>{{ nombre }}</span></div>
+    {% endfor %}
   </div>
 
   {% if not cuenta_activa %}
-  <a class="pf-btn pf-btn--primary pf-btn--block pf-mt-16"
-     href="{{ url_for('pagos.checkout', plan=plan_key) }}">
-    <i data-ico="credit-card" class="pf-ico--sm"></i> Activar {{ plan_nombre }}
-  </a>
+    {% if tarjeta_activa %}
+    <a class="pf-btn pf-btn--primary pf-btn--block pf-mt-16"
+       href="{{ url_for('pagos.checkout', plan=plan_key) }}">
+      <i data-ico="credit-card" class="pf-ico--sm"></i> Pagar con tarjeta
+    </a>
+    {% endif %}
+    {% if deuna_activo %}
+    <a class="pf-btn pf-btn--secondary pf-btn--block pf-mt-8"
+       href="{{ url_for('pagos.deuna', plan=plan_key) }}">
+      📲 Pagar con DeUna
+    </a>
+    {% endif %}
+    {% if not tarjeta_activa and not deuna_activo %}
+    <div class="pf-alerta pf-alerta--warn pf-mt-16">
+      <i data-ico="info" class="pf-ico--xs"></i>
+      <span>El cobro todavía no está activado. Escríbenos y lo resolvemos.</span>
+    </div>
+    {% endif %}
   {% else %}
-  <div class="pf-btn pf-btn--ghost pf-btn--block pf-mt-16" style="cursor:default">
-    <i data-ico="check" class="pf-ico--sm"></i> Plan activo
-  </div>
+    <div class="pf-btn pf-btn--ghost pf-btn--block pf-mt-16" style="cursor:default">
+      <i data-ico="check" class="pf-ico--sm"></i> Plan activo
+    </div>
   {% endif %}
 </div>
 
 {# ── Club ── #}
 <div class="pl-card">
   <h2 class="pl-nombre">Club</h2>
-  <div class="pl-precio">$49 <span>/ mes</span></div>
-  <div style="margin-top:16px">
+  <div class="pl-precio">${{ ajustes.precio_club }} <span>/ mes</span></div>
+  <div style="margin-top:14px">
     <div class="pl-feat"><i data-ico="check" class="pf-ico--sm"></i>
       <span>Varios entrenadores y categorías</span></div>
     <div class="pl-feat"><i data-ico="check" class="pf-ico--sm"></i>
@@ -121,15 +145,34 @@
     <div class="pl-feat"><i data-ico="check" class="pf-ico--sm"></i>
       <span>Acompañamiento en la puesta en marcha</span></div>
   </div>
-  <a class="pf-btn pf-btn--secondary pf-btn--block pf-mt-16"
+  {% if tarjeta_activa %}
+  <a class="pf-btn pf-btn--ghost pf-btn--block pf-mt-16"
      href="{{ url_for('pagos.checkout', plan='club') }}">
-    <i data-ico="credit-card" class="pf-ico--sm"></i> Activar Club
+    <i data-ico="credit-card" class="pf-ico--sm"></i> Contratar Club
+  </a>
+  {% elif deuna_activo %}
+  <a class="pf-btn pf-btn--ghost pf-btn--block pf-mt-16"
+     href="{{ url_for('pagos.deuna', plan='club') }}">📲 Pagar con DeUna</a>
+  {% endif %}
+</div>
+
+{# ── Código ── #}
+<div class="pf-card">
+  <a class="pf-item" href="{{ url_for('futbol.canjear') }}">
+    <div class="pf-item__icon">🎟️</div>
+    <div class="pf-item__body">
+      <div class="pf-item__title">Tengo un código</div>
+      <div class="pf-item__sub">Canjéalo por meses de Pro</div>
+    </div>
+    <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
   </a>
 </div>
 
-<p class="pf-center" style="font-size:12px;color:var(--text-muted);padding:6px 26px 34px;line-height:1.6">
-  Pago mensual, cancelas cuando quieras. Se cobra con tarjeta vía PayPal o por
-  transferencia con DeUna.
+<p class="pf-center" style="font-size:12px;color:var(--text-muted);
+          padding:6px 26px 34px;line-height:1.6">
+  Pago mensual, cancelas cuando quieras. Con tarjeta se renueva solo; con DeUna
+  no hay comisión pero se verifica a mano. Lo que crees con el plan gratuito no
+  se borra nunca.
 </p>
 
 {% endblock %}

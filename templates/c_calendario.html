@@ -1,0 +1,517 @@
+{% extends '_shell.html' %}
+{% block title %}Calendario · ProFoot{% endblock %}
+
+{# Rejilla mensual + análisis de carga. La hoja inferior sirve para crear y
+   para editar: es el mismo formulario, así que solo hay un sitio donde puede
+   romperse. #}
+
+{% block hero_label %}<div class="pf-hero__label">Planificación</div>{% endblock %}
+{% block hero_title %}Calendario{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {{ n_jugadores }} jugador{{ '' if n_jugadores == 1 else 'es' }} en la plantilla
+</div>
+{% endblock %}
+{% block hero_actions %}
+<button type="button" class="pf-hero__btn" onclick="nuevoEvento()" aria-label="Nuevo evento">
+  <i data-ico="plus"></i>
+</button>
+{% endblock %}
+
+{% block content %}
+
+{# ══════════ NAVEGACIÓN DE MES ══════════ #}
+<div class="pf-mes">
+  <a class="pf-mes__b" href="{{ url_for('futbol.c_calendario', a=mes_ant.a, m=mes_ant.m) }}"
+     aria-label="Mes anterior"><i data-ico="chevron-left" class="pf-ico--sm"></i></a>
+  <h2 class="pf-mes__t">{{ nombre_mes }} {{ anio }}</h2>
+  <a class="pf-mes__b" href="{{ url_for('futbol.c_calendario', a=mes_sig.a, m=mes_sig.m) }}"
+     aria-label="Mes siguiente"><i data-ico="chevron-right" class="pf-ico--sm"></i></a>
+</div>
+
+{% if not es_mes_actual %}
+<div class="pf-center" style="margin-bottom:10px">
+  <a href="{{ url_for('futbol.c_calendario') }}"
+     style="font-size:12.5px;font-weight:650;color:var(--primary);text-decoration:none">
+    Volver a hoy
+  </a>
+</div>
+{% endif %}
+
+{# ══════════ REJILLA ══════════ #}
+<div class="pf-cal">
+  <div class="pf-cal__cab">
+    {% for d in dias_cortos %}<span>{{ d }}</span>{% endfor %}
+  </div>
+
+  {% for semana in semanas %}
+  <div class="pf-cal__sem">
+    {% for c in semana %}
+    <div class="pf-cal__dia
+                {{ 'pf-cal__dia--fuera' if not c.del_mes }}
+                {{ 'pf-cal__dia--finde' if c.finde and c.del_mes }}
+                {{ 'pf-cal__dia--hoy' if c.hoy }}"
+         onclick="verDia('{{ c.iso }}')" role="button" tabindex="0"
+         aria-label="{{ c.dia }}, {{ c.eventos|length }} evento(s)">
+      <div class="pf-cal__n">{{ c.dia }}</div>
+      <div class="pf-cal__puntos">
+        {% for col in c.colores %}
+          <span class="pf-cal__punto" style="background:{{ col }}"></span>
+        {% endfor %}
+      </div>
+      {% if c.eventos and c.del_mes %}
+        <div class="pf-cal__mini">{{ c.eventos[0].titulo }}</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+</div>
+
+{# ══════════ ANÁLISIS DE LA SEMANA ══════════ #}
+<details class="pf-card pf-mt-16" open>
+  <summary style="display:flex;align-items:center;gap:9px;cursor:pointer;list-style:none">
+    <i data-ico="zap" class="pf-ico--sm" style="color:var(--primary)"></i>
+    <span style="font-weight:700;font-size:14px;flex:1">Análisis de la semana</span>
+    <i data-ico="chevron-down" class="pf-ico--sm pf-item__chev"></i>
+  </summary>
+
+  <div class="pf-mt-12">
+    <div class="pf-carga">
+      <div>
+        <div class="pf-carga__n" style="color:{{ analisis.color }}">{{ analisis.carga }}</div>
+        <div style="font-size:11px;color:var(--text-muted)">carga semanal</div>
+      </div>
+      <div class="pf-grow">
+        <div class="pf-punt__bar">
+          <i style="width:{{ analisis.pct }}%;background:{{ analisis.color }}"></i>
+        </div>
+        <div class="pf-row pf-row--between" style="font-size:11px;color:var(--text-muted);margin-top:5px">
+          <span>{{ analisis.n_entrenos }} entreno{{ '' if analisis.n_entrenos == 1 else 's' }}</span>
+          <span>{{ analisis.minutos }} min</span>
+          {% if analisis.racha %}<span>🔥 {{ analisis.racha }} días</span>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    {% if analisis.reparto %}
+    <div class="pf-mt-16">
+      <div class="pf-label">Reparto del trabajo</div>
+      <div class="pf-carga__reparto pf-mt-8">
+        {% for r in analisis.reparto %}
+          <i style="width:{{ r.pct }}%;background:{{ r.color }}"
+             title="{{ r.etiqueta }} {{ r.pct }}%"></i>
+        {% endfor %}
+      </div>
+      <div class="pf-row" style="gap:12px;flex-wrap:wrap;margin-top:8px">
+        {% for r in analisis.reparto %}
+        <span style="font-size:11px;color:var(--text-sec);display:flex;align-items:center;gap:5px">
+          <i style="width:8px;height:8px;border-radius:2px;background:{{ r.color }};display:inline-block"></i>
+          {{ r.etiqueta }} {{ r.pct }}%
+        </span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if analisis.proximo_partido %}
+    <div class="pf-mt-16" style="display:flex;align-items:center;gap:11px;
+                padding:12px 14px;border-radius:var(--r-lg);background:var(--border-soft)">
+      <span class="pf-pill {{ 'pf-pill--info' if analisis.proximo_partido.local else 'pf-pill--muted' }}">
+        {{ 'LOCAL' if analisis.proximo_partido.local else 'VISITA' }}
+      </span>
+      <div class="pf-grow">
+        <div style="font-weight:700;font-size:13.5px">
+          {{ ('vs ' ~ analisis.proximo_partido.rival) if analisis.proximo_partido.rival
+             else analisis.proximo_partido.titulo }}
+        </div>
+        <div style="font-size:11.5px;color:var(--text-sec)">
+          {% if analisis.dias_partido == 0 %}¡Hoy!
+          {% elif analisis.dias_partido == 1 %}Mañana
+          {% else %}En {{ analisis.dias_partido }} días{% endif %}
+          · {{ analisis.proximo_partido._fecha.strftime('%d/%m') }}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% for a in analisis.alertas %}
+    <div class="pf-alerta pf-alerta--{{ a.tipo }}">
+      <i data-ico="{{ 'alert-triangle' if a.tipo != 'info' else 'info' }}" class="pf-ico--xs"></i>
+      <span>{{ a.texto }}</span>
+    </div>
+    {% endfor %}
+
+    <p style="margin:11px 0 0;font-size:11px;color:var(--text-muted);line-height:1.6">
+      La carga son los minutos por el factor de intensidad (suave ×0,5 ·
+      media ×1 · alta ×1,5 · máxima ×2). Es una guía, no una prescripción
+      médica.
+    </p>
+  </div>
+</details>
+
+{# ══════════ PRÓXIMOS ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Lo que viene</h2>
+    <a href="{{ url_for('futbol.c_asistencia') }}"
+       style="font-size:12.5px;font-weight:650;color:var(--primary);text-decoration:none">
+      Asistencia →
+    </a>
+  </div>
+
+  {% if proximos %}
+    {% for e in proximos %}
+    <div class="pf-ev" onclick="editar(PROXIMOS[{{ loop.index0 }}])" role="button" tabindex="0">
+      <div class="pf-ev__bar" style="background:{{ e._color }}"></div>
+      <div class="pf-grow">
+        <div class="pf-ev__t">
+          {{ e._meta.emoji }}
+          {{ ('vs ' ~ e.rival) if e.tipo == 'partido' and e.rival else e.titulo }}
+        </div>
+        <div class="pf-ev__s">
+          {{ e._etiqueta }}
+          {%- if e._fecha %} · {{ e._fecha.strftime('%d/%m') }}{% endif %}
+          {%- if e.hora %} · {{ e.hora[:5] }}{% endif %}
+          {%- if e.lugar %} · {{ e.lugar }}{% endif %}
+          {%- if e.tipo == 'entreno' %} · {{ e.duracion_min }}′ {{ e._intensidad.etiqueta|lower }}{% endif %}
+        </div>
+      </div>
+      <div style="text-align:right;flex:none">
+        {% if e._dias is not none %}
+        <div class="pf-pill pf-pill--muted">
+          {% if e._dias == 0 %}hoy{% elif e._dias == 1 %}mañana{% else %}{{ e._dias }} d{% endif %}
+        </div>
+        {% endif %}
+        {% if e.tipo in ('entreno', 'partido') %}
+        <a class="pf-btn pf-btn--ghost" style="padding:5px 9px;font-size:11px;margin-top:6px"
+           href="{{ url_for('futbol.c_pasar_lista', eid=e.id) }}"
+           onclick="event.stopPropagation()">Lista</a>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="pf-empty">
+      <div class="pf-empty__icon">📅</div>
+      <div class="pf-empty__title">Nada por delante</div>
+      <div class="pf-empty__text">Agenda el próximo entrenamiento o partido.</div>
+      <button class="pf-btn pf-btn--primary pf-mt-16" type="button"
+              onclick="nuevoEvento()">Agendar</button>
+    </div>
+  {% endif %}
+</div>
+
+{% if planes %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Tus planes de sesión</h2>
+    <a href="{{ url_for('futbol.c_planes') }}"
+       style="font-size:12.5px;font-weight:650;color:var(--primary);text-decoration:none">
+      Ver todos →
+    </a>
+  </div>
+  {% for p in planes[:4] %}
+  <a class="pf-medida" href="{{ url_for('futbol.c_plan', plid=p.id) }}"
+     style="text-decoration:none;color:inherit">
+    <span class="pf-medida__et">{{ p.nombre }}</span>
+    <span class="pf-pill pf-pill--muted">{{ p.duracion_min }}′</span>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div style="height:24px"></div>
+
+{# ══════════ HOJA: DÍA ══════════ #}
+<div class="pf-sheet-back" id="pf-sheet-dia-back"></div>
+<aside class="pf-sheet" id="pf-sheet-dia" role="dialog" aria-modal="true">
+  <div class="pf-sheet__grip"></div>
+  <div class="pf-sheet__head">
+    <div class="pf-row pf-row--between">
+      <div>
+        <h2 class="pf-sheet__title" id="dia-titulo">Día</h2>
+        <p class="pf-sheet__sub" id="dia-sub"></p>
+      </div>
+      <button type="button" class="pf-hero__btn"
+              style="background:var(--border-soft);color:var(--text-sec)"
+              onclick="PF.closeSheet('pf-sheet-dia')" aria-label="Cerrar">
+        <i data-ico="x" class="pf-ico--sm"></i>
+      </button>
+    </div>
+  </div>
+  <div class="pf-sheet__body">
+    <div id="dia-eventos"></div>
+    <button class="pf-btn pf-btn--primary pf-btn--block pf-mt-12" type="button"
+            id="dia-nuevo">
+      <i data-ico="plus" class="pf-ico--sm"></i> Agendar este día
+    </button>
+  </div>
+</aside>
+
+{# ══════════ HOJA: EVENTO ══════════ #}
+<div class="pf-sheet-back" id="pf-sheet-ev-back"></div>
+<aside class="pf-sheet" id="pf-sheet-ev" role="dialog" aria-modal="true">
+  <div class="pf-sheet__grip"></div>
+  <div class="pf-sheet__head">
+    <div class="pf-row pf-row--between">
+      <h2 class="pf-sheet__title" id="ev-titulo">Nuevo evento</h2>
+      <button type="button" class="pf-hero__btn"
+              style="background:var(--border-soft);color:var(--text-sec)"
+              onclick="PF.closeSheet('pf-sheet-ev')" aria-label="Cerrar">
+        <i data-ico="x" class="pf-ico--sm"></i>
+      </button>
+    </div>
+  </div>
+
+  <div class="pf-sheet__body">
+    <input type="hidden" id="f-id">
+
+    <div class="pf-field">
+      <label class="pf-label">Tipo</label>
+      <div class="pf-row" style="gap:6px;flex-wrap:wrap">
+        {% for clave, etiqueta, emoji, color in tipos %}
+        <button type="button" class="pf-seg" data-tipo="{{ clave }}"
+                onclick="ponerTipo('{{ clave }}')">{{ emoji }} {{ etiqueta }}</button>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="pf-field pf-mt-12">
+      <label class="pf-label" for="f-titulo">Título</label>
+      <input class="pf-input" id="f-titulo" maxlength="120" placeholder="Entrenamiento">
+    </div>
+
+    <div class="pf-row" style="gap:10px">
+      <div class="pf-grow">
+        <label class="pf-label" for="f-fecha">Fecha</label>
+        <input class="pf-input" id="f-fecha" type="date">
+      </div>
+      <div style="width:110px;flex:none">
+        <label class="pf-label" for="f-hora">Hora</label>
+        <input class="pf-input" id="f-hora" type="time">
+      </div>
+    </div>
+
+    <div class="pf-field pf-mt-12">
+      <label class="pf-label" for="f-lugar">Lugar</label>
+      <input class="pf-input" id="f-lugar" maxlength="120" placeholder="Cancha municipal">
+    </div>
+
+    {# Solo para entrenamientos #}
+    <div id="bloque-entreno">
+      <div class="pf-row pf-mt-12" style="gap:10px">
+        <div class="pf-grow">
+          <label class="pf-label" for="f-tipo-entreno">Trabajo</label>
+          <select class="pf-select" id="f-tipo-entreno">
+            {% for clave, etiqueta, color in tipos_entreno %}
+              <option value="{{ clave }}">{{ etiqueta }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="pf-grow">
+          <label class="pf-label" for="f-intensidad">Intensidad</label>
+          <select class="pf-select" id="f-intensidad">
+            {% for clave, etiqueta, factor in intensidades %}
+              <option value="{{ clave }}" {{ 'selected' if clave == 'media' }}>{{ etiqueta }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div style="width:92px;flex:none">
+          <label class="pf-label" for="f-duracion">Minutos</label>
+          <input class="pf-input" id="f-duracion" type="number" value="90" min="0" max="600">
+        </div>
+      </div>
+      {% if planes %}
+      <div class="pf-field pf-mt-12">
+        <label class="pf-label" for="f-plan">Usar un plan guardado</label>
+        <select class="pf-select" id="f-plan">
+          <option value="">— sin plan —</option>
+          {% for p in planes %}
+            <option value="{{ p.id }}">{{ p.nombre }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+    </div>
+
+    {# Solo para partidos #}
+    <div id="bloque-partido" style="display:none">
+      <div class="pf-row pf-mt-12" style="gap:10px">
+        <div class="pf-grow">
+          <label class="pf-label" for="f-rival">Rival</label>
+          <input class="pf-input" id="f-rival" maxlength="80">
+        </div>
+        <div style="width:120px;flex:none">
+          <label class="pf-label" for="f-local">Condición</label>
+          <select class="pf-select" id="f-local">
+            <option value="1">🏠 Local</option>
+            <option value="0">✈️ Visita</option>
+          </select>
+        </div>
+      </div>
+      <div class="pf-field pf-mt-12">
+        <label class="pf-label" for="f-resultado">Resultado (si ya se jugó)</label>
+        <input class="pf-input" id="f-resultado" maxlength="20" placeholder="2-1">
+      </div>
+    </div>
+
+    <div class="pf-field pf-mt-12">
+      <label class="pf-label" for="f-descripcion">Notas</label>
+      <textarea class="pf-textarea" id="f-descripcion" rows="3" maxlength="1200"></textarea>
+    </div>
+
+    <button class="pf-btn pf-btn--primary pf-btn--block pf-mt-16" type="button" id="f-guardar">
+      <i data-ico="save" class="pf-ico--sm"></i> Guardar
+    </button>
+    <button class="pf-btn pf-btn--danger pf-btn--block pf-mt-8" type="button"
+            id="f-borrar" style="display:none">
+      Borrar evento
+    </button>
+    <div style="height:14px"></div>
+  </div>
+</aside>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const EVENTOS  = {{ eventos_json|tojson }};
+const PROXIMOS = {{ proximos_json|tojson }};
+const HOY = '{{ hoy }}';
+
+const $ = id => document.getElementById(id);
+let tipoActual = 'entreno';
+
+/* ─── Tipo de evento ─── */
+function ponerTipo(t) {
+  tipoActual = t;
+  document.querySelectorAll('[data-tipo]').forEach(b => {
+    b.classList.toggle('on', b.dataset.tipo === t);
+  });
+  $('bloque-entreno').style.display = (t === 'entreno') ? '' : 'none';
+  $('bloque-partido').style.display = (t === 'partido') ? '' : 'none';
+}
+
+/* ─── Ver un día ─── */
+function verDia(iso) {
+  const delDia = EVENTOS.filter(e => String(e.fecha).slice(0, 10) === iso);
+  const [a, m, d] = [iso.slice(0, 4), iso.slice(5, 7), iso.slice(8, 10)];
+  $('dia-titulo').textContent = d + '/' + m + '/' + a;
+  $('dia-sub').textContent = delDia.length
+    ? delDia.length + (delDia.length === 1 ? ' evento' : ' eventos')
+    : 'Sin nada agendado';
+
+  const caja = $('dia-eventos');
+  caja.innerHTML = '';
+  delDia.forEach(e => {
+    const div = document.createElement('div');
+    div.className = 'pf-ev';
+    div.style.cursor = 'pointer';
+    div.innerHTML =
+      '<div class="pf-ev__bar" style="background:' + (e._color || '#94a3b8') + '"></div>' +
+      '<div class="pf-grow"><div class="pf-ev__t">' +
+      escapar(e.titulo || '') + '</div><div class="pf-ev__s">' +
+      escapar(e._etiqueta || '') + (e.hora ? ' · ' + String(e.hora).slice(0, 5) : '') +
+      (e.lugar ? ' · ' + escapar(e.lugar) : '') + '</div></div>';
+    div.onclick = () => { PF.closeSheet('pf-sheet-dia'); editar(e); };
+    caja.appendChild(div);
+  });
+
+  $('dia-nuevo').onclick = () => {
+    PF.closeSheet('pf-sheet-dia');
+    nuevoEvento(iso);
+  };
+  PF.openSheet('pf-sheet-dia');
+}
+
+function escapar(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+/* ─── Crear / editar ─── */
+function nuevoEvento(iso) {
+  $('ev-titulo').textContent = 'Nuevo evento';
+  $('f-id').value = '';
+  $('f-titulo').value = '';
+  $('f-fecha').value = iso || HOY;
+  $('f-hora').value = '';
+  $('f-lugar').value = '';
+  $('f-descripcion').value = '';
+  $('f-duracion').value = 90;
+  $('f-intensidad').value = 'media';
+  $('f-tipo-entreno').value = 'mixto';
+  if ($('f-plan')) $('f-plan').value = '';
+  $('f-rival').value = '';
+  $('f-local').value = '1';
+  $('f-resultado').value = '';
+  $('f-borrar').style.display = 'none';
+  ponerTipo('entreno');
+  PF.openSheet('pf-sheet-ev');
+}
+
+function editar(e) {
+  $('ev-titulo').textContent = 'Editar evento';
+  $('f-id').value = e.id;
+  $('f-titulo').value = e.titulo || '';
+  $('f-fecha').value = String(e.fecha || '').slice(0, 10);
+  $('f-hora').value = e.hora ? String(e.hora).slice(0, 5) : '';
+  $('f-lugar').value = e.lugar || '';
+  $('f-descripcion').value = e.descripcion || '';
+  $('f-duracion').value = e.duracion_min || 90;
+  $('f-intensidad').value = e.intensidad || 'media';
+  $('f-tipo-entreno').value = e.tipo_entreno || 'mixto';
+  $('f-rival').value = e.rival || '';
+  $('f-local').value = (e.local === false) ? '0' : '1';
+  $('f-resultado').value = e.resultado || '';
+  $('f-borrar').style.display = '';
+  ponerTipo(e.tipo || 'entreno');
+  PF.openSheet('pf-sheet-ev');
+}
+
+/* ─── Guardar ─── */
+$('f-guardar').onclick = function () {
+  const b = this;
+  const datos = {
+    id: $('f-id').value || null,
+    tipo: tipoActual,
+    titulo: $('f-titulo').value,
+    fecha: $('f-fecha').value,
+    hora: $('f-hora').value || null,
+    lugar: $('f-lugar').value,
+    descripcion: $('f-descripcion').value,
+    duracion_min: +$('f-duracion').value || 90,
+    tipo_entreno: $('f-tipo-entreno').value,
+    intensidad: $('f-intensidad').value,
+    rival: $('f-rival').value,
+    local: $('f-local').value === '1',
+    resultado: $('f-resultado').value,
+  };
+  const plan = $('f-plan');
+  if (plan && plan.value && !datos.id) datos.plan_id = plan.value;
+
+  b.disabled = true;
+  PF.api('/api/calendario/evento', datos)
+    .then(j => {
+      PF.toast(j.mensaje, 'success');
+      setTimeout(() => location.reload(), 600);
+    })
+    .catch(e => {
+      PF.toast(e.message, 'error');
+      b.disabled = false;
+    });
+};
+
+$('f-borrar').onclick = function () {
+  if (!confirm('¿Borrar este evento?')) return;
+  PF.api('/api/calendario/evento/' + $('f-id').value, {}, 'DELETE')
+    .then(() => {
+      PF.toast('Evento borrado.', 'success');
+      setTimeout(() => location.reload(), 600);
+    })
+    .catch(e => PF.toast(e.message, 'error'));
+};
+</script>
+{% endblock %}

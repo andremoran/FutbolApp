@@ -1,0 +1,142 @@
+{% extends '_shell.html' %}
+{% block title %}Evolución del equipo · ProFoot{% endblock %}
+
+{# La pregunta que contesta: ¿el equipo va a mejor? Puntaje medio mes a mes y
+   quién tira del grupo y quién se queda. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_evaluaciones') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Rendimiento</div>{% endblock %}
+{% block hero_title %}Evolución{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {{ n_evaluaciones }} evaluación{{ '' if n_evaluaciones == 1 else 'es' }}
+  {%- if media_equipo %} · media del equipo {{ media_equipo }}/100{% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+
+{% if not n_evaluaciones %}
+<div class="pf-card">
+  <div class="pf-empty">
+    <div class="pf-empty__icon">📈</div>
+    <div class="pf-empty__title">Aún no hay nada que comparar</div>
+    <div class="pf-empty__text">
+      Toma la misma prueba dos veces con unas semanas de diferencia y aquí
+      verás si el trabajo está dando resultado.
+    </div>
+    <a class="pf-btn pf-btn--primary pf-mt-16"
+       href="{{ url_for('futbol.c_eval_catalogo') }}">Ver el catálogo</a>
+  </div>
+</div>
+
+{% else %}
+
+{# ══════════ MEDIA DEL EQUIPO ══════════ #}
+{% if media_equipo %}
+<div class="pf-card pf-center" style="padding:22px 18px">
+  <div style="font-size:12px;color:var(--text-muted);letter-spacing:.5px;
+              text-transform:uppercase;font-weight:700">Media del equipo</div>
+  <div class="pf-medida__v" style="font-size:44px;margin-top:4px">
+    {{ media_equipo }}<span class="pf-medida__u" style="font-size:18px">/100</span>
+  </div>
+  <div class="pf-punt__bar pf-mt-12"><i style="width:{{ media_equipo }}%"></i></div>
+</div>
+{% endif %}
+
+{# ══════════ MES A MES ══════════ #}
+{% if meses|length >= 2 %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Mes a mes</h2>
+  </div>
+  <div class="pf-radar">
+    {% for m in meses %}
+    <div class="pf-radar__f">
+      <div class="pf-radar__et" style="width:76px;font-size:11.5px">
+        {{ m.mes[5:7] }}/{{ m.mes[2:4] }}
+      </div>
+      <div class="pf-radar__bar"><i style="width:{{ m.puntaje }}%"></i></div>
+      <div class="pf-radar__n">{{ m.puntaje }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  <p style="margin:11px 0 0;font-size:11.5px;color:var(--text-muted);line-height:1.6">
+    Puntaje medio de todas las pruebas tomadas cada mes. Ojo: si un mes solo
+    mediste velocidad, la media de ese mes es solo de velocidad.
+  </p>
+</div>
+{% endif %}
+
+{# ══════════ PERFIL DEL EQUIPO ══════════ #}
+{% if radar_equipo %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Dónde está fuerte el grupo</h2>
+  </div>
+  <div class="pf-radar">
+    {% for f in radar_equipo %}
+    <div class="pf-radar__f">
+      <div class="pf-radar__et">{{ f.emoji }} {{ f.etiqueta }}</div>
+      <div class="pf-radar__bar"><i style="width:{{ f.puntaje }}%"></i></div>
+      <div class="pf-radar__n">{{ f.puntaje }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{# ══════════ JUGADOR A JUGADOR ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Jugador a jugador</h2>
+  </div>
+
+  {% for x in resumen %}
+  <a class="pf-jug" href="{{ url_for('futbol.c_eval_jugador', pid=x.jugador.id) }}"
+     style="text-decoration:none;color:inherit">
+    <div class="pf-avatar pf-avatar--sm">
+      {%- if x.jugador.profile_photo %}<img src="{{ x.jugador.profile_photo }}" alt="">
+      {%- else %}{{ (x.jugador.name or '?')[:1]|upper }}{% endif -%}
+    </div>
+    <div class="pf-grow">
+      <div class="pf-jug__n">{{ x.jugador.name }}</div>
+      <div class="pf-jug__s">
+        {% if x.n %}
+          {{ x.n }} evaluación{{ '' if x.n == 1 else 'es' }}
+          {%- if x.ultima %} · última {{ x.ultima.strftime('%d/%m/%y') }}{% endif %}
+        {% else %}
+          Sin medir todavía
+        {% endif %}
+      </div>
+    </div>
+    {% if x.puntaje is not none %}
+      <div style="width:88px;flex:none">
+        <div class="pf-punt">
+          <div class="pf-punt__bar"><i style="width:{{ x.puntaje }}%"></i></div>
+        </div>
+        <div style="text-align:right;font-size:13px;font-weight:800;margin-top:3px">
+          {{ x.puntaje }}
+        </div>
+      </div>
+    {% else %}
+      <span class="pf-pill pf-pill--muted">—</span>
+    {% endif %}
+  </a>
+  {% endfor %}
+</div>
+
+{% endif %}
+
+<div class="pf-px-16 pf-mt-16" style="padding-bottom:34px">
+  <a class="pf-btn pf-btn--secondary pf-btn--block"
+     href="{{ url_for('futbol.c_eval_catalogo') }}">
+    <i data-ico="plus" class="pf-ico--sm"></i> Tomar otra prueba
+  </a>
+</div>
+
+{% endblock %}

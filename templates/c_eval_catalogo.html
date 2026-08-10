@@ -1,0 +1,126 @@
+{% extends '_shell.html' %}
+{% block title %}Catálogo de pruebas · ProFoot{% endblock %}
+
+{# Las pruebas estándar publicadas, agrupadas por familia. Cada una lleva su
+   fuente: si el entrenador va a decirle a un padre que su hijo está en el
+   percentil de un juvenil, tiene que poder decir de dónde sale el número. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_evaluaciones') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Medición</div>{% endblock %}
+{% block hero_title %}Catálogo{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">{{ n_pruebas }} pruebas con baremo internacional</div>
+{% endblock %}
+
+{% block content %}
+
+<div class="pf-segs pf-mt-16">
+  <a class="pf-seg {{ 'on' if not filtro }}" href="{{ url_for('futbol.c_eval_catalogo') }}">
+    Todas
+  </a>
+  {% for clave, etiqueta, emoji, desc in categorias %}
+    <a class="pf-seg {{ 'on' if filtro == clave }}"
+       href="{{ url_for('futbol.c_eval_catalogo', c=clave) }}">{{ emoji }} {{ etiqueta }}</a>
+  {% endfor %}
+</div>
+
+{% for clave, etiqueta, emoji, desc in categorias %}
+  {% set lista = por_categoria.get(clave) %}
+  {% if lista %}
+  <div class="pf-card">
+    <div class="pf-card__head">
+      <h2 class="pf-card__title">{{ emoji }} {{ etiqueta }}</h2>
+      <span class="pf-pill pf-pill--muted">{{ lista|length }}</span>
+    </div>
+    <p style="margin:0 0 6px;font-size:12px;color:var(--text-muted)">{{ desc }}</p>
+
+    {% for t in lista %}
+    <details style="border-top:1px solid var(--border-soft);padding:11px 0">
+      <summary style="display:flex;align-items:center;gap:10px;cursor:pointer;
+                      list-style:none;-webkit-tap-highlight-color:transparent">
+        <div class="pf-grow">
+          <div class="pf-jug__n">
+            {{ t.nombre }}
+            {% if t._propia %}<span class="pf-pill pf-pill--purple">propia</span>{% endif %}
+          </div>
+          <div class="pf-jug__s">
+            {{ t.subcategoria }}
+            {%- if t._usos %} · usada {{ t._usos }} vez{{ '' if t._usos == 1 else 'es' }}{% endif %}
+          </div>
+        </div>
+        <i data-ico="chevron-down" class="pf-ico--sm pf-item__chev"></i>
+      </summary>
+
+      <div style="padding:10px 0 4px">
+        <p style="margin:0 0 8px;font-size:13px;line-height:1.6">{{ t.descripcion }}</p>
+
+        {% if t.protocolo %}
+        <div style="background:var(--border-soft);border-radius:var(--r-md);padding:11px 13px;
+                    font-size:12.5px;line-height:1.65;color:var(--text-sec)">
+          <b style="color:var(--text)">Cómo se toma.</b> {{ t.protocolo }}
+        </div>
+        {% endif %}
+
+        {% if t.formula %}
+        <p style="margin:8px 0 0;font-size:11.5px;color:var(--text-muted)">
+          <b>Fórmula:</b> {{ t.formula }}
+        </p>
+        {% endif %}
+
+        <p style="margin:8px 0 0;font-size:11px;color:var(--text-muted);line-height:1.55">
+          {% for c in t.campos %}
+            <span style="display:inline-block;margin-right:10px">
+              📐 {{ c.etiqueta }}{% if c.unidad %} ({{ c.unidad }}){% endif %}
+            </span>
+          {% endfor %}
+        </p>
+        <p style="margin:6px 0 0;font-size:10.5px;color:var(--text-muted);font-style:italic">
+          {{ t.fuente }}
+        </p>
+
+        <div class="pf-row pf-mt-12" style="gap:8px">
+          <a class="pf-btn pf-btn--primary pf-grow"
+             href="{{ url_for('futbol.c_eval_aplicar', clave=t.clave) }}">
+            <i data-ico="plus" class="pf-ico--sm"></i> Tomar
+          </a>
+          {% if t._usos %}
+          <a class="pf-btn pf-btn--ghost pf-grow"
+             href="{{ url_for('futbol.c_eval_ranking', clave=t.clave) }}">
+            <i data-ico="award" class="pf-ico--sm"></i> Ranking
+          </a>
+          {% endif %}
+        </div>
+      </div>
+    </details>
+    {% endfor %}
+  </div>
+  {% endif %}
+{% endfor %}
+
+<div class="pf-card">
+  <a class="pf-item" href="{{ url_for('futbol.c_eval_nueva') }}">
+    <div class="pf-item__icon">➕</div>
+    <div class="pf-item__body">
+      <div class="pf-item__title">
+        Crear una prueba propia
+        {% if not fut_es_pro %}<span class="pf-pro">Pro</span>{% endif %}
+      </div>
+      <div class="pf-item__sub">Si mides algo que no está en el catálogo</div>
+    </div>
+    <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+  </a>
+</div>
+
+<p class="pf-center" style="font-size:11.5px;color:var(--text-muted);
+          padding:6px 26px 30px;line-height:1.65">
+  Los baremos vienen de estudios publicados (Cooper, Bangsbo, Haugen, Léger,
+  EUROFIT y otros). Se ajustan a la categoría y al nivel que configures en
+  <a href="{{ url_for('futbol.c_evaluaciones') }}"
+     style="color:var(--primary);font-weight:600">Evaluaciones</a>.
+</p>
+
+{% endblock %}

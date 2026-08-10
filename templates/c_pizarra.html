@@ -50,6 +50,31 @@
   .pz-tool.is-on { background: var(--primary); color: #fff; }
   .pz-tool:active { transform: scale(.96); }
   .pz-form { max-width: 520px; margin: 0 auto 10px; display: flex; gap: 8px; }
+
+  /* ── Animación por momentos ──
+     Una jugada se explica moviendo, no con una foto. El entrenador coloca a
+     todos, captura un "momento", los vuelve a mover, captura otro… y la
+     reproducción interpola entre ellos. Es lo mismo que hace la app nativa,
+     con la ventaja de que un momento es solo una copia del estado. */
+  .pz-anim {
+    max-width: 520px; margin: 10px auto 0;
+    background: #fff; border: 1px solid var(--border-soft);
+    border-radius: var(--r-lg); padding: 11px 13px;
+  }
+  .pz-anim__fila { display: flex; align-items: center; gap: 7px; }
+  .pz-momentos {
+    display: flex; gap: 6px; overflow-x: auto; margin-top: 9px;
+    padding-bottom: 3px; scrollbar-width: none;
+  }
+  .pz-momentos::-webkit-scrollbar { display: none; }
+  .pz-momento {
+    flex: none; width: 38px; height: 38px; border-radius: 9px;
+    display: grid; place-items: center; cursor: pointer;
+    font-size: 13px; font-weight: 800;
+    background: var(--border-soft); border: 1.5px solid var(--border);
+    color: var(--text-sec);
+  }
+  .pz-momento.is-on { background: var(--primary); border-color: var(--primary); color: #fff; }
 </style>
 {% endblock %}
 
@@ -68,6 +93,28 @@
   </div>
 
   <canvas class="pz-cancha" id="pz-canvas" width="520" height="740"></canvas>
+
+  {# ── Momentos de la jugada ── #}
+  <div class="pz-anim">
+    <div class="pz-anim__fila">
+      <span style="font-size:12.5px;font-weight:700;flex:1">
+        Momentos <span class="pf-pill pf-pill--muted" id="pz-n-momentos">0</span>
+      </span>
+      <button class="pf-btn pf-btn--secondary" type="button" id="pz-capturar"
+              style="padding:7px 12px;font-size:12px">
+        <i data-ico="camera" class="pf-ico--xs"></i> Capturar
+      </button>
+      <button class="pf-btn pf-btn--primary" type="button" id="pz-reproducir"
+              style="padding:7px 12px;font-size:12px" disabled>
+        <i data-ico="play" class="pf-ico--xs"></i> Reproducir
+      </button>
+    </div>
+    <div class="pz-momentos" id="pz-momentos"></div>
+    <p style="margin:8px 0 0;font-size:11px;color:var(--text-muted);line-height:1.55">
+      Coloca a los jugadores, pulsa <b>Capturar</b>, muévelos al siguiente sitio
+      y vuelve a capturar. Al reproducir se ve el movimiento completo.
+    </p>
+  </div>
 
   <p class="pf-center" style="font-size:12px;color:var(--text-sec);margin:12px auto 0;max-width:420px;line-height:1.5">
     Arrastra a los jugadores para colocarlos. Con la herramienta <strong>Flecha</strong>
@@ -123,10 +170,12 @@
     jugadores: [],   // {x, y, n}       — propios
     rivales: [],     // {x, y}
     flechas: [],     // {x1, y1, x2, y2}
+    momentos: [],    // [estado, estado…] — la animación
     formacion: document.getElementById('pz-formacion').value
   };
   var historial = [];
   var herramienta = 'mover';
+  var reproduciendo = false;
 
   function guardarHistorial() {
     historial.push(JSON.stringify(estado));
@@ -302,6 +351,117 @@
     pintar();
   });
 
+  // ── Animación por momentos ──────────────────────────────────────────────
+  function copiaPosiciones() {
+    // Solo posiciones: las flechas son anotación, no movimiento, y repetirlas
+    // en cada momento multiplicaría el tamaño de la jugada sin aportar nada.
+    return {
+      jugadores: estado.jugadores.map(function (j) { return { x: j.x, y: j.y, n: j.n }; }),
+      rivales: estado.rivales.map(function (r) { return { x: r.x, y: r.y }; })
+    };
+  }
+
+  function pintarMomentos() {
+    var caja = document.getElementById('pz-momentos');
+    caja.innerHTML = '';
+    (estado.momentos || []).forEach(function (m, i) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'pz-momento';
+      b.textContent = i + 1;
+      b.title = 'Ir al momento ' + (i + 1) + ' · pulsación larga para borrarlo';
+      b.addEventListener('click', function () { irAMomento(i); });
+      // Borrar con pulsación larga: en el móvil no hay clic derecho.
+      var temporizador;
+      b.addEventListener('pointerdown', function () {
+        temporizador = setTimeout(function () { borrarMomento(i); }, 650);
+      });
+      ['pointerup', 'pointerleave'].forEach(function (ev) {
+        b.addEventListener(ev, function () { clearTimeout(temporizador); });
+      });
+      caja.appendChild(b);
+    });
+    document.getElementById('pz-n-momentos').textContent = (estado.momentos || []).length;
+    document.getElementById('pz-reproducir').disabled = (estado.momentos || []).length < 2;
+  }
+
+  function irAMomento(i) {
+    var m = (estado.momentos || [])[i];
+    if (!m) return;
+    guardarHistorial();
+    estado.jugadores = m.jugadores.map(function (j) { return { x: j.x, y: j.y, n: j.n }; });
+    estado.rivales = m.rivales.map(function (r) { return { x: r.x, y: r.y }; });
+    pintar();
+    var botones = document.querySelectorAll('.pz-momento');
+    botones.forEach(function (b, k) { b.classList.toggle('is-on', k === i); });
+  }
+
+  function borrarMomento(i) {
+    estado.momentos.splice(i, 1);
+    pintarMomentos();
+    PF.toast('Momento borrado');
+  }
+
+  document.getElementById('pz-capturar').addEventListener('click', function () {
+    estado.momentos = estado.momentos || [];
+    if (estado.momentos.length >= 20) {
+      PF.toast('Máximo 20 momentos por jugada.', 'error');
+      return;
+    }
+    estado.momentos.push(copiaPosiciones());
+    pintarMomentos();
+    PF.toast('Momento ' + estado.momentos.length + ' capturado');
+  });
+
+  document.getElementById('pz-reproducir').addEventListener('click', function () {
+    if (reproduciendo) return;
+    var ms = estado.momentos || [];
+    if (ms.length < 2) return;
+
+    reproduciendo = true;
+    var boton = this;
+    boton.innerHTML = 'Reproduciendo…';
+    var copiaAntes = JSON.parse(JSON.stringify(copiaPosiciones()));
+
+    var DURACION = 1100;          // ms por tramo
+    var tramo = 0;
+    var inicio = performance.now();
+
+    function paso(ahora) {
+      var t = Math.min(1, (ahora - inicio) / DURACION);
+      // Suavizado: arranca y frena despacio, como se mueve un jugador.
+      var e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      var a = ms[tramo], b = ms[tramo + 1];
+
+      estado.jugadores = a.jugadores.map(function (j, i) {
+        var destino = b.jugadores[i] || j;
+        return { x: j.x + (destino.x - j.x) * e, y: j.y + (destino.y - j.y) * e, n: j.n };
+      });
+      estado.rivales = a.rivales.map(function (r, i) {
+        var destino = b.rivales[i] || r;
+        return { x: r.x + (destino.x - r.x) * e, y: r.y + (destino.y - r.y) * e };
+      });
+      pintar();
+
+      if (t < 1) {
+        requestAnimationFrame(paso);
+      } else if (tramo + 2 < ms.length) {
+        tramo++;
+        inicio = performance.now();
+        requestAnimationFrame(paso);
+      } else {
+        reproduciendo = false;
+        boton.innerHTML = '<i data-ico="play" class="pf-ico--xs"></i> Reproducir';
+        if (window.PF && PF.icons) PF.icons();
+        // Se deja como estaba antes de reproducir: reproducir no es editar.
+        estado.jugadores = copiaAntes.jugadores;
+        estado.rivales = copiaAntes.rivales;
+        pintar();
+      }
+    }
+    requestAnimationFrame(paso);
+  });
+
   // ── Guardar ─────────────────────────────────────────────────────────────
   document.getElementById('pz-guardar').addEventListener('click', function () {
     PF.api('{{ url_for("futbol.api_jugada_guardar") }}', {
@@ -324,6 +484,8 @@
     var guardado = {{ jugada.datos|tojson }};
     if (guardado && guardado.jugadores && guardado.jugadores.length) {
       estado = guardado;
+      // Las jugadas guardadas antes de la animación no tienen `momentos`.
+      estado.momentos = estado.momentos || [];
     } else {
       aplicarFormacion(estado.formacion);
     }
@@ -331,6 +493,7 @@
     aplicarFormacion(estado.formacion);
   {% endif %}
   pintar();
+  pintarMomentos();
 })();
 </script>
 {% endblock %}

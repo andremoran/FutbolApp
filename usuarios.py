@@ -5,6 +5,9 @@ usuarios.py — El usuario de FutbolApp y el hash de contraseñas.
 Tabla propia `usuarios` en el Supabase de FutbolApp. Los roles conservan los
 nombres que ya usaban las plantillas para no reescribirlas:
   'especialista' = entrenador   ·   'paciente' = jugador
+
+Sobre eso, `tier` ('free' | 'pro') y `es_admin` componen los cinco roles del
+producto. Quién puede hacer qué se decide en roles.py, no aquí.
 """
 import hashlib
 import hmac
@@ -17,6 +20,34 @@ from flask_login import UserMixin
 logger = logging.getLogger(__name__)
 
 ADMIN_EMAILS = {c.strip().lower() for c in (os.getenv('ADMIN_EMAILS', '') or '').split(',') if c.strip()}
+
+# Caché del arranque en frío. Un módulo se importa una vez por proceso, así que
+# la comprobación se hace una sola vez y no en cada carga de usuario.
+_ADMINS_EN_BASE = None
+
+
+def _hay_admins():
+    """¿Ya hay algún administrador nombrado en la base?
+
+    ADMIN_EMAILS solo vale mientras NO lo haya: si valiera siempre, cualquiera
+    que se registrara con uno de esos correos entraría al panel, y basta con
+    que uno de ellos sea una dirección que nadie controle para regalar el
+    acceso a usuarios, cobros y códigos. En cuanto hay un administrador de
+    verdad, la lista del entorno deja de conceder nada.
+    """
+    global _ADMINS_EN_BASE
+    if _ADMINS_EN_BASE is None:
+        from futbol import db
+        if db.sb() is None:
+            return False          # sin base no se decide nada: no se cachea
+        _ADMINS_EN_BASE = bool(db.rows('usuarios', 'hay admins', es_admin=True))
+    return _ADMINS_EN_BASE
+
+
+def olvidar_cache_admins():
+    """Se llama al nombrar o quitar un administrador."""
+    global _ADMINS_EN_BASE
+    _ADMINS_EN_BASE = None
 
 
 # ─── Contraseñas ─────────────────────────────────────────────────────────────
@@ -63,7 +94,17 @@ class User(UserMixin):
         self.activo = bool(d.get('activo', False))
         self.plan = d.get('plan') or 'basico'
         self.creado = d.get('creado')
-        self._es_admin = self.correo in ADMIN_EMAILS
+        self.anio_nacimiento = d.get('anio_nacimiento')
+        self.club = d.get('club')
+
+        # ── Los cinco roles ──
+        self.tier = (d.get('tier') or 'free').lower()
+        self.pro_hasta = d.get('pro_hasta')
+        self.pro_origen = d.get('pro_origen')
+        self.codigo_promo = d.get('codigo_promo')
+        self.bloqueado = bool(d.get('bloqueado', False))
+        self._es_admin = bool(d.get('es_admin')) or (
+            self.correo in ADMIN_EMAILS and not _hay_admins())
 
     def is_especialista(self):
         return self.role == 'especialista'
@@ -73,6 +114,32 @@ class User(UserMixin):
 
     def is_admin(self):
         return self._es_admin
+
+    @property
+    def is_active(self):
+        """Flask-Login: una cuenta bloqueada por el administrador no entra.
+
+        Tiene que ser PROPIEDAD, no método: Flask-Login lee `user.is_active`
+        sin llamarlo, y un método enlazado siempre es verdadero — la cuenta
+        bloqueada entraría igual y nadie se enteraría.
+        """
+        return not self.bloqueado
+
+    # ── Atajos que usan las plantillas ──
+    @property
+    def es_pro(self):
+        from roles import es_pro
+        return es_pro(self)
+
+    @property
+    def rol_clave(self):
+        from roles import clave_de
+        return clave_de(self)
+
+    @property
+    def rol_etiqueta(self):
+        from roles import etiqueta_de
+        return etiqueta_de(self)
 
     @property
     def iniciales(self):

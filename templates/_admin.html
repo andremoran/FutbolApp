@@ -1,0 +1,75 @@
+{# ============================================================================
+   _admin.html — Armazón del panel de administración.
+
+   Nada que ver con _shell.html: la app es clara y móvil, el panel es oscuro y
+   de escritorio. Son dos productos distintos para dos usos distintos y
+   mezclarlos haría que ninguno de los dos se viera bien.
+
+   Bloques: title · encabezado · content · scripts
+   Variable que espera: `seccion` (para marcar la pestaña activa).
+   ============================================================================ #}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Panel · ProFoot{% endblock %}</title>
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#0b1220">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
+  {% block head %}{% endblock %}
+</head>
+
+<body class="adm">
+<div class="adm-wrap">
+
+  {# ══════════════════ CABECERA ══════════════════ #}
+  <div class="adm-top">
+    <div class="adm-top__grow">
+      <h1 class="adm-h1">{% block encabezado %}Panel de administración{% endblock %}</h1>
+      <p class="adm-sub">{% block encabezado_sub %}ProFoot Assistant · trastienda{% endblock %}</p>
+    </div>
+    <div class="adm-acciones">
+      <a class="adm-btn" href="{{ url_for('futbol.home') }}">↩ Volver a la app</a>
+      <span class="adm-tag adm-tag--admin">🛡️ {{ current_user.name }}</span>
+    </div>
+  </div>
+
+  {# ══════════════════ NAVEGACIÓN ══════════════════ #}
+  <nav class="adm-nav">
+    <a href="{{ url_for('admin.tablero') }}"  class="{{ 'on' if seccion == 'tablero' }}">📊 Tablero</a>
+    <a href="{{ url_for('admin.usuarios') }}" class="{{ 'on' if seccion == 'usuarios' }}">👥 Usuarios</a>
+    <a href="{{ url_for('admin.codigos') }}"  class="{{ 'on' if seccion == 'codigos' }}">🎟️ Códigos</a>
+    <a href="{{ url_for('admin.pagos') }}"    class="{{ 'on' if seccion == 'pagos' }}">💳 Pagos</a>
+    <a href="{{ url_for('admin.bandeja') }}"  class="{{ 'on' if seccion == 'avisos' }}">
+      🔔 Avisos
+      {% if sin_leer %}<span class="adm-pip">{{ sin_leer }}</span>{% endif %}
+    </a>
+    <a href="{{ url_for('admin.pantalla_ajustes') }}" class="{{ 'on' if seccion == 'ajustes' }}">⚙️ Ajustes</a>
+  </nav>
+
+  {# ══════════════════ AVISOS DEL SERVIDOR ══════════════════ #}
+  {% with mensajes = get_flashed_messages(with_categories=true) %}
+    {% for categoria, texto in mensajes %}
+    <div class="adm-card adm-card--pad adm-mb"
+         style="border-left:3px solid var(--a-{{ 'mal' if categoria == 'error' else ('ok' if categoria == 'success' else 'info') }})">
+      {{ texto }}
+    </div>
+    {% endfor %}
+  {% endwith %}
+
+  {% block content %}{% endblock %}
+</div>
+
+<div class="adm-modal-back" id="adm-modal-back"></div>
+<div id="adm-toasts"></div>
+
+<script src="{{ url_for('static', filename='admin.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

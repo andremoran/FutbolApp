@@ -1,0 +1,176 @@
+{% extends '_shell.html' %}
+{% block title %}Ficha médica · ProFoot{% endblock %}
+
+{# La frontera de privacidad importa tanto como los datos: el entrenador ve el
+   contacto de emergencia y las alergias, nada más. Se le dice en voz alta al
+   jugador, porque si sospecha que se lee todo, no escribe la verdad. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.ficha') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Mi salud</div>{% endblock %}
+{% block hero_title %}Ficha médica{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {% if activas %}
+    {{ activas|length }} lesión{{ '' if activas|length == 1 else 'es' }} en curso
+  {% else %}
+    Sin lesiones activas
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+
+{# ══════════ QUIÉN VE QUÉ ══════════ #}
+<div class="pf-card">
+  <div class="pf-alerta pf-alerta--info" style="margin-top:0">
+    <i data-ico="lock" class="pf-ico--xs"></i>
+    <span>
+      De todo esto, tu entrenador solo ve el <b>contacto de emergencia</b>, tu
+      <b>grupo sanguíneo</b> y tus <b>alergias</b> — lo que hace falta si te
+      pasa algo en el campo. La medicación y tus condiciones son solo tuyas.
+    </span>
+  </div>
+</div>
+
+{# ══════════ LESIONES ══════════ #}
+{% if lesiones %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Tus lesiones</h2>
+  </div>
+  {% for l in lesiones %}
+  <div style="padding:12px 0;border-bottom:1px solid var(--border-soft)">
+    <div class="pf-row pf-row--between">
+      <div class="pf-grow">
+        <div class="pf-jug__n">
+          {{ l.zona }}{% if l.lado %} ({{ l.lado }}){% endif %}
+        </div>
+        <div class="pf-jug__s">
+          {{ l._fecha.strftime('%d/%m/%Y') if l._fecha else '' }}
+          {%- if l._dias is not none %} · {{ l._dias }} día{{ '' if l._dias == 1 else 's' }}{% endif %}
+          {%- if l.tipo %} · {{ l.tipo }}{% endif %}
+        </div>
+      </div>
+      <span class="pf-pill" style="background:{{ l._estado.color }}22;color:{{ l._estado.color }}">
+        {{ l._estado.etiqueta }}
+      </span>
+    </div>
+    {% if l.descripcion %}
+    <p style="margin:7px 0 0;font-size:12.5px;line-height:1.6;color:var(--text-sec)">
+      {{ l.descripcion }}
+    </p>
+    {% endif %}
+    {% if l._restantes is not none %}
+    <p style="margin:5px 0 0;font-size:11.5px;color:var(--text-muted)">
+      {% if l._restantes > 0 %}
+        Alta prevista en {{ l._restantes }} día{{ '' if l._restantes == 1 else 's' }}
+      {% elif l._restantes == 0 %}
+        Alta prevista para hoy
+      {% else %}
+        Se pasó la fecha de alta prevista
+      {% endif %}
+    </p>
+    {% endif %}
+  </div>
+  {% endfor %}
+  <p style="margin:11px 0 0;font-size:11.5px;color:var(--text-muted);line-height:1.6">
+    El parte de lesiones lo lleva tu entrenador. Si algo no cuadra, díselo.
+  </p>
+</div>
+{% endif %}
+
+{# ══════════ LA FICHA ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Contacto de emergencia</h2>
+    <span class="pf-pill pf-pill--muted">lo ve tu entrenador</span>
+  </div>
+  <div class="pf-row" style="gap:10px">
+    <div class="pf-grow">
+      <label class="pf-label" for="f-contacto">Nombre</label>
+      <input class="pf-input" id="f-contacto" maxlength="120"
+             value="{{ ficha.contacto_nombre or '' }}" placeholder="Madre, padre, pareja…">
+    </div>
+    <div class="pf-grow">
+      <label class="pf-label" for="f-tel">Teléfono</label>
+      <input class="pf-input" id="f-tel" maxlength="30" inputmode="tel"
+             value="{{ ficha.contacto_tel or '' }}">
+    </div>
+  </div>
+
+  <div class="pf-row pf-mt-12" style="gap:10px">
+    <div style="width:120px;flex:none">
+      <label class="pf-label" for="f-sangre">Grupo sanguíneo</label>
+      <select class="pf-select" id="f-sangre">
+        <option value="">—</option>
+        {% for g in ['O-', 'O+', 'A-', 'A+', 'B-', 'B+', 'AB-', 'AB+'] %}
+          <option value="{{ g }}" {{ 'selected' if ficha.grupo_sanguineo == g }}>{{ g }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="pf-grow">
+      <label class="pf-label" for="f-seguro">Seguro médico</label>
+      <input class="pf-input" id="f-seguro" maxlength="120"
+             value="{{ ficha.seguro or '' }}" placeholder="IESS, particular…">
+    </div>
+  </div>
+
+  <div class="pf-field pf-mt-12">
+    <label class="pf-label" for="f-alergias">Alergias</label>
+    <textarea class="pf-textarea" id="f-alergias" rows="2" maxlength="600"
+              placeholder="Medicamentos, alimentos, picaduras…">{{ ficha.alergias or '' }}</textarea>
+    <p style="margin:5px 0 0;font-size:11px;color:var(--text-muted)">
+      Esto también lo ve tu entrenador: puede salvarte en una urgencia.
+    </p>
+  </div>
+</div>
+
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Solo para ti</h2>
+    <span class="pf-pill pf-pill--info">privado</span>
+  </div>
+  <div class="pf-field">
+    <label class="pf-label" for="f-medicacion">Medicación habitual</label>
+    <textarea class="pf-textarea" id="f-medicacion" rows="2" maxlength="600">{{ ficha.medicacion or '' }}</textarea>
+  </div>
+  <div class="pf-field pf-mt-12">
+    <label class="pf-label" for="f-condiciones">Condiciones médicas</label>
+    <textarea class="pf-textarea" id="f-condiciones" rows="3" maxlength="800"
+              placeholder="Asma, diabetes, operaciones anteriores…">{{ ficha.condiciones or '' }}</textarea>
+  </div>
+</div>
+
+<div class="pf-px-16 pf-mt-16" style="padding-bottom:34px">
+  <button class="pf-btn pf-btn--primary pf-btn--block" type="button" id="btn-guardar">
+    <i data-ico="save" class="pf-ico--sm"></i> Guardar la ficha
+  </button>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('btn-guardar').onclick = function () {
+  const boton = this;
+  const v = id => document.getElementById(id).value;
+  boton.disabled = true;
+  PF.api('/api/medico', {
+    contacto_nombre: v('f-contacto'), contacto_tel: v('f-tel'),
+    grupo_sanguineo: v('f-sangre'), seguro: v('f-seguro'),
+    alergias: v('f-alergias'), medicacion: v('f-medicacion'),
+    condiciones: v('f-condiciones'),
+  }).then(j => {
+    PF.toast(j.mensaje, 'success');
+    boton.disabled = false;
+  }).catch(e => {
+    PF.toast(e.message, 'error');
+    boton.disabled = false;
+  });
+};
+</script>
+{% endblock %}

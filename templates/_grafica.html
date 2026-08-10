@@ -1,0 +1,68 @@
+{# ============================================================================
+   _grafica.html — Línea de evolución en SVG puro.
+
+   Sin librerías de gráficas: son 40 kB para dibujar ocho puntos, y aquí manda
+   que la app abra rápido en un móvil de gama baja con datos móviles.
+
+   Se usa así:
+     {% with serie = mi_serie, alto = 128 %}{% include '_grafica.html' %}{% endwith %}
+
+   `serie` = lista de {fecha, valor} — se dibuja `valor`.
+   El eje Y se ajusta al rango de los datos con un 12 % de aire arriba y abajo,
+   porque si arrancara en cero una mejora de 4,20 a 4,10 s sería invisible.
+   ============================================================================ #}
+
+{% set pts = serie|default([], true)|list %}
+{% if pts|length >= 2 %}
+  {% set valores = pts|map(attribute='valor')|select('defined')|list %}
+  {% set vmin = valores|min %}
+  {% set vmax = valores|max %}
+  {% set rango = (vmax - vmin) if (vmax - vmin) > 0 else (vmax|abs * 0.1 + 1) %}
+  {% set lo = vmin - rango * 0.12 %}
+  {% set hi = vmax + rango * 0.12 %}
+  {% set span = hi - lo %}
+  {% set n = pts|length %}
+  {% set alto_g = alto|default(128) %}
+  {% set h = alto_g - 22 %}
+
+  <svg class="pf-grafica" viewBox="0 0 300 {{ alto_g }}" preserveAspectRatio="none"
+       role="img" aria-label="Evolución de la marca">
+    {# Área bajo la línea: da volumen sin necesitar rejilla ni ejes #}
+    <path class="pf-grafica__area" d="
+      {%- for p in pts -%}
+        {{ 'M' if loop.first else 'L' }}{{ (loop.index0 * 300 / (n - 1))|round(2) }},{{ (h - ((p.valor - lo) / span) * (h - 12) - 6)|round(2) }}
+      {%- endfor -%}
+      L300,{{ h }} L0,{{ h }} Z"></path>
+
+    <path class="pf-grafica__linea" d="
+      {%- for p in pts -%}
+        {{ 'M' if loop.first else 'L' }}{{ (loop.index0 * 300 / (n - 1))|round(2) }},{{ (h - ((p.valor - lo) / span) * (h - 12) - 6)|round(2) }}
+      {%- endfor -%}"></path>
+
+    {% for p in pts %}
+      <circle class="pf-grafica__punto"
+              cx="{{ (loop.index0 * 300 / (n - 1))|round(2) }}"
+              cy="{{ (h - ((p.valor - lo) / span) * (h - 12) - 6)|round(2) }}"
+              r="{{ 4 if (loop.last or loop.first) else 3 }}"></circle>
+    {% endfor %}
+
+    {# Solo la primera y la última fecha: con ocho no cabe ninguna más #}
+    <text class="pf-grafica__et" x="0" y="{{ alto_g - 4 }}">
+      {{ pts[0].fecha.strftime('%d/%m/%y') if pts[0].fecha else '' }}
+    </text>
+    <text class="pf-grafica__et" x="300" y="{{ alto_g - 4 }}" text-anchor="end">
+      {{ pts[-1].fecha.strftime('%d/%m/%y') if pts[-1].fecha else '' }}
+    </text>
+  </svg>
+
+  <div class="pf-row pf-row--between" style="font-size:11px;color:var(--text-muted);margin-top:2px">
+    <span>{{ '%g'|format(vmin) }}</span>
+    <span>{{ pts|length }} tomas</span>
+    <span>{{ '%g'|format(vmax) }}</span>
+  </div>
+{% elif pts|length == 1 %}
+  <p style="margin:0;font-size:12.5px;color:var(--text-muted);line-height:1.6">
+    Solo hay una toma. Repite la prueba en unas semanas y aquí verás la línea
+    de progreso.
+  </p>
+{% endif %}

@@ -1,0 +1,268 @@
+{% extends '_admin.html' %}
+{% block title %}Usuarios · Panel ProFoot{% endblock %}
+{% block encabezado %}Usuarios{% endblock %}
+{% block encabezado_sub %}
+  Activa el Pro, cambia el rol, bloquea o borra cuentas.
+{% endblock %}
+
+{% block content %}
+
+{# ══════════════════ RESUMEN POR ROL ══════════════════ #}
+<div class="adm-grid adm-grid--4 adm-mb">
+  {% for clave, meta in roles.items() %}
+    {% set n = usuarios|selectattr('_rol', 'equalto', clave)|list|length %}
+    <a class="adm-kpi" href="{{ url_for('admin.usuarios', rol='' if rol_filtro == clave else clave, f=filtro) }}"
+       style="{{ 'box-shadow:inset 0 0 0 1px rgba(52,211,153,.4)' if rol_filtro == clave }}">
+      <div class="adm-kpi__ico">{{ meta.emoji }}</div>
+      <div><div class="adm-kpi__n">{{ n }}</div>
+           <div class="adm-kpi__t">{{ meta.etiqueta }}</div></div>
+    </a>
+  {% endfor %}
+</div>
+
+{# ══════════════════ TABLA ══════════════════ #}
+<div class="adm-card">
+  <div class="adm-card__head">
+    <h2 class="adm-card__title">
+      Cuentas <span class="adm-mut" id="cuenta-visibles">{{ usuarios|length }}</span>
+    </h2>
+    <div class="adm-grow"></div>
+    <input class="adm-in" id="buscador" type="search" style="max-width:280px"
+           placeholder="Buscar nombre, correo o código…"
+           value="{{ filtro }}"
+           oninput="ADM.filtrar(this, '#tabla-usuarios tbody tr', '#cuenta-visibles')">
+    {% if rol_filtro or filtro %}
+      <a class="adm-btn adm-btn--sm" href="{{ url_for('admin.usuarios') }}">Quitar filtros</a>
+    {% endif %}
+  </div>
+
+  {% if usuarios %}
+  <div class="adm-tabla-scroll">
+    <table class="adm-tabla" id="tabla-usuarios">
+      <thead>
+        <tr>
+          <th>Persona</th>
+          <th>Rol</th>
+          <th>Plan</th>
+          <th>Equipo</th>
+          <th>Alta</th>
+          <th class="adm-der">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for u in usuarios %}
+        <tr data-uid="{{ u.id }}">
+          {# ── Persona ── #}
+          <td>
+            <div class="adm-persona">
+              <div class="adm-av">
+                {%- if u.foto %}<img src="{{ u.foto }}" alt="">
+                {%- else %}{{ (u.nombre or '?')[:1]|upper }}{% endif -%}
+              </div>
+              <div class="adm-grow">
+                <div class="adm-persona__n">
+                  {{ u.nombre }}
+                  {% if u.bloqueado %}<span class="adm-tag adm-tag--mal">🚫 bloqueada</span>{% endif %}
+                </div>
+                <div class="adm-persona__m">{{ u.correo }}</div>
+                {% if u.telefono %}<div class="adm-persona__m">{{ u.telefono }}</div>{% endif %}
+              </div>
+            </div>
+          </td>
+
+          {# ── Rol ── #}
+          <td class="adm-nowrap">
+            <span class="adm-tag adm-tag--{{ 'admin' if u._rol == 'admin' else ('pro' if u._pro_vigente else 'free') }}">
+              {{ u._rol_emoji }} {{ u._rol_etiqueta }}
+            </span>
+          </td>
+
+          {# ── Plan ── #}
+          <td class="adm-nowrap">
+            {% if u._pro_vigente %}
+              <span class="adm-tag adm-tag--pro">⭐ Pro</span>
+              {% if u._pro_hasta %}
+                <div class="adm-xs {{ 'adm-mut' if u._dias > 14 else '' }}"
+                     style="margin-top:4px;{{ 'color:var(--a-warn)' if u._dias is not none and u._dias <= 14 }}">
+                  hasta {{ u._pro_hasta.strftime('%d/%m/%Y') }}
+                  {%- if u._dias is not none %} · {{ u._dias }} d{% endif %}
+                </div>
+              {% else %}
+                <div class="adm-xs adm-mut" style="margin-top:4px">sin caducidad</div>
+              {% endif %}
+              {% if u.pro_origen %}
+                <div class="adm-xs adm-mut">vía {{ u.pro_origen }}</div>
+              {% endif %}
+            {% else %}
+              <span class="adm-tag adm-tag--free">Gratuito</span>
+            {% endif %}
+          </td>
+
+          {# ── Equipo ── #}
+          <td>
+            {% if u._es_coach %}
+              {% if u.codigo_equipo %}
+                <span class="adm-cod">{{ u.codigo_equipo }}</span>
+                <button class="adm-btn adm-btn--sm adm-btn--icon" title="Copiar"
+                        onclick="ADM.copiar('{{ u.codigo_equipo }}', this)">⧉</button>
+              {% endif %}
+              <div class="adm-xs adm-mut" style="margin-top:4px">
+                {{ u._n_jugadores }} jugador{{ '' if u._n_jugadores == 1 else 'es' }}
+                {%- if not u._pro_vigente %} · tope 12{% endif %}
+              </div>
+              {% if u.club %}<div class="adm-xs adm-mut">{{ u.club }}</div>{% endif %}
+            {% elif u._coach %}
+              <div class="adm-xs adm-sec">Equipo de {{ u._coach }}</div>
+            {% else %}
+              <span class="adm-xs adm-mut">Sin equipo</span>
+            {% endif %}
+          </td>
+
+          {# ── Alta ── #}
+          <td class="adm-xs adm-mut adm-nowrap">
+            {{ u._alta.strftime('%d/%m/%Y') if u._alta else '—' }}
+          </td>
+
+          {# ── Acciones ── #}
+          <td class="adm-der">
+            <div class="adm-acciones" style="justify-content:flex-end">
+              <button class="adm-btn adm-btn--sm adm-btn--pri"
+                      onclick="darPro('{{ u.id }}', '{{ u.nombre|e }}')">⭐ Pro</button>
+              {% if u._pro_vigente and u._rol != 'admin' %}
+                <button class="adm-btn adm-btn--sm"
+                        onclick="ADM.accion(this, '/admin/api/usuario/{{ u.id }}', {accion:'free'})">
+                  Quitar
+                </button>
+              {% endif %}
+              <button class="adm-btn adm-btn--sm"
+                      onclick="editar('{{ u.id }}', {{ {'nombre': u.nombre, 'correo': u.correo, 'telefono': u.telefono or '', 'club': u.club or ''}|tojson }})">
+                ✎
+              </button>
+              <button class="adm-btn adm-btn--sm {{ 'adm-btn--ok' if u.bloqueado else '' }}"
+                      title="{{ 'Desbloquear' if u.bloqueado else 'Bloquear el acceso' }}"
+                      onclick="ADM.accion(this, '/admin/api/usuario/{{ u.id }}', {accion:'bloquear', valor:{{ 'false' if u.bloqueado else 'true' }}})">
+                {{ '🔓' if u.bloqueado else '🔒' }}
+              </button>
+              {% if u.id != current_user.id %}
+              <button class="adm-btn adm-btn--sm adm-btn--mal" title="Borrar la cuenta"
+                      onclick="borrar('{{ u.id }}', '{{ u.nombre|e }}')">🗑</button>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="adm-vacio">
+      <div class="adm-vacio__e">🔍</div>
+      <p>Ninguna cuenta coincide con el filtro.</p>
+    </div>
+  {% endif %}
+</div>
+
+{# ══════════════════ MODAL: DAR PRO ══════════════════ #}
+<div class="adm-modal" id="m-pro">
+  <div class="adm-modal__head">
+    <h3 class="adm-modal__title">⭐ Activar plan Pro</h3>
+    <button class="adm-btn adm-btn--sm" onclick="ADM.cerrar('m-pro')">✕</button>
+  </div>
+  <div class="adm-modal__body">
+    <p class="adm-sec" style="margin-top:0">
+      Le vas a dar Pro a <b id="pro-nombre"></b>. Si ya lo tenía, los meses se
+      suman a lo que le quedaba.
+    </p>
+    <div class="adm-campo">
+      <label class="adm-lbl" for="pro-meses">Meses</label>
+      <select class="adm-sel" id="pro-meses">
+        <option value="1">1 mes</option>
+        <option value="3" selected>3 meses</option>
+        <option value="6">6 meses</option>
+        <option value="12">12 meses</option>
+        <option value="24">24 meses</option>
+      </select>
+      <p class="adm-ayuda">Queda registrado como concesión manual del administrador.</p>
+    </div>
+  </div>
+  <div class="adm-modal__pie">
+    <button class="adm-btn" onclick="ADM.cerrar('m-pro')">Cancelar</button>
+    <button class="adm-btn adm-btn--pri" id="pro-ok">Activar</button>
+  </div>
+</div>
+
+{# ══════════════════ MODAL: EDITAR ══════════════════ #}
+<div class="adm-modal" id="m-editar">
+  <div class="adm-modal__head">
+    <h3 class="adm-modal__title">✎ Editar datos</h3>
+    <button class="adm-btn adm-btn--sm" onclick="ADM.cerrar('m-editar')">✕</button>
+  </div>
+  <div class="adm-modal__body">
+    <div class="adm-campo">
+      <label class="adm-lbl" for="ed-nombre">Nombre</label>
+      <input class="adm-in" id="ed-nombre" maxlength="80">
+    </div>
+    <div class="adm-campo">
+      <label class="adm-lbl" for="ed-correo">Correo</label>
+      <input class="adm-in" id="ed-correo" type="email" maxlength="120">
+    </div>
+    <div class="adm-fila">
+      <div class="adm-campo">
+        <label class="adm-lbl" for="ed-telefono">Teléfono</label>
+        <input class="adm-in" id="ed-telefono" maxlength="30">
+      </div>
+      <div class="adm-campo">
+        <label class="adm-lbl" for="ed-club">Club</label>
+        <input class="adm-in" id="ed-club" maxlength="80">
+      </div>
+    </div>
+  </div>
+  <div class="adm-modal__pie">
+    <button class="adm-btn" onclick="ADM.cerrar('m-editar')">Cancelar</button>
+    <button class="adm-btn adm-btn--pri" id="ed-ok">Guardar</button>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let objetivo = null;
+
+function darPro(uid, nombre) {
+  objetivo = uid;
+  document.getElementById('pro-nombre').textContent = nombre;
+  ADM.abrir('m-pro');
+}
+document.getElementById('pro-ok').onclick = function () {
+  ADM.accion(this, '/admin/api/usuario/' + objetivo,
+             { accion: 'pro', meses: +document.getElementById('pro-meses').value });
+};
+
+function editar(uid, datos) {
+  objetivo = uid;
+  document.getElementById('ed-nombre').value   = datos.nombre || '';
+  document.getElementById('ed-correo').value   = datos.correo || '';
+  document.getElementById('ed-telefono').value = datos.telefono || '';
+  document.getElementById('ed-club').value     = datos.club || '';
+  ADM.abrir('m-editar');
+}
+document.getElementById('ed-ok').onclick = function () {
+  ADM.accion(this, '/admin/api/usuario/' + objetivo, {
+    accion: 'datos',
+    nombre:   document.getElementById('ed-nombre').value,
+    correo:   document.getElementById('ed-correo').value,
+    telefono: document.getElementById('ed-telefono').value,
+    club:     document.getElementById('ed-club').value,
+  });
+};
+
+function borrar(uid, nombre) {
+  if (!ADM.confirmarTexto(
+        'Se borrará la cuenta de ' + nombre + ' y TODO lo que creó: ' +
+        'evaluaciones, eventos, hábitos y mensajes.\nNo se puede deshacer.',
+        'BORRAR')) return;
+  ADM.accion(null, '/admin/api/usuario/' + uid + '/borrar', {});
+}
+</script>
+{% endblock %}

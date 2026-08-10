@@ -1,0 +1,220 @@
+{% extends '_shell.html' %}
+{% block title %}Lesiones · ProFoot{% endblock %}
+
+{# Quién está disponible y quién no. Del jugador solo se trae el contacto de
+   emergencia, el grupo sanguíneo y las alergias: la medicación y sus
+   condiciones ni siquiera se piden a la base. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_equipo') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Salud del equipo</div>{% endblock %}
+{% block hero_title %}Lesiones{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {{ n_disponibles }} disponible{{ '' if n_disponibles == 1 else 's' }}
+  {%- if activas %} · {{ activas|length }} de baja{% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+
+<div class="pf-card">
+  <div class="pf-alerta pf-alerta--info" style="margin-top:0">
+    <i data-ico="lock" class="pf-ico--xs"></i>
+    <span>De la ficha médica de tus jugadores solo ves el contacto de
+      emergencia, el grupo sanguíneo y las alergias. La medicación y sus
+      condiciones son privadas.</span>
+  </div>
+</div>
+
+{# ══════════ REGISTRAR ══════════ #}
+{% if jugadores %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Registrar una lesión</h2>
+  </div>
+
+  <div class="pf-field">
+    <label class="pf-label" for="l-jugador">Jugador</label>
+    <select class="pf-select" id="l-jugador">
+      {% for j in jugadores %}<option value="{{ j.id }}">{{ j.name }}</option>{% endfor %}
+    </select>
+  </div>
+
+  <div class="pf-row pf-mt-12" style="gap:10px">
+    <div class="pf-grow">
+      <label class="pf-label" for="l-zona">Zona</label>
+      <select class="pf-select" id="l-zona">
+        {% for z in zonas %}<option value="{{ z }}">{{ z }}</option>{% endfor %}
+      </select>
+    </div>
+    <div style="width:120px;flex:none">
+      <label class="pf-label" for="l-lado">Lado</label>
+      <select class="pf-select" id="l-lado">
+        <option value="">—</option>
+        <option value="Izquierdo">Izquierdo</option>
+        <option value="Derecho">Derecho</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="pf-row pf-mt-12" style="gap:10px">
+    <div class="pf-grow">
+      <label class="pf-label" for="l-tipo">Tipo</label>
+      <select class="pf-select" id="l-tipo">
+        {% for clave, etiqueta in tipos %}<option value="{{ clave }}">{{ etiqueta }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="pf-grow">
+      <label class="pf-label" for="l-gravedad">Gravedad</label>
+      <select class="pf-select" id="l-gravedad" onchange="sugerirAlta()">
+        {% for clave, etiqueta, color, plazo in gravedades %}
+          <option value="{{ clave }}" data-plazo="{{ plazo }}">{{ etiqueta }} — {{ plazo }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+
+  <div class="pf-row pf-mt-12" style="gap:10px">
+    <div class="pf-grow">
+      <label class="pf-label" for="l-fecha">Cuándo pasó</label>
+      <input class="pf-input" id="l-fecha" type="date" value="{{ hoy }}">
+    </div>
+    <div class="pf-grow">
+      <label class="pf-label" for="l-alta">Alta prevista</label>
+      <input class="pf-input" id="l-alta" type="date">
+    </div>
+  </div>
+
+  <div class="pf-field pf-mt-12">
+    <label class="pf-label" for="l-descripcion">Qué pasó</label>
+    <textarea class="pf-textarea" id="l-descripcion" rows="2" maxlength="1000"
+              placeholder="Mecanismo, si hubo diagnóstico médico, qué se le indicó"></textarea>
+  </div>
+
+  <button class="pf-btn pf-btn--primary pf-btn--block pf-mt-16" type="button" id="btn-lesion">
+    <i data-ico="save" class="pf-ico--sm"></i> Registrar
+  </button>
+</div>
+{% endif %}
+
+{# ══════════ PLANTILLA ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Estado de la plantilla</h2>
+  </div>
+
+  {% for j in jugadores %}
+  <div class="pf-jug">
+    <div class="pf-avatar pf-avatar--sm">
+      {%- if j.profile_photo %}<img src="{{ j.profile_photo }}" alt="">
+      {%- else %}{{ (j.name or '?')[:1]|upper }}{% endif -%}
+    </div>
+    <div class="pf-grow">
+      <div class="pf-jug__n">{{ j.name }}</div>
+      <div class="pf-jug__s">
+        {% if j._activa %}
+          {{ j._activa.zona }} · {{ j._activa._gravedad.etiqueta|lower }}
+          {%- if j._activa._dias is not none %} · {{ j._activa._dias }} día{{ '' if j._activa._dias == 1 else 's' }}{% endif %}
+        {% else %}
+          Disponible
+          {%- if j._lesiones %} · {{ j._lesiones|length }} lesión{{ '' if j._lesiones|length == 1 else 'es' }} en el histórico{% endif %}
+        {% endif %}
+      </div>
+      {% if j._medico.contacto_tel or j._medico.alergias %}
+      <div class="pf-jug__s" style="color:var(--text-sec)">
+        {%- if j._medico.contacto_tel %}📞 {{ j._medico.contacto_nombre or 'Emergencia' }}
+          {{ j._medico.contacto_tel }}{% endif -%}
+        {%- if j._medico.grupo_sanguineo %} · 🩸 {{ j._medico.grupo_sanguineo }}{% endif -%}
+        {%- if j._medico.alergias %} · ⚠️ {{ j._medico.alergias|truncate(40) }}{% endif -%}
+      </div>
+      {% endif %}
+    </div>
+    {% if j._activa %}
+      <span class="pf-pill" style="background:{{ j._activa._estado.color }}22;
+            color:{{ j._activa._estado.color }}">{{ j._activa._estado.etiqueta }}</span>
+      <button class="pf-btn pf-btn--ghost" type="button" style="padding:6px 10px;font-size:12px"
+              onclick="darAlta('{{ j._activa.id }}', '{{ j.name|e }}')">Alta</button>
+    {% else %}
+      <span class="pf-pill pf-pill--info">✅</span>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="pf-empty">
+    <div class="pf-empty__icon">👥</div>
+    <div class="pf-empty__title">Todavía no tienes jugadores</div>
+  </div>
+  {% endfor %}
+</div>
+
+{# ══════════ HISTÓRICO ══════════ #}
+{% if lesiones %}
+<details class="pf-card">
+  <summary style="display:flex;align-items:center;gap:9px;cursor:pointer;list-style:none">
+    <span style="font-weight:700;font-size:14px;flex:1">
+      Histórico de lesiones ({{ lesiones|length }})
+    </span>
+    <i data-ico="chevron-down" class="pf-ico--sm pf-item__chev"></i>
+  </summary>
+  {% for l in lesiones %}
+  <div class="pf-medida">
+    <span class="pf-medida__et">
+      {{ l._fecha.strftime('%d/%m/%y') if l._fecha else '' }} · {{ l.zona }}
+      {%- if l._dias is not none %} · {{ l._dias }} d{% endif %}
+    </span>
+    <span class="pf-pill" style="background:{{ l._estado.color }}22;color:{{ l._estado.color }}">
+      {{ l._estado.etiqueta }}
+    </span>
+  </div>
+  {% endfor %}
+</details>
+{% endif %}
+
+<div style="height:34px"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* Rellena la fecha de alta con el plazo típico de esa gravedad: es una
+   estimación de partida, no un diagnóstico, y el entrenador la corrige. */
+function sugerirAlta() {
+  const dias = { leve: 5, moderada: 18, grave: 45 };
+  const g = document.getElementById('l-gravedad').value;
+  const base = new Date(document.getElementById('l-fecha').value || Date.now());
+  base.setDate(base.getDate() + (dias[g] || 7));
+  document.getElementById('l-alta').value = base.toISOString().slice(0, 10);
+}
+sugerirAlta();
+
+const btn = document.getElementById('btn-lesion');
+if (btn) btn.onclick = function () {
+  const boton = this;
+  const v = id => document.getElementById(id).value;
+  boton.disabled = true;
+  PF.api('/api/lesion', {
+    player_id: v('l-jugador'), zona: v('l-zona'), lado: v('l-lado'),
+    tipo: v('l-tipo'), gravedad: v('l-gravedad'), fecha: v('l-fecha'),
+    alta_prevista: v('l-alta'), descripcion: v('l-descripcion'),
+    estado: 'activa',
+  }).then(j => {
+    PF.toast(j.mensaje, 'success');
+    setTimeout(() => location.reload(), 700);
+  }).catch(e => {
+    PF.toast(e.message, 'error');
+    boton.disabled = false;
+  });
+};
+
+function darAlta(lid, nombre) {
+  if (!confirm('¿Dar de alta a ' + nombre + '?\n\nVolverá a contar como disponible.')) return;
+  PF.api('/api/lesion', { id: lid, estado: 'alta',
+                          alta_real: new Date().toISOString().slice(0, 10),
+                          player_id: null })
+    .then(() => location.reload())
+    .catch(e => PF.toast(e.message, 'error'));
+}
+</script>
+{% endblock %}

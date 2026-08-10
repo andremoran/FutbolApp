@@ -1,0 +1,124 @@
+{% extends '_shell.html' %}
+{% block title %}Unirme a un equipo · ProFoot{% endblock %}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.inicio') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Mi equipo</div>{% endblock %}
+{% block hero_title %}Unirme{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {% if entrenador %}Ya estás con {{ entrenador.name }}{% else %}Con el código de tu entrenador{% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+
+{% if entrenador %}
+<div class="pf-card">
+  <div class="pf-row" style="gap:12px">
+    <div class="pf-avatar">
+      {%- if entrenador.profile_photo %}<img src="{{ entrenador.profile_photo }}" alt="">
+      {%- else %}{{ (entrenador.name or '?')[:1]|upper }}{% endif -%}
+    </div>
+    <div class="pf-grow">
+      <div style="font-weight:700;font-size:15px">{{ entrenador.name }}</div>
+      <div style="font-size:12.5px;color:var(--text-sec)">
+        Tu entrenador{% if entrenador.club %} · {{ entrenador.club }}{% endif %}
+      </div>
+    </div>
+    <span class="pf-pill pf-pill--info">Activo</span>
+  </div>
+  <p style="margin:12px 0 0;font-size:12.5px;color:var(--text-muted);line-height:1.6">
+    Si quieres cambiar de equipo, pide el código del nuevo entrenador abajo. Tu
+    histórico se queda contigo.
+  </p>
+</div>
+{% endif %}
+
+{% if solicitud and solicitud.estado == 'pendiente' %}
+<div class="pf-card" style="border-color:var(--warning)">
+  <div class="pf-alerta pf-alerta--warn" style="margin-top:0">
+    <i data-ico="clock" class="pf-ico--xs"></i>
+    <span>
+      Mandaste una solicitud
+      {%- if solicitud._coach %} a <b>{{ solicitud._coach.name }}</b>{% endif %}
+      {%- if solicitud._fecha %} el {{ solicitud._fecha.strftime('%d/%m/%Y') }}{% endif %}.
+      Está esperando su respuesta.
+    </span>
+  </div>
+</div>
+{% elif solicitud and solicitud.estado == 'rechazada' %}
+<div class="pf-card">
+  <div class="pf-alerta pf-alerta--info" style="margin-top:0">
+    <i data-ico="info" class="pf-ico--xs"></i>
+    <span>Tu última solicitud no fue aceptada. Puedes volver a pedirlo o probar
+      con otro código.</span>
+  </div>
+</div>
+{% endif %}
+
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Código del equipo</h2>
+  </div>
+  <p style="margin:0 0 12px;font-size:12.5px;color:var(--text-sec);line-height:1.6">
+    Son seis caracteres que te da tu entrenador. Al mandarlo, él recibe tu
+    solicitud y decide.
+  </p>
+
+  <div class="pf-field">
+    <input class="pf-input" id="u-codigo" maxlength="10" autocomplete="off"
+           placeholder="ABC123"
+           style="text-transform:uppercase;font-family:monospace;font-size:22px;
+                  letter-spacing:5px;text-align:center;font-weight:800">
+  </div>
+
+  <div class="pf-field pf-mt-12">
+    <label class="pf-label" for="u-posicion">Tu posición</label>
+    <select class="pf-select" id="u-posicion">
+      <option value="">—</option>
+      {% for p in posiciones %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
+    </select>
+  </div>
+
+  <div class="pf-field pf-mt-12">
+    <label class="pf-label" for="u-mensaje">Mensaje (opcional)</label>
+    <textarea class="pf-textarea" id="u-mensaje" rows="3" maxlength="400"
+              placeholder="Preséntate: tu edad, dónde jugabas antes…"></textarea>
+  </div>
+
+  <button class="pf-btn pf-btn--primary pf-btn--block pf-mt-16" type="button" id="btn-unirme">
+    <i data-ico="send" class="pf-ico--sm"></i> Mandar solicitud
+  </button>
+</div>
+
+<p class="pf-center" style="font-size:12px;color:var(--text-muted);
+          padding:6px 26px 34px;line-height:1.65">
+  ¿No tienes código? Pídeselo a tu entrenador: lo tiene en su pantalla de
+  plantilla.
+</p>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('btn-unirme').onclick = function () {
+  const boton = this;
+  boton.disabled = true;
+  PF.api('/api/unirme', {
+    codigo:   document.getElementById('u-codigo').value,
+    posicion: document.getElementById('u-posicion').value,
+    mensaje:  document.getElementById('u-mensaje').value,
+  }).then(j => {
+    PF.toast(j.mensaje, 'success');
+    setTimeout(() => { location.href = j.redirect; }, 1100);
+  }).catch(e => {
+    PF.toast(e.message, 'error');
+    boton.disabled = false;
+  });
+};
+</script>
+{% endblock %}

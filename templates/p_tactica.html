@@ -1,0 +1,76 @@
+{% extends '_shell.html' %}
+{% block title %}Jugadas del equipo · ProFoot{% endblock %}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.inicio') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Mi equipo</div>{% endblock %}
+{% block hero_title %}Jugadas{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {% if entrenador %}
+    {{ jugadas|length }} jugada{{ '' if jugadas|length == 1 else 's' }} de {{ entrenador.name }}
+  {% else %}
+    Sin equipo todavía
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+
+{% if not entrenador %}
+<div class="pf-card">
+  <div class="pf-empty">
+    <div class="pf-empty__icon">👥</div>
+    <div class="pf-empty__title">Todavía no estás en un equipo</div>
+    <div class="pf-empty__text">Las jugadas las comparte tu entrenador.</div>
+    <a class="pf-btn pf-btn--primary pf-mt-16"
+       href="{{ url_for('futbol.p_unirme') }}">Unirme a un equipo</a>
+  </div>
+</div>
+
+{% elif jugadas %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Para repasar en casa</h2>
+  </div>
+  {% for j in jugadas %}
+  <a class="pf-jug" href="{{ url_for('futbol.p_jugada', jid=j.id) }}"
+     style="text-decoration:none;color:inherit">
+    <div class="pf-item__icon">📐</div>
+    <div class="pf-grow">
+      <div class="pf-jug__n">{{ j.nombre }}</div>
+      <div class="pf-jug__s">
+        {%- if j.formacion %}{{ j.formacion }} · {% endif -%}
+        {%- if j._momentos %}animada, {{ j._momentos }} momentos
+        {%- else %}estática{% endif -%}
+        {%- if j._fecha %} · {{ j._fecha.strftime('%d/%m/%Y') }}{% endif -%}
+      </div>
+    </div>
+    {% if j._momentos %}<span class="pf-pill pf-pill--info">▶</span>{% endif %}
+    <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+  </a>
+  {% endfor %}
+</div>
+
+<p class="pf-center" style="font-size:12px;color:var(--text-muted);
+          padding:6px 26px 34px;line-height:1.6">
+  Solo puedes verlas: las jugadas las dibuja y las cambia tu entrenador.
+</p>
+
+{% else %}
+<div class="pf-card">
+  <div class="pf-empty">
+    <div class="pf-empty__icon">📐</div>
+    <div class="pf-empty__title">Sin jugadas todavía</div>
+    <div class="pf-empty__text">
+      Cuando {{ entrenador.name }} dibuje una en la pizarra, la verás aquí para
+      repasarla cuando quieras.
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

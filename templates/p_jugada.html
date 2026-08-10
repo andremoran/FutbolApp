@@ -1,0 +1,216 @@
+{% extends '_shell.html' %}
+{% block title %}{{ jugada.nombre }} · ProFoot{% endblock %}
+
+{# Visor de SOLO LECTURA. Comparte el dibujo de la cancha con la pizarra del
+   entrenador pero sin una sola herramienta de edición: el jugador no puede
+   mover a nadie ni guardar nada, ni por accidente ni a propósito. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.p_tactica') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">
+  {{ jugada.formacion or 'Jugada' }}
+</div>{% endblock %}
+{% block hero_title %}{{ jugada.nombre }}{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {% if momentos %}Animada · {{ momentos }} momentos{% else %}Esquema estático{% endif %}
+</div>
+{% endblock %}
+{% block hero_actions %}{% endblock %}
+
+{% block head %}
+<style>
+  .pj-cancha {
+    display: block; width: 100%; max-width: 520px; margin: 0 auto;
+    border-radius: var(--r-xl); box-shadow: var(--sh-md);
+    background: #15803d; touch-action: manipulation;
+  }
+  .pj-ctrl { max-width: 520px; margin: 14px auto 0; display: flex; gap: 8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div style="padding:16px 16px 0">
+  <canvas class="pj-cancha" id="pj-canvas" width="520" height="740"></canvas>
+
+  {% if momentos > 1 %}
+  <div class="pj-ctrl">
+    <button class="pf-btn pf-btn--primary pf-grow" type="button" id="pj-play">
+      <i data-ico="play" class="pf-ico--sm"></i> Reproducir la jugada
+    </button>
+    <button class="pf-btn pf-btn--ghost" type="button" id="pj-reiniciar" style="flex:none">
+      <i data-ico="refresh-cw" class="pf-ico--sm"></i>
+    </button>
+  </div>
+  <p class="pf-center" style="font-size:12px;color:var(--text-muted);margin:10px 0 0">
+    Toca reproducir para ver el movimiento completo.
+  </p>
+  {% endif %}
+</div>
+
+{% if jugada.datos and jugada.datos.flechas %}
+<p class="pf-center" style="font-size:12px;color:var(--text-sec);
+          padding:12px 26px 0;line-height:1.6">
+  Las flechas marcan hacia dónde se mueve cada jugador.
+</p>
+{% endif %}
+
+<div style="height:34px"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  'use strict';
+
+  var DATOS = {{ (jugada.datos or {})|tojson }};
+  var lienzo = document.getElementById('pj-canvas');
+  var ctx = lienzo.getContext('2d');
+  var W = lienzo.width, H = lienzo.height;
+
+  var base = {
+    jugadores: (DATOS.jugadores || []).map(function (j) { return { x: j.x, y: j.y, n: j.n }; }),
+    rivales: (DATOS.rivales || []).map(function (r) { return { x: r.x, y: r.y }; })
+  };
+  var actual = JSON.parse(JSON.stringify(base));
+  var momentos = DATOS.momentos || [];
+  var reproduciendo = false;
+
+  /* ── Cancha ── */
+  function cancha() {
+    ctx.fillStyle = '#15803d';
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.fillStyle = 'rgba(255,255,255,.035)';
+    for (var i = 0; i < 10; i += 2) ctx.fillRect(0, i * H / 10, W, H / 10);
+
+    ctx.strokeStyle = 'rgba(255,255,255,.55)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(14, 14, W - 28, H - 28);
+
+    ctx.beginPath();
+    ctx.moveTo(14, H / 2); ctx.lineTo(W - 14, H / 2);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(W / 2, H / 2, W * 0.16, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Áreas
+    var ax = W * 0.22, aw = W * 0.56, ah = H * 0.14;
+    ctx.strokeRect(ax, 14, aw, ah);
+    ctx.strokeRect(ax, H - 14 - ah, aw, ah);
+    var px = W * 0.36, pw = W * 0.28, ph = H * 0.06;
+    ctx.strokeRect(px, 14, pw, ph);
+    ctx.strokeRect(px, H - 14 - ph, pw, ph);
+  }
+
+  function pintar() {
+    cancha();
+
+    // Flechas
+    ctx.strokeStyle = '#fbbf24';
+    ctx.fillStyle = '#fbbf24';
+    ctx.lineWidth = 3;
+    (DATOS.flechas || []).forEach(function (f) {
+      var x1 = f.x1 * W, y1 = f.y1 * H, x2 = f.x2 * W, y2 = f.y2 * H;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+      ctx.stroke();
+      var ang = Math.atan2(y2 - y1, x2 - x1);
+      ctx.beginPath();
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(x2 - 13 * Math.cos(ang - 0.4), y2 - 13 * Math.sin(ang - 0.4));
+      ctx.lineTo(x2 - 13 * Math.cos(ang + 0.4), y2 - 13 * Math.sin(ang + 0.4));
+      ctx.closePath();
+      ctx.fill();
+    });
+
+    // Rivales
+    (actual.rivales || []).forEach(function (r) {
+      ctx.beginPath();
+      ctx.arc(r.x * W, r.y * H, 13, 0, Math.PI * 2);
+      ctx.fillStyle = '#ef4444';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.85)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    });
+
+    // Propios
+    ctx.font = '700 13px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    (actual.jugadores || []).forEach(function (j) {
+      ctx.beginPath();
+      ctx.arc(j.x * W, j.y * H, 15, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      ctx.strokeStyle = '#047857';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.fillStyle = '#047857';
+      ctx.fillText(String(j.n), j.x * W, j.y * H + 0.5);
+    });
+  }
+
+  /* ── Reproducción ── */
+  var botonPlay = document.getElementById('pj-play');
+  if (botonPlay) {
+    botonPlay.addEventListener('click', function () {
+      if (reproduciendo || momentos.length < 2) return;
+      reproduciendo = true;
+      botonPlay.disabled = true;
+      botonPlay.innerHTML = 'Reproduciendo…';
+
+      var DURACION = 1100, tramo = 0, inicio = performance.now();
+
+      function paso(ahora) {
+        var t = Math.min(1, (ahora - inicio) / DURACION);
+        var e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        var a = momentos[tramo], b = momentos[tramo + 1];
+
+        actual.jugadores = a.jugadores.map(function (j, i) {
+          var d = b.jugadores[i] || j;
+          return { x: j.x + (d.x - j.x) * e, y: j.y + (d.y - j.y) * e, n: j.n };
+        });
+        actual.rivales = (a.rivales || []).map(function (r, i) {
+          var d = (b.rivales || [])[i] || r;
+          return { x: r.x + (d.x - r.x) * e, y: r.y + (d.y - r.y) * e };
+        });
+        pintar();
+
+        if (t < 1) {
+          requestAnimationFrame(paso);
+        } else if (tramo + 2 < momentos.length) {
+          tramo++; inicio = performance.now();
+          requestAnimationFrame(paso);
+        } else {
+          reproduciendo = false;
+          botonPlay.disabled = false;
+          botonPlay.innerHTML = '<i data-ico="play" class="pf-ico--sm"></i> Reproducir otra vez';
+          if (window.PF && PF.icons) PF.icons();
+        }
+      }
+      requestAnimationFrame(paso);
+    });
+  }
+
+  var botonReiniciar = document.getElementById('pj-reiniciar');
+  if (botonReiniciar) {
+    botonReiniciar.addEventListener('click', function () {
+      if (reproduciendo) return;
+      actual = JSON.parse(JSON.stringify(momentos.length ? momentos[0] : base));
+      pintar();
+    });
+  }
+
+  if (momentos.length) actual = JSON.parse(JSON.stringify(momentos[0]));
+  pintar();
+})();
+</script>
+{% endblock %}

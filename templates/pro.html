@@ -1,0 +1,69 @@
+{% extends '_shell.html' %}
+{% block title %}{{ funcion }} · ProFoot{% endblock %}
+
+{# Donde acaba quien toca una función de pago con el plan gratuito.
+   Dice QUÉ pedía y qué más se lleva, en vez de soltarle una lista de precios
+   sin contexto: si no sabe qué acaba de intentar, no compra. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="javascript:history.back()" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Plan Pro</div>{% endblock %}
+{% block hero_title %}{{ funcion }}{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">Está en el plan Pro</div>
+{% endblock %}
+{% block hero_actions %}{% endblock %}
+
+{% block content %}
+
+<div class="pf-card pf-center" style="padding:26px 20px">
+  <div style="font-size:44px;line-height:1">🔒</div>
+  <h2 style="margin:12px 0 6px;font-size:19px;font-weight:800;letter-spacing:-.4px">
+    {{ funcion }}
+  </h2>
+  <p style="margin:0;font-size:14px;color:var(--text-sec);line-height:1.6">
+    {% if es_coach %}
+      Con Coach Pro tienes la plantilla sin límite, las evaluaciones contra
+      baremos internacionales y el asistente de IA.
+    {% else %}
+      Con Jugador Pro ves tu nivel contra baremos internacionales, tu evolución
+      y el asistente de IA.
+    {% endif %}
+  </p>
+
+  <a class="pf-btn pf-btn--primary pf-btn--block pf-mt-16"
+     href="{{ url_for('futbol.planes') }}">
+    <i data-ico="star" class="pf-ico--sm"></i> Ver los planes
+  </a>
+  <a class="pf-btn pf-btn--ghost pf-btn--block pf-mt-8"
+     href="{{ url_for('futbol.canjear') }}">
+    <i data-ico="award" class="pf-ico--sm"></i> Tengo un código
+  </a>
+</div>
+
+{# ── Qué más se desbloquea ── #}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Todo lo que incluye</h2>
+  </div>
+  {% for clave, nombre in permisos.items() %}
+  <div class="pf-medida">
+    <i data-ico="check-circle" class="pf-ico--sm"
+       style="color:{{ 'var(--primary)' if clave == permiso else 'var(--text-muted)' }}"></i>
+    <span class="pf-medida__et"
+          style="{{ 'color:var(--text);font-weight:650' if clave == permiso }}">
+      {{ nombre }}{% if clave == permiso %} — lo que pediste{% endif %}
+    </span>
+  </div>
+  {% endfor %}
+</div>
+
+<p class="pf-center" style="font-size:12px;color:var(--text-muted);
+          padding:8px 26px 30px;line-height:1.6">
+  Lo que ya creaste con el plan gratuito no se borra ni se bloquea.
+</p>
+
+{% endblock %}

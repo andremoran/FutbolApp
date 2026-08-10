@@ -120,7 +120,12 @@ def login():
         flash('Correo o contraseña incorrectos.', 'error')
         return redirect(url_for('auth.entrar'))
 
-    login_user(User(fila), remember=True)
+    usuario = User(fila)
+    if not login_user(usuario, remember=True):
+        # login_user devuelve False cuando la cuenta no está activa.
+        flash('Tu cuenta está bloqueada. Escríbenos para reactivarla.', 'error')
+        return redirect(url_for('auth.entrar'))
+
     _intentos.pop(ip, None)
     logger.info('Acceso de %s (%s)', correo, fila.get('rol'))
     return redirect(url_for('futbol.home'))
@@ -129,8 +134,13 @@ def login():
 @bp.route('/logout')
 @login_required
 def logout():
-    logout_user()
+    # El orden importa: `logout_user()` marca la cookie de "recordarme" para
+    # borrarla poniendo `_remember='clear'` EN LA SESIÓN. Si se limpiara la
+    # sesión después, se borraría esa marca, la cookie sobreviviría y el
+    # usuario volvería a entrar solo en la siguiente petición — en un móvil
+    # prestado eso es que no se puede cerrar sesión.
     session.clear()
+    logout_user()
     return redirect(url_for('auth.entrar'))
 
 
@@ -186,7 +196,10 @@ def signup():
         'rol': 'especialista' if es_coach else 'paciente',
         'telefono': (request.form.get('telefono') or '').strip() or None,
         'genero': request.form.get('gender') or None,
-        'activo': False,          # se activa al suscribirse; hay prueba gratuita
+        # Toda cuenta nace en el plan gratuito y funcional: nadie tiene que
+        # pagar para probar. El Pro se activa con tarjeta, DeUna o código.
+        'activo': False,
+        'tier': 'free',
         'plan': 'basico',
         'creado': _ahora(),
     }
@@ -218,6 +231,13 @@ def signup():
             'activo': True,
             'creado': _ahora(),
         }, 'vincular jugador')
+
+    # Los tres administradores se enteran de cada alta, por correo y en el panel.
+    try:
+        import avisos
+        avisos.aviso_alta(nuevo)
+    except Exception as e:                                    # pragma: no cover
+        logger.warning('No se pudo avisar del alta: %s', e)
 
     login_user(User(nuevo), remember=True)
     flash('¡Cuenta creada! Bienvenido a ProFoot.' if es_coach

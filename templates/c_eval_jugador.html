@@ -1,0 +1,133 @@
+{% extends '_shell.html' %}
+{% block title %}Evaluaciones de {{ jugador.name }}{% endblock %}
+
+{# La foto actual del jugador: el ÚLTIMO resultado de cada prueba (no todos,
+   que serían cien filas), el perfil por familias y el histórico debajo. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="javascript:history.back()" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Evaluaciones</div>{% endblock %}
+{% block hero_title %}{{ jugador.name }}{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {{ perfil|length }} prueba{{ '' if perfil|length == 1 else 's' }} medida{{ '' if perfil|length == 1 else 's' }}
+  {%- if es_manual %} · sin cuenta{% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+
+{# ══════════ PERFIL POR FAMILIAS ══════════ #}
+{% if radar and es_pro %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Perfil</h2>
+  </div>
+  <div class="pf-radar">
+    {% for f in radar %}
+    <div class="pf-radar__f">
+      <div class="pf-radar__et">{{ f.emoji }} {{ f.etiqueta }}</div>
+      <div class="pf-radar__bar"><i style="width:{{ f.puntaje }}%"></i></div>
+      <div class="pf-radar__n">{{ f.puntaje }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  <p style="margin:11px 0 0;font-size:11.5px;color:var(--text-muted);line-height:1.6">
+    Puntaje 0-100 comparado con su categoría. Permite comparar pruebas que se
+    miden en unidades distintas.
+  </p>
+</div>
+{% elif not es_pro and perfil %}
+<div class="pf-card">
+  <div class="pf-alerta pf-alerta--info" style="margin-top:0">
+    <i data-ico="lock" class="pf-ico--xs"></i>
+    <span>Con Coach Pro cada marca sale comparada con el baremo de su categoría
+      y aparece el perfil por familias.
+      <a href="{{ url_for('futbol.planes') }}"
+         style="color:inherit;font-weight:700">Ver planes</a></span>
+  </div>
+</div>
+{% endif %}
+
+{# ══════════ ESTADO ACTUAL ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Última marca de cada prueba</h2>
+  </div>
+
+  {% if perfil %}
+    {% for r in perfil %}
+    <a class="pf-jug" href="{{ url_for('futbol.c_eval_resultado', rid=r.id) }}"
+       style="text-decoration:none;color:inherit">
+      <div class="pf-grow">
+        <div class="pf-jug__n">{{ r.test_nombre }}</div>
+        <div class="pf-jug__s">
+          {{ r._fecha.strftime('%d/%m/%Y') if r._fecha else '' }}
+          {%- if r._test.subcategoria %} · {{ r._test.subcategoria }}{% endif %}
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div class="pf-medida__v">
+          {{ '%g'|format(r._valor) if r._valor is not none else '—' }}<span
+            class="pf-medida__u"> {{ r._unidad }}</span>
+        </div>
+        {% if r._nivel_meta %}
+          <span class="pf-nivel pf-nivel--{{ r._nivel }}" style="margin-top:4px">
+            {{ r._nivel_meta.etiqueta }}
+          </span>
+        {% endif %}
+      </div>
+    </a>
+    {% endfor %}
+  {% else %}
+    <div class="pf-empty">
+      <div class="pf-empty__icon">📊</div>
+      <div class="pf-empty__title">Sin evaluaciones todavía</div>
+      <div class="pf-empty__text">
+        Tómale una prueba y aquí aparecerá su ficha completa.
+      </div>
+      <a class="pf-btn pf-btn--primary pf-mt-16"
+         href="{{ url_for('futbol.c_eval_catalogo') }}">Ver el catálogo</a>
+    </div>
+  {% endif %}
+</div>
+
+{# ══════════ HISTÓRICO ══════════ #}
+{% if historial|length > perfil|length %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Histórico completo</h2>
+    <span class="pf-pill pf-pill--muted">{{ historial|length }}</span>
+  </div>
+  {% for r in historial %}
+  <a class="pf-medida" href="{{ url_for('futbol.c_eval_resultado', rid=r.id) }}"
+     style="text-decoration:none;color:inherit">
+    <span class="pf-medida__et">
+      {{ r._fecha.strftime('%d/%m/%y') if r._fecha else '' }} · {{ r.test_nombre }}
+    </span>
+    <span class="pf-medida__v" style="font-size:14px">
+      {{ '%g'|format(r._valor) if r._valor is not none else '—' }}<span
+        class="pf-medida__u"> {{ r._unidad }}</span>
+    </span>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="pf-px-16 pf-mt-16" style="padding-bottom:34px">
+  <a class="pf-btn pf-btn--primary pf-btn--block"
+     href="{{ url_for('futbol.c_eval_catalogo') }}">
+    <i data-ico="plus" class="pf-ico--sm"></i> Tomarle una prueba
+  </a>
+  {% if not es_manual %}
+  <a class="pf-btn pf-btn--ghost pf-btn--block pf-mt-8"
+     href="{{ url_for('futbol.c_jugador', pid=jugador.id) }}">
+    <i data-ico="user" class="pf-ico--sm"></i> Ver su ficha completa
+  </a>
+  {% endif %}
+</div>
+
+{% endblock %}

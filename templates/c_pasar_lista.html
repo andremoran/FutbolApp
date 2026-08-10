@@ -1,0 +1,165 @@
+{% extends '_shell.html' %}
+{% block title %}Pasar lista · ProFoot{% endblock %}
+
+{# Pasar lista en el campo, con una mano y sin gafas: botones grandes, todo en
+   una pantalla y un solo guardado al final. Nada de una petición por toque:
+   en el campo la cobertura falla y se perdería media lista. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_asistencia') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">
+  {{ evento._fecha.strftime('%d/%m/%Y') if evento._fecha else '' }}
+</div>{% endblock %}
+{% block hero_title %}{{ evento.titulo }}{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {{ evento._etiqueta }}
+  {%- if evento.hora %} · {{ evento.hora[:5] }}{% endif %}
+  {%- if evento.lugar %} · {{ evento.lugar }}{% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+
+{% if lista %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Marca a cada uno</h2>
+    <span class="pf-pill pf-pill--muted" id="contador">0 / {{ lista|length }}</span>
+  </div>
+
+  <div class="pf-row" style="gap:6px;margin-bottom:12px">
+    <button class="pf-btn pf-btn--ghost pf-grow" type="button" onclick="todos('presente')">
+      Todos presentes
+    </button>
+    <button class="pf-btn pf-btn--ghost pf-grow" type="button" onclick="todos('pendiente')">
+      Limpiar
+    </button>
+  </div>
+
+  {% for j in lista %}
+  <div style="padding:13px 0;border-bottom:1px solid var(--border-soft)"
+       data-jugador="{{ j.id }}" data-nombre="{{ j.nombre }}">
+    <div class="pf-row" style="gap:10px;margin-bottom:8px">
+      <div class="pf-avatar pf-avatar--sm"
+           {% if j.manual %}style="background:var(--purple-bg);color:var(--purple)"{% endif %}>
+        {%- if j.foto %}<img src="{{ j.foto }}" alt="">
+        {%- else %}{{ (j.nombre or '?')[:1]|upper }}{% endif -%}
+      </div>
+      <div class="pf-grow">
+        <div class="pf-jug__n">
+          {%- if j.dorsal %}<span style="color:var(--text-muted)">#{{ j.dorsal }}</span> {% endif -%}
+          {{ j.nombre }}
+        </div>
+        <div class="pf-jug__s">{{ j.posicion or ('Sin cuenta' if j.manual else 'Sin posición') }}</div>
+      </div>
+    </div>
+
+    <div class="pf-asis">
+      {% for clave, etiqueta, emoji, color in estados %}
+        {% if clave != 'pendiente' %}
+        <button type="button" class="pf-asis__b {{ 'on' if j.estado == clave }}"
+                data-e="{{ clave }}" onclick="marcar(this)">
+          {{ emoji }}<br>{{ etiqueta }}
+        </button>
+        {% endif %}
+      {% endfor %}
+    </div>
+
+    <input class="pf-input pf-mt-8" data-motivo maxlength="200"
+           placeholder="Motivo (opcional)" value="{{ j.motivo }}"
+           style="font-size:12.5px;padding:8px 11px;
+                  {{ '' if j.estado in ('ausente', 'justificado', 'tarde') else 'display:none' }}">
+  </div>
+  {% endfor %}
+</div>
+
+<div class="pf-px-16 pf-mt-16" style="padding-bottom:34px">
+  <button class="pf-btn pf-btn--primary pf-btn--block" type="button" id="btn-guardar">
+    <i data-ico="save" class="pf-ico--sm"></i> Guardar la lista
+  </button>
+</div>
+
+{% else %}
+<div class="pf-card">
+  <div class="pf-empty">
+    <div class="pf-empty__icon">👥</div>
+    <div class="pf-empty__title">No hay a quién pasar lista</div>
+    <div class="pf-empty__text">
+      Suma jugadores a la plantilla o apúntalos a mano si aún no tienen cuenta.
+    </div>
+    <a class="pf-btn pf-btn--primary pf-mt-16"
+       href="{{ url_for('futbol.c_manuales') }}">Apuntar jugadores</a>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function contar() {
+  const total = document.querySelectorAll('[data-jugador]').length;
+  const marcados = document.querySelectorAll('.pf-asis__b.on').length;
+  document.getElementById('contador').textContent = marcados + ' / ' + total;
+}
+
+function marcar(boton) {
+  const fila = boton.closest('[data-jugador]');
+  const yaEstaba = boton.classList.contains('on');
+  fila.querySelectorAll('.pf-asis__b').forEach(b => b.classList.remove('on'));
+  // Volver a tocar el mismo botón lo desmarca: en el campo se toca sin mirar.
+  if (!yaEstaba) boton.classList.add('on');
+
+  const estado = yaEstaba ? '' : boton.dataset.e;
+  const motivo = fila.querySelector('[data-motivo]');
+  motivo.style.display =
+    ['ausente', 'justificado', 'tarde'].indexOf(estado) !== -1 ? '' : 'none';
+  contar();
+}
+
+function todos(estado) {
+  document.querySelectorAll('[data-jugador]').forEach(fila => {
+    fila.querySelectorAll('.pf-asis__b').forEach(b => {
+      b.classList.toggle('on', estado !== 'pendiente' && b.dataset.e === estado);
+    });
+    const m = fila.querySelector('[data-motivo]');
+    if (m) m.style.display = 'none';
+  });
+  contar();
+}
+
+document.getElementById('btn-guardar').onclick = function () {
+  const boton = this;
+  const marcas = [];
+  document.querySelectorAll('[data-jugador]').forEach(fila => {
+    const activo = fila.querySelector('.pf-asis__b.on');
+    marcas.push({
+      player_id: fila.dataset.jugador,
+      nombre: fila.dataset.nombre,
+      estado: activo ? activo.dataset.e : 'pendiente',
+      motivo: (fila.querySelector('[data-motivo]') || {}).value || '',
+    });
+  });
+
+  boton.disabled = true;
+  boton.innerHTML = 'Guardando…';
+  PF.api('/api/asistencia/lista',
+         { event_id: '{{ evento.id }}', marcas: marcas })
+    .then(j => {
+      PF.toast(j.mensaje, 'success');
+      setTimeout(() => { location.href = '{{ url_for("futbol.c_asistencia") }}'; }, 800);
+    })
+    .catch(e => {
+      PF.toast(e.message, 'error');
+      boton.disabled = false;
+      boton.innerHTML = 'Guardar la lista';
+    });
+};
+
+contar();
+</script>
+{% endblock %}

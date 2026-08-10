@@ -13,6 +13,13 @@
 
 {% block content %}
 
+{% if entrenador %}
+<div class="pf-segs pf-mt-16">
+  <span class="pf-seg on">📋 Lista</span>
+  <a class="pf-seg" href="{{ url_for('futbol.p_calendario') }}">📅 Calendario</a>
+</div>
+{% endif %}
+
 {% if not entrenador %}
   <div class="pf-empty">
     <div class="pf-empty__icon"><i data-ico="calendar" class="pf-ico--xxl"></i></div>

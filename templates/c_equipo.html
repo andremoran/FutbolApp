@@ -28,6 +28,17 @@
 
 {% block content %}
 
+{# Atajos a lo que se hace desde la plantilla. Van aquí y no en la barra
+   inferior, que es réplica exacta de la app nativa y no se toca. #}
+<div class="pf-segs pf-mt-16">
+  <a class="pf-seg" href="{{ url_for('futbol.c_evaluaciones') }}">📊 Evaluaciones</a>
+  <a class="pf-seg" href="{{ url_for('futbol.c_solicitudes') }}">📬 Solicitudes</a>
+  <a class="pf-seg" href="{{ url_for('futbol.c_manuales') }}">✍️ Sin cuenta</a>
+  <a class="pf-seg" href="{{ url_for('futbol.c_medico') }}">
+    🏥 Lesiones{% if not fut_es_pro %} 🔒{% endif %}
+  </a>
+</div>
+
 {% if jugadores %}
 <div class="tp-buscar">
   <i data-ico="search" class="pf-ico--sm"></i>

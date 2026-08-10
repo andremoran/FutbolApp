@@ -1,0 +1,198 @@
+{% extends '_shell.html' %}
+{% block title %}Jugadores sin cuenta · ProFoot{% endblock %}
+
+{# Un chico de once años no tiene correo. Se apunta a mano, se le evalúa y se
+   le pasa lista igual; si algún día se registra, se le enchufa la ficha con
+   todo el histórico. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_equipo') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Plantilla</div>{% endblock %}
+{% block hero_title %}Sin cuenta{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {{ manuales|length }} apuntado{{ '' if manuales|length == 1 else 's' }} a mano
+  · {{ n_plantilla }} con cuenta
+</div>
+{% endblock %}
+
+{% block content %}
+
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Apuntar un jugador</h2>
+  </div>
+  <p style="margin:0 0 12px;font-size:12.5px;color:var(--text-sec);line-height:1.6">
+    Para los que no tienen correo o todavía no se han registrado. Cuentan en la
+    plantilla, se les evalúa y entran en la lista de asistencia.
+  </p>
+
+  <div class="pf-field">
+    <label class="pf-label" for="m-nombre">Nombre</label>
+    <input class="pf-input" id="m-nombre" maxlength="100" placeholder="Nombre y apellido">
+  </div>
+
+  <div class="pf-row pf-mt-12" style="gap:10px">
+    <div style="width:88px;flex:none">
+      <label class="pf-label" for="m-dorsal">Dorsal</label>
+      <input class="pf-input" id="m-dorsal" type="number" min="1" max="99">
+    </div>
+    <div class="pf-grow">
+      <label class="pf-label" for="m-posicion">Posición</label>
+      <select class="pf-select" id="m-posicion">
+        <option value="">—</option>
+        {% for p in posiciones %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
+      </select>
+    </div>
+  </div>
+
+  <div class="pf-row pf-mt-12" style="gap:10px">
+    <div class="pf-grow">
+      <label class="pf-label" for="m-anio">Año de nacimiento</label>
+      <input class="pf-input" id="m-anio" type="number" min="1950" max="2025"
+             placeholder="2011">
+    </div>
+    <div class="pf-grow">
+      <label class="pf-label" for="m-pie">Pie hábil</label>
+      <select class="pf-select" id="m-pie">
+        <option value="">—</option>
+        <option value="Derecho">Derecho</option>
+        <option value="Izquierdo">Izquierdo</option>
+        <option value="Ambidiestro">Ambidiestro</option>
+      </select>
+    </div>
+  </div>
+  <p class="pf-mt-8" style="margin:0;font-size:11.5px;color:var(--text-muted);line-height:1.55">
+    El año de nacimiento importa: es lo que decide con qué baremo se comparan
+    sus evaluaciones.
+  </p>
+
+  <div class="pf-row pf-mt-12" style="gap:10px">
+    <div class="pf-grow">
+      <label class="pf-label" for="m-tutor">Representante</label>
+      <input class="pf-input" id="m-tutor" maxlength="120" placeholder="Nombre del padre o madre">
+    </div>
+    <div class="pf-grow">
+      <label class="pf-label" for="m-telefono">Teléfono</label>
+      <input class="pf-input" id="m-telefono" maxlength="30" inputmode="tel">
+    </div>
+  </div>
+
+  <button class="pf-btn pf-btn--primary pf-btn--block pf-mt-16" type="button" id="btn-crear">
+    <i data-ico="user-plus" class="pf-ico--sm"></i> Apuntar
+  </button>
+</div>
+
+{# ══════════ LOS QUE HAY ══════════ #}
+{% if manuales %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">En la plantilla</h2>
+    <span class="pf-pill pf-pill--muted">{{ manuales|length }}</span>
+  </div>
+  {% for m in manuales %}
+  <div class="pf-jug">
+    <div class="pf-avatar pf-avatar--sm" style="background:var(--purple-bg);color:var(--purple)">
+      {{ (m.nombre or '?')[:1]|upper }}
+    </div>
+    <div class="pf-grow">
+      <div class="pf-jug__n">
+        {%- if m.dorsal %}<span style="color:var(--text-muted)">#{{ m.dorsal }}</span> {% endif -%}
+        {{ m.nombre }}
+      </div>
+      <div class="pf-jug__s">
+        {{ m.posicion or 'Sin posición' }}
+        {%- if m.anio_nacimiento %} · {{ m.anio_nacimiento }}{% endif %}
+        {%- if m._evals %} · {{ m._evals }} evaluación{{ '' if m._evals == 1 else 'es' }}{% endif %}
+      </div>
+    </div>
+    <a class="pf-btn pf-btn--ghost" style="padding:6px 10px;font-size:12px"
+       href="{{ url_for('futbol.c_eval_jugador', pid=m.id) }}">Ficha</a>
+    <button class="pf-btn pf-btn--ghost" type="button" style="padding:6px 10px;font-size:12px"
+            onclick="archivar('{{ m.id }}', '{{ m.nombre|e }}')">✕</button>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if archivados %}
+<details class="pf-card">
+  <summary style="display:flex;align-items:center;gap:9px;cursor:pointer;list-style:none">
+    <span style="font-weight:700;font-size:14px;flex:1">
+      Archivados ({{ archivados|length }})
+    </span>
+    <i data-ico="chevron-down" class="pf-ico--sm pf-item__chev"></i>
+  </summary>
+  <p style="margin:10px 0 4px;font-size:12px;color:var(--text-muted);line-height:1.6">
+    No cuentan en la plantilla, pero su histórico de evaluaciones sigue ahí.
+  </p>
+  {% for m in archivados %}
+  <div class="pf-jug">
+    <div class="pf-grow">
+      <div class="pf-jug__n" style="color:var(--text-sec)">{{ m.nombre }}</div>
+      <div class="pf-jug__s">
+        {% if m.vinculado_a %}Vinculado a una cuenta{% else %}Archivado{% endif %}
+        {%- if m._evals %} · {{ m._evals }} evaluación{{ '' if m._evals == 1 else 'es' }}{% endif %}
+      </div>
+    </div>
+    {% if not m.vinculado_a %}
+    <button class="pf-btn pf-btn--ghost" type="button" style="padding:6px 10px;font-size:12px"
+            onclick="restaurar('{{ m.id }}')">Restaurar</button>
+    {% endif %}
+  </div>
+  {% endfor %}
+</details>
+{% endif %}
+
+{% if not manuales and not archivados %}
+<div class="pf-card">
+  <div class="pf-empty">
+    <div class="pf-empty__icon">✍️</div>
+    <div class="pf-empty__title">Nadie apuntado a mano</div>
+    <div class="pf-empty__text">
+      Úsalo con las categorías de formación, donde casi nadie tiene correo.
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div style="height:34px"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('btn-crear').onclick = function () {
+  const boton = this;
+  const v = id => document.getElementById(id).value;
+  boton.disabled = true;
+  PF.api('/api/manual', {
+    nombre: v('m-nombre'), dorsal: v('m-dorsal'), posicion: v('m-posicion'),
+    anio_nacimiento: v('m-anio'), pie_habil: v('m-pie'),
+    tutor: v('m-tutor'), telefono: v('m-telefono'),
+  }).then(j => {
+    PF.toast(j.mensaje, 'success');
+    setTimeout(() => location.reload(), 700);
+  }).catch(e => {
+    PF.toast(e.message, 'error');
+    boton.disabled = false;
+  });
+};
+
+function archivar(mid, nombre) {
+  if (!confirm('¿Sacar a ' + nombre + ' de la plantilla?\n\n' +
+               'Sus evaluaciones se conservan y puedes restaurarlo cuando quieras.')) return;
+  PF.api('/api/manual/' + mid, {}, 'DELETE')
+    .then(() => location.reload())
+    .catch(e => PF.toast(e.message, 'error'));
+}
+
+function restaurar(mid) {
+  PF.api('/api/manual/' + mid + '/restaurar', {})
+    .then(() => location.reload())
+    .catch(e => PF.toast(e.message, 'error'));
+}
+</script>
+{% endblock %}

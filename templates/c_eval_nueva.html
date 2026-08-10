@@ -1,0 +1,188 @@
+{% extends '_shell.html' %}
+{% block title %}Prueba propia · ProFoot{% endblock %}
+
+{# Para lo que el entrenador mide y no está en el catálogo. No lleva baremo
+   internacional —no lo hay— pero sí registro, histórico y evolución. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_eval_catalogo') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Medición</div>{% endblock %}
+{% block hero_title %}Prueba propia{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">Lo que mides tú y no está en el catálogo</div>
+{% endblock %}
+
+{% block content %}
+
+<div class="pf-card">
+  <div class="pf-field">
+    <label class="pf-label" for="p-nombre">Nombre de la prueba</label>
+    <input class="pf-input" id="p-nombre" maxlength="120"
+           placeholder="Ej. Circuito de finalización del club">
+  </div>
+
+  <div class="pf-field pf-mt-12">
+    <label class="pf-label" for="p-categoria">Familia</label>
+    <select class="pf-select" id="p-categoria">
+      {% for clave, etiqueta, emoji, desc in categorias %}
+        <option value="{{ clave }}">{{ emoji }} {{ etiqueta }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="pf-field pf-mt-12">
+    <label class="pf-label" for="p-descripcion">Qué mide</label>
+    <input class="pf-input" id="p-descripcion" maxlength="200"
+           placeholder="En una línea">
+  </div>
+
+  <div class="pf-field pf-mt-12">
+    <label class="pf-label" for="p-protocolo">Cómo se toma</label>
+    <textarea class="pf-textarea" id="p-protocolo" rows="4" maxlength="2000"
+              placeholder="Distancias, número de intentos, qué se anota y qué penaliza. Cuanto más concreto, más comparables serán las tomas de aquí a un año."></textarea>
+  </div>
+</div>
+
+{# ══════════ MEDIDAS ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Qué se anota</h2>
+  </div>
+  <p style="margin:0 0 10px;font-size:12px;color:var(--text-muted);line-height:1.6">
+    La primera medida es la que manda en el ranking y en la evolución.
+  </p>
+
+  <div id="campos"></div>
+
+  <button class="pf-btn pf-btn--ghost pf-btn--block pf-mt-12" type="button" id="btn-mas">
+    <i data-ico="plus" class="pf-ico--sm"></i> Añadir otra medida
+  </button>
+</div>
+
+<div class="pf-px-16 pf-mt-16">
+  <button class="pf-btn pf-btn--primary pf-btn--block" type="button" id="btn-crear">
+    <i data-ico="save" class="pf-ico--sm"></i> Crear la prueba
+  </button>
+</div>
+
+{# ══════════ LAS QUE YA TIENE ══════════ #}
+{% if propias %}
+<div class="pf-card pf-mt-16">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Tus pruebas</h2>
+    <span class="pf-pill pf-pill--muted">{{ propias|length }}</span>
+  </div>
+  {% for p in propias %}
+  <div class="pf-jug">
+    <div class="pf-grow">
+      <div class="pf-jug__n">{{ p.nombre }}</div>
+      <div class="pf-jug__s">
+        {{ p.campos|length }} medida{{ '' if p.campos|length == 1 else 's' }}
+        · {{ p.descripcion|truncate(48) }}
+      </div>
+    </div>
+    <a class="pf-btn pf-btn--ghost" style="padding:7px 11px"
+       href="{{ url_for('futbol.c_eval_aplicar', clave=p.clave) }}">Tomar</a>
+    <button class="pf-btn pf-btn--danger" style="padding:7px 11px" type="button"
+            onclick="borrar('{{ p._id }}', '{{ p.nombre|e }}')">✕</button>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<p class="pf-center" style="font-size:11.5px;color:var(--text-muted);
+          padding:8px 26px 34px;line-height:1.65">
+  Las pruebas propias no llevan baremo internacional porque no existe: guardan
+  la marca, el histórico y la evolución, pero no dicen «élite» ni «promedio».
+</p>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let n = 0;
+
+function anadirCampo(etiqueta, unidad) {
+  n++;
+  const div = document.createElement('div');
+  div.className = 'pf-medida';
+  div.style.cssText = 'display:block;padding:12px 0';
+  div.dataset.campo = '1';
+  div.innerHTML = `
+    <div class="pf-row" style="gap:8px;align-items:flex-end">
+      <div class="pf-grow">
+        <label class="pf-label">Medida ${n}${n === 1 ? ' (principal)' : ''}</label>
+        <input class="pf-input" data-k="etiqueta" maxlength="60"
+               placeholder="Ej. Tiempo" value="${etiqueta || ''}">
+      </div>
+      <div style="width:78px;flex:none">
+        <label class="pf-label">Unidad</label>
+        <input class="pf-input" data-k="unidad" maxlength="12"
+               placeholder="s" value="${unidad || ''}">
+      </div>
+      ${n > 1 ? '<button class="pf-btn pf-btn--ghost" type="button" style="padding:11px" onclick="this.closest(\'[data-campo]\').remove()">✕</button>' : ''}
+    </div>
+    <div class="pf-row pf-mt-8" style="gap:8px">
+      <div class="pf-grow">
+        <label class="pf-label">Qué es mejor</label>
+        <select class="pf-select" data-k="direccion">
+          <option value="mayor_mejor">Más es mejor (metros, saltos…)</option>
+          <option value="menor_mejor">Menos es mejor (tiempos, errores…)</option>
+        </select>
+      </div>
+      <div style="width:110px;flex:none">
+        <label class="pf-label">Decimales</label>
+        <select class="pf-select" data-k="decimales">
+          <option value="0">0 — 28</option>
+          <option value="1">1 — 4,2</option>
+          <option value="2" selected>2 — 4,22</option>
+        </select>
+      </div>
+    </div>`;
+  document.getElementById('campos').appendChild(div);
+}
+
+anadirCampo();
+document.getElementById('btn-mas').onclick = () => anadirCampo();
+
+document.getElementById('btn-crear').onclick = function () {
+  const boton = this;
+  const campos = [];
+  document.querySelectorAll('[data-campo]').forEach(d => {
+    const v = k => (d.querySelector('[data-k="' + k + '"]') || {}).value || '';
+    if (v('etiqueta').trim()) {
+      campos.push({
+        etiqueta: v('etiqueta'), unidad: v('unidad'),
+        direccion: v('direccion'), decimales: +v('decimales'),
+      });
+    }
+  });
+
+  boton.disabled = true;
+  PF.api('/api/eval/test', {
+    nombre:      document.getElementById('p-nombre').value,
+    categoria:   document.getElementById('p-categoria').value,
+    descripcion: document.getElementById('p-descripcion').value,
+    protocolo:   document.getElementById('p-protocolo').value,
+    campos:      campos,
+  }).then(j => {
+    PF.toast('Prueba creada.', 'success');
+    setTimeout(() => { location.href = j.redirect; }, 700);
+  }).catch(e => {
+    PF.toast(e.message, 'error');
+    boton.disabled = false;
+  });
+};
+
+function borrar(tid, nombre) {
+  if (!confirm('¿Borrar la prueba "' + nombre + '"?\n\n' +
+               'Las marcas ya tomadas se conservan.')) return;
+  PF.api('/api/eval/test/' + tid, {}, 'DELETE')
+    .then(() => location.reload())
+    .catch(e => PF.toast(e.message, 'error'));
+}
+</script>
+{% endblock %}

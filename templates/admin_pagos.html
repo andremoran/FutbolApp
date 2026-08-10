@@ -1,0 +1,188 @@
+{% extends '_admin.html' %}
+{% block title %}Pagos · Panel ProFoot{% endblock %}
+{% block encabezado %}Pagos{% endblock %}
+{% block encabezado_sub %}
+  La tarjeta la cobra y verifica PayPal sola. Los comprobantes de DeUna los
+  apruebas tú aquí.
+{% endblock %}
+
+{% block content %}
+
+{# ══════════════════ PENDIENTES ══════════════════ #}
+{% if pendientes %}
+<div class="adm-card adm-mb" style="box-shadow:inset 0 0 0 1px rgba(251,191,36,.25)">
+  <div class="adm-card__head">
+    <h2 class="adm-card__title">📲 Por revisar</h2>
+    <span class="adm-tag adm-tag--warn">{{ pendientes|length }}</span>
+  </div>
+  <div class="adm-card__body" style="display:flex;flex-direction:column;gap:14px">
+    {% for p in pendientes %}
+    <div id="pago-{{ p.id }}" class="adm-card adm-card--pad"
+         style="background:rgba(255,255,255,.03)">
+      <div class="adm-flex adm-flex--between adm-mb" style="flex-wrap:wrap;gap:12px">
+        <div>
+          <div class="adm-b" style="font-size:15px">{{ p._usuario.nombre or '—' }}</div>
+          <div class="adm-xs adm-mut">{{ p._usuario.correo or '' }}</div>
+        </div>
+        <div class="adm-der">
+          <div class="adm-b" style="font-size:19px;color:var(--a-verde-2)">
+            {{ p.importe or '—' }} {{ p.moneda or 'USD' }}
+          </div>
+          <div class="adm-xs adm-mut">
+            {{ p.plan or '—' }} ·
+            {{ p._fecha.strftime('%d/%m/%Y') if p._fecha else '' }}
+          </div>
+        </div>
+      </div>
+
+      <div class="adm-fila adm-mb">
+        <div>
+          <div class="adm-lbl">Referencia</div>
+          <div>{{ p.referencia or '— sin número —' }}</div>
+        </div>
+        <div>
+          <div class="adm-lbl">Pasarela</div>
+          <div>{{ p.proveedor or 'deuna' }}</div>
+        </div>
+        <div>
+          <div class="adm-lbl">Meses solicitados</div>
+          <div>{{ p.meses or 1 }}</div>
+        </div>
+      </div>
+
+      {% if p.comprobante %}
+      <div class="adm-mb">
+        <div class="adm-lbl">Comprobante</div>
+        <a href="{{ p.comprobante }}" target="_blank" rel="noopener">
+          <img src="{{ p.comprobante }}" alt="Comprobante"
+               style="max-width:300px;max-height:340px;border-radius:12px;
+                      border:1px solid var(--a-line)">
+        </a>
+        <p class="adm-ayuda">Púlsalo para verlo en grande. Comprueba importe, fecha y destinatario.</p>
+      </div>
+      {% else %}
+        <p class="adm-ayuda adm-mb">No adjuntó imagen. Verifica el movimiento en la cuenta antes de aprobar.</p>
+      {% endif %}
+
+      <div class="adm-fila">
+        <div class="adm-campo" style="max-width:150px">
+          <label class="adm-lbl" for="meses-{{ p.id }}">Meses a dar</label>
+          <select class="adm-sel" id="meses-{{ p.id }}">
+            {% for m in [1, 3, 6, 12] %}
+              <option value="{{ m }}" {{ 'selected' if (p.meses or 1) == m }}>{{ m }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="adm-campo">
+          <label class="adm-lbl" for="nota-{{ p.id }}">Nota (opcional)</label>
+          <input class="adm-in" id="nota-{{ p.id }}" maxlength="400"
+                 placeholder="Verificado en el estado de cuenta del 08/08">
+        </div>
+      </div>
+
+      <div class="adm-acciones">
+        <button class="adm-btn adm-btn--ok" onclick="resolver('{{ p.id }}', 'aprobar', this)">
+          ✅ Aprobar y activar Pro
+        </button>
+        <button class="adm-btn adm-btn--mal" onclick="resolver('{{ p.id }}', 'rechazar', this)">
+          ✕ Rechazar
+        </button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{# ══════════════════ DATOS DE DEUNA ══════════════════ #}
+<div class="adm-card adm-mb">
+  <div class="adm-card__head">
+    <h2 class="adm-card__title">📲 Cuenta DeUna que ven los usuarios</h2>
+    <span class="adm-tag adm-tag--{{ 'ok' if ajustes.deuna_activo else 'free' }}">
+      {{ 'Activo' if ajustes.deuna_activo else 'Apagado' }}
+    </span>
+    <div class="adm-grow"></div>
+    <a class="adm-btn adm-btn--sm" href="{{ url_for('admin.pantalla_ajustes') }}">Editar</a>
+  </div>
+  <div class="adm-card__body">
+    {% if ajustes.deuna_titular or ajustes.deuna_telefono %}
+      <div class="adm-fila">
+        <div><div class="adm-lbl">Titular</div><div>{{ ajustes.deuna_titular or '—' }}</div></div>
+        <div><div class="adm-lbl">Documento</div><div>{{ ajustes.deuna_documento or '—' }}</div></div>
+        <div><div class="adm-lbl">Teléfono</div><div>{{ ajustes.deuna_telefono or '—' }}</div></div>
+        <div><div class="adm-lbl">Banco</div><div>{{ ajustes.deuna_banco or '—' }}</div></div>
+      </div>
+    {% else %}
+      <p class="adm-ayuda" style="margin:0">
+        Aún no has puesto los datos de la cuenta DeUna. Hasta que lo hagas, a los
+        usuarios solo se les ofrece la tarjeta.
+        <a href="{{ url_for('admin.pantalla_ajustes') }}" style="color:var(--a-verde-2)">Configurarlo →</a>
+      </p>
+    {% endif %}
+  </div>
+</div>
+
+{# ══════════════════ HISTORIAL ══════════════════ #}
+<div class="adm-card">
+  <div class="adm-card__head">
+    <h2 class="adm-card__title">Historial de pagos</h2>
+    <div class="adm-grow"></div>
+    <input class="adm-in" type="search" style="max-width:240px" placeholder="Buscar…"
+           oninput="ADM.filtrar(this, '#tabla-pagos tbody tr')">
+  </div>
+  {% if pagos %}
+  <div class="adm-tabla-scroll">
+    <table class="adm-tabla" id="tabla-pagos">
+      <thead><tr>
+        <th>Fecha</th><th>Persona</th><th>Plan</th><th>Importe</th>
+        <th>Pasarela</th><th>Estado</th><th>Referencia</th>
+      </tr></thead>
+      <tbody>
+      {% for p in pagos %}
+        <tr>
+          <td class="adm-xs adm-mut adm-nowrap">
+            {{ p._fecha.strftime('%d/%m/%Y') if p._fecha else '—' }}
+          </td>
+          <td>
+            <div class="adm-persona__n">{{ p._usuario.nombre or '—' }}</div>
+            <div class="adm-persona__m">{{ p._usuario.correo or '' }}</div>
+          </td>
+          <td class="adm-xs">{{ p.plan or '—' }}</td>
+          <td class="adm-b adm-nowrap">{{ p.importe or '—' }}</td>
+          <td class="adm-xs adm-sec">{{ p.proveedor or '—' }}</td>
+          <td class="adm-nowrap">
+            {% set e = (p.estado or '')|lower %}
+            <span class="adm-tag adm-tag--{{ 'ok' if e in ('active', 'aprobado', 'approved')
+                                             else ('warn' if p._pendiente else 'mal') }}">
+              {{ p.estado or '—' }}
+            </span>
+          </td>
+          <td class="adm-xs adm-mut">{{ p.referencia or p.suscripcion_id or '—' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="adm-vacio"><div class="adm-vacio__e">💳</div>
+      <p>Todavía no hay pagos registrados.</p></div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function resolver(pid, accion, boton) {
+  const meses = document.getElementById('meses-' + pid);
+  const nota  = document.getElementById('nota-' + pid);
+  if (accion === 'rechazar' &&
+      !confirm('¿Rechazar este comprobante?\n\nEl usuario NO recibirá el plan Pro.')) return;
+  ADM.accion(boton, '/admin/api/pago/' + pid, {
+    accion: accion,
+    meses: meses ? +meses.value : 1,
+    nota: nota ? nota.value : '',
+  });
+}
+</script>
+{% endblock %}

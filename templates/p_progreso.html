@@ -84,17 +84,35 @@
     <div class="pf-hub-card__s">Goles y minutos</div>
   </a>
 
-  <a class="pf-hub-card" href="{{ url_for('futbol.mis_tests') }}" style="grid-column:1 / -1">
+  <a class="pf-hub-card" href="{{ url_for('futbol.p_evaluaciones') }}" style="grid-column:1 / -1">
     <span class="pf-row" style="gap:14px">
       <span class="pf-hub-card__ico" style="margin:0;background:rgba(139,92,246,.12);color:var(--purple)">
-        <i data-ico="bar-chart-2" class="pf-ico--lg"></i>
+        <i data-ico="award" class="pf-ico--lg"></i>
       </span>
       <span class="pf-grow">
-        <span class="pf-hub-card__t" style="display:block">Mis pruebas físicas</span>
-        <span class="pf-hub-card__s">Resultados y puesto en el equipo</span>
+        <span class="pf-hub-card__t" style="display:block">Mis evaluaciones</span>
+        <span class="pf-hub-card__s">Tus marcas y tu nivel contra baremos internacionales</span>
       </span>
       <i data-ico="chevron-right" class="pf-ico--sm" style="color:var(--text-muted)"></i>
     </span>
+  </a>
+
+  <a class="pf-hub-card" href="{{ url_for('futbol.p_evolucion') }}">
+    <span class="pf-hub-card__ico" style="background:rgba(16,185,129,.12);color:var(--primary)">
+      <i data-ico="trending-up" class="pf-ico--lg"></i>
+    </span>
+    <div class="pf-hub-card__t">
+      Evolución {% if not fut_es_pro %}<span class="pf-pro">Pro</span>{% endif %}
+    </div>
+    <div class="pf-hub-card__s">Cómo vas progresando</div>
+  </a>
+
+  <a class="pf-hub-card" href="{{ url_for('futbol.mis_tests') }}">
+    <span class="pf-hub-card__ico" style="background:rgba(100,116,139,.12);color:var(--text-sec)">
+      <i data-ico="clipboard" class="pf-ico--lg"></i>
+    </span>
+    <div class="pf-hub-card__t">Pruebas del coach</div>
+    <div class="pf-hub-card__s">Marcas y puesto en el equipo</div>
   </a>
 
 </div>

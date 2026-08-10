@@ -15,6 +15,8 @@ from functools import wraps
 from flask import render_template, redirect, url_for, abort, request
 from flask_login import login_required, current_user
 
+import roles
+
 from . import bp, db
 
 
@@ -212,6 +214,7 @@ def c_evento(eid):
 # ═══════════════════════ 4. TÁCTICA ═══════════════════════
 @bp.route('/coach/tactica')
 @solo_entrenador
+@roles.solo_pro('tactica')
 def c_tactica():
     jugadas = db.rows('fut_tactical_plays', 'jugadas', coach_id=current_user.id,
                       _order='creado', _desc=True)
@@ -224,6 +227,7 @@ def c_tactica():
 @bp.route('/coach/tactica/pizarra')
 @bp.route('/coach/tactica/pizarra/<jid>')
 @solo_entrenador
+@roles.solo_pro('tactica')
 def c_pizarra(jid=None):
     jugada = None
     if jid:
@@ -239,6 +243,7 @@ def c_pizarra(jid=None):
 # ═══════════════════════ 5. IA ═══════════════════════
 @bp.route('/coach/ia')
 @solo_entrenador
+@roles.solo_pro('ia')
 def c_ia():
     historial = db.rows('fut_ia_chat', 'chat ia coach', user_id=current_user.id,
                         _order='creado', _limit=40)

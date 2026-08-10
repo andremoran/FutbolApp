@@ -1,0 +1,217 @@
+{% extends '_shell.html' %}
+{% block title %}Evaluaciones · ProFoot{% endblock %}
+
+{# El centro de las evaluaciones del entrenador: contra qué baremo se compara,
+   a quién le toca medir, qué pruebas usar y lo último que se tomó. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_equipo') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Medición</div>{% endblock %}
+{% block hero_title %}Evaluaciones{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {{ n_total }} evaluación{{ '' if n_total == 1 else 'es' }} ·
+  {{ jugadores|length + manuales|length }} jugador{{ '' if (jugadores|length + manuales|length) == 1 else 'es' }}
+</div>
+{% endblock %}
+
+{% block content %}
+
+{# ══════════ CONTRA QUÉ SE COMPARA ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Nivel del equipo</h2>
+    {% if not fut_es_pro %}<span class="pf-pro">Pro</span>{% endif %}
+  </div>
+  <p style="margin:0 0 12px;font-size:12.5px;color:var(--text-sec);line-height:1.6">
+    Un Cooper de 2.400 m es excelente en sub-14 y flojo en profesional. Dinos
+    con quién comparar a tu equipo y cada marca sale ya interpretada.
+  </p>
+
+  <div class="pf-row" style="gap:10px">
+    <div class="pf-grow">
+      <label class="pf-label" for="ctx-edad">Categoría</label>
+      <select class="pf-select" id="ctx-edad">
+        {% for clave, etiqueta in edades %}
+          <option value="{{ clave }}" {{ 'selected' if clave == contexto_edad }}>{{ etiqueta }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="pf-grow">
+      <label class="pf-label" for="ctx-nivel">Nivel</label>
+      <select class="pf-select" id="ctx-nivel">
+        {% for clave, etiqueta, desc in niveles %}
+          <option value="{{ clave }}" {{ 'selected' if clave == contexto_nivel }}>{{ etiqueta }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+  <p id="ctx-desc" style="margin:8px 0 0;font-size:11.5px;color:var(--text-muted)"></p>
+
+  <button class="pf-btn pf-btn--secondary pf-btn--block pf-mt-12" type="button" id="btn-ctx">
+    <i data-ico="save" class="pf-ico--sm"></i> Guardar
+  </button>
+</div>
+
+{# ══════════ A QUIÉN LE TOCA ══════════ #}
+{% if pendientes %}
+<div class="pf-card" style="border-color:var(--warning)">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Sin medir hace más de 45 días</h2>
+    <span class="pf-pill pf-pill--warning">{{ pendientes|length }}</span>
+  </div>
+  {% for j in pendientes[:6] %}
+  <a class="pf-jug" href="{{ url_for('futbol.c_eval_jugador', pid=j.id) }}"
+     style="text-decoration:none;color:inherit">
+    <div class="pf-avatar pf-avatar--sm">
+      {%- if j.profile_photo %}<img src="{{ j.profile_photo }}" alt="">
+      {%- else %}{{ (j.name or '?')[:1]|upper }}{% endif -%}
+    </div>
+    <div class="pf-grow">
+      <div class="pf-jug__n">{{ j.name }}</div>
+      <div class="pf-jug__s">{{ (j.fut or {}).get('posicion') or 'Sin posición' }}</div>
+    </div>
+    <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ══════════ PRUEBAS MÁS USADAS ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Tomar una prueba</h2>
+    <a href="{{ url_for('futbol.c_eval_catalogo') }}"
+       style="font-size:12.5px;font-weight:650;color:var(--primary);text-decoration:none">
+      Ver las 30 →
+    </a>
+  </div>
+</div>
+
+<div class="pf-rej pf-rej--2">
+  {% for t in destacadas %}
+    {% if t %}
+    <a class="pf-tarjeta" href="{{ url_for('futbol.c_eval_aplicar', clave=t.clave) }}">
+      <div class="pf-tarjeta__e">{{ {'fisico':'🏃','tecnico':'⚽','tactico':'🧠',
+                                     'mental':'💚','antropometria':'📏'}[t.categoria] }}</div>
+      <div class="pf-tarjeta__t">{{ t.nombre }}</div>
+      <div class="pf-tarjeta__s">{{ t.subcategoria }}</div>
+    </a>
+    {% endif %}
+  {% endfor %}
+</div>
+
+<div class="pf-rej pf-rej--2 pf-mt-12">
+  <a class="pf-tarjeta" href="{{ url_for('futbol.c_eval_catalogo') }}"
+     style="background:var(--primary-faint);border-color:var(--primary-light)">
+    <div class="pf-tarjeta__e">📚</div>
+    <div class="pf-tarjeta__t">Catálogo completo</div>
+    <div class="pf-tarjeta__s">Todas las pruebas por familia</div>
+  </a>
+  <a class="pf-tarjeta" href="{{ url_for('futbol.c_evolucion') }}"
+     style="background:var(--primary-faint);border-color:var(--primary-light)">
+    <div class="pf-tarjeta__e">📈</div>
+    <div class="pf-tarjeta__t">Evolución del equipo</div>
+    <div class="pf-tarjeta__s">
+      Cómo va el grupo {% if not fut_es_pro %}<span class="pf-pro">Pro</span>{% endif %}
+    </div>
+  </a>
+</div>
+
+{# ══════════ ÚLTIMAS EVALUACIONES ══════════ #}
+<div class="pf-card pf-mt-16">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Lo último medido</h2>
+  </div>
+
+  {% if resultados %}
+    {% for r in resultados %}
+    <a class="pf-jug" href="{{ url_for('futbol.c_eval_resultado', rid=r.id) }}"
+       style="text-decoration:none;color:inherit">
+      <div class="pf-grow">
+        <div class="pf-jug__n">{{ r.jugador_nombre or 'Jugador' }}</div>
+        <div class="pf-jug__s">
+          {{ r.test_nombre }} ·
+          {{ r._fecha.strftime('%d/%m/%Y') if r._fecha else '' }}
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div class="pf-medida__v">
+          {{ '%g'|format(r._valor) if r._valor is not none else '—' }}<span
+            class="pf-medida__u"> {{ r._unidad }}</span>
+        </div>
+        {% if r._nivel_meta %}
+          <span class="pf-nivel pf-nivel--{{ r._nivel }}" style="margin-top:4px">
+            {{ r._nivel_meta.etiqueta }}
+          </span>
+        {% endif %}
+      </div>
+    </a>
+    {% endfor %}
+  {% else %}
+    <div class="pf-empty">
+      <div class="pf-empty__icon">📊</div>
+      <div class="pf-empty__title">Todavía no has medido nada</div>
+      <div class="pf-empty__text">
+        Empieza por un sprint de 30 m o un Cooper: se toman en una sesión y
+        dan la foto física del equipo.
+      </div>
+    </div>
+  {% endif %}
+</div>
+
+{# ══════════ ATAJOS ══════════ #}
+<div class="pf-card">
+  <a class="pf-item" href="{{ url_for('futbol.c_manuales') }}">
+    <div class="pf-item__icon">✍️</div>
+    <div class="pf-item__body">
+      <div class="pf-item__title">Jugadores sin cuenta</div>
+      <div class="pf-item__sub">{{ manuales|length }} apuntados a mano</div>
+    </div>
+    <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+  </a>
+  <a class="pf-item" href="{{ url_for('futbol.c_eval_nueva') }}">
+    <div class="pf-item__icon">➕</div>
+    <div class="pf-item__body">
+      <div class="pf-item__title">
+        Crear una prueba propia
+        {% if not fut_es_pro %}<span class="pf-pro">Pro</span>{% endif %}
+      </div>
+      <div class="pf-item__sub">La que uses y no esté en el catálogo</div>
+    </div>
+    <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+  </a>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const DESC = {{ descripciones_nivel|tojson }};
+
+function pintarDesc() {
+  const n = document.getElementById('ctx-nivel').value;
+  document.getElementById('ctx-desc').textContent = DESC[n] || '';
+}
+document.getElementById('ctx-nivel').addEventListener('change', pintarDesc);
+pintarDesc();
+
+document.getElementById('btn-ctx').onclick = function () {
+  const b = this;
+  b.disabled = true;
+  PF.api('/api/eval/contexto', {
+    categoria_edad: document.getElementById('ctx-edad').value,
+    nivel: document.getElementById('ctx-nivel').value,
+  }).then(j => {
+    PF.toast(j.mensaje, 'success');
+    b.disabled = false;
+  }).catch(e => {
+    PF.toast(e.message, 'error');
+    b.disabled = false;
+  });
+};
+</script>
+{% endblock %}

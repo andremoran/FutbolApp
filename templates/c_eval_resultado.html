@@ -1,0 +1,151 @@
+{% extends '_shell.html' %}
+{% block title %}{{ r.test_nombre }} · {{ r.jugador_nombre }}{% endblock %}
+
+{# El detalle de una toma: cada medida con su nivel, contra qué baremo se
+   comparó y cómo ha ido evolucionando ese jugador en esa prueba. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="javascript:history.back()" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">{{ r.jugador_nombre }}</div>{% endblock %}
+{% block hero_title %}{{ r.test_nombre }}{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {{ r._fecha.strftime('%d de %B de %Y')|replace('January','enero')|replace('February','febrero')|replace('March','marzo')|replace('April','abril')|replace('May','mayo')|replace('June','junio')|replace('July','julio')|replace('August','agosto')|replace('September','septiembre')|replace('October','octubre')|replace('November','noviembre')|replace('December','diciembre') if r._fecha else '' }}
+</div>
+{% endblock %}
+
+{% block content %}
+
+{# ══════════ VEREDICTO ══════════ #}
+<div class="pf-card pf-center" style="padding:22px 18px">
+  <div style="font-size:34px;line-height:1">{{ r._categoria_meta.emoji or '📊' }}</div>
+  <div class="pf-medida__v" style="font-size:38px;margin-top:6px">
+    {{ '%g'|format(r._valor) if r._valor is not none else '—' }}<span
+      class="pf-medida__u" style="font-size:17px"> {{ r._unidad }}</span>
+  </div>
+  <div style="font-size:12.5px;color:var(--text-muted);margin-top:2px">
+    {{ r._etiqueta_valor }}
+  </div>
+
+  {% if es_pro %}
+    {% if r._nivel_meta %}
+      <div class="pf-mt-12">
+        <span class="pf-nivel pf-nivel--{{ r._nivel }}"
+              style="font-size:13px;padding:6px 16px">{{ r._nivel_meta.etiqueta }}</span>
+      </div>
+    {% endif %}
+    {% if r.puntaje is not none %}
+      <div class="pf-punt pf-mt-16">
+        <div class="pf-punt__bar"><i style="width:{{ r.puntaje }}%"></i></div>
+        <div class="pf-punt__n">{{ r.puntaje }}</div>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);text-align:right;margin-top:2px">
+        sobre 100
+      </div>
+    {% endif %}
+  {% else %}
+    <div class="pf-alerta pf-alerta--info pf-mt-12" style="text-align:left">
+      <i data-ico="lock" class="pf-ico--xs"></i>
+      <span>Con el plan Pro esta marca sale comparada con el baremo
+        internacional de la categoría.
+        <a href="{{ url_for('futbol.planes') }}"
+           style="color:inherit;font-weight:700">Ver planes</a></span>
+    </div>
+  {% endif %}
+</div>
+
+{# ══════════ MEDIDA A MEDIDA ══════════ #}
+{% if r._detalle %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Lo que se midió</h2>
+  </div>
+  {% for d in r._detalle %}
+  <div style="padding:11px 0;border-bottom:1px solid var(--border-soft)">
+    <div class="pf-row" style="gap:10px">
+      <div class="pf-medida__et pf-grow">{{ d.etiqueta }}</div>
+      <div class="pf-medida__v">
+        {{ '%g'|format(d.valor) }}<span class="pf-medida__u"> {{ d.unidad }}</span>
+      </div>
+      {% if d.meta %}
+        <span class="pf-nivel pf-nivel--{{ d.nivel }}">{{ d.meta.etiqueta }}</span>
+      {% endif %}
+    </div>
+    {% if d.resumen %}<div class="pf-baremo">{{ d.resumen }}</div>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ══════════ EVOLUCIÓN ══════════ #}
+{% if serie and serie|length >= 2 %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Cómo ha ido evolucionando</h2>
+  </div>
+  {% with alto = 132 %}{% include '_grafica.html' %}{% endwith %}
+</div>
+{% endif %}
+
+{# ══════════ CONTEXTO Y NOTAS ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Ficha de la toma</h2>
+  </div>
+  <div class="pf-medida">
+    <span class="pf-medida__et">Comparado con</span>
+    <span style="font-size:13px;font-weight:650">
+      {{ r.contexto_edad|replace('sub_', 'Sub-')|replace('general', 'General')|replace('adulto', 'Adulto') }}
+      · {{ r.contexto_nivel|replace('_', ' ')|title }}
+    </span>
+  </div>
+  {% if r._test.fuente %}
+  <div class="pf-medida">
+    <span class="pf-medida__et">Baremo</span>
+    <span style="font-size:11.5px;color:var(--text-sec);text-align:right;max-width:62%">
+      {{ r._test.fuente }}
+    </span>
+  </div>
+  {% endif %}
+  {% if r.notas %}
+  <div style="padding-top:11px">
+    <div class="pf-label">Notas del entrenador</div>
+    <p style="margin:4px 0 0;font-size:13px;line-height:1.65">{{ r.notas }}</p>
+  </div>
+  {% endif %}
+</div>
+
+<div class="pf-px-16 pf-mt-16" style="padding-bottom:34px">
+  <div class="pf-row" style="gap:8px">
+    <a class="pf-btn pf-btn--secondary pf-grow"
+       href="{{ url_for('futbol.c_eval_aplicar', clave=r.test_clave) }}">
+      <i data-ico="repeat" class="pf-ico--sm"></i> Repetir
+    </a>
+    <a class="pf-btn pf-btn--ghost pf-grow"
+       href="{{ url_for('futbol.c_eval_ranking', clave=r.test_clave) }}">
+      <i data-ico="award" class="pf-ico--sm"></i> Ranking
+    </a>
+  </div>
+  <button class="pf-btn pf-btn--danger pf-btn--block pf-mt-12" type="button" id="btn-borrar">
+    <i data-ico="x" class="pf-ico--sm"></i> Borrar esta toma
+  </button>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('btn-borrar').onclick = function () {
+  if (!confirm('¿Borrar esta evaluación?\n\nNo se puede deshacer.')) return;
+  PF.api('/api/eval/resultado/{{ r.id }}', {}, 'DELETE')
+    .then(() => {
+      PF.toast('Evaluación borrada.', 'success');
+      setTimeout(() => { location.href = '{{ url_for("futbol.c_evaluaciones") }}'; }, 700);
+    })
+    .catch(e => PF.toast(e.message, 'error'));
+};
+</script>
+{% endblock %}
