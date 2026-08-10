@@ -4,5 +4,11 @@
     "entrenador_pro": "P-7DD61303A8072180HNJ45QRQ",
     "club": "P-91U61885612669942NJ45QRY"
   },
-  "sandbox_producto": "PROD-6XE34500EV4134923"
+  "sandbox_producto": "PROD-6XE34500EV4134923",
+  "live": {
+    "jugador_pro": "P-2EY217298V397793FNJ46GCA",
+    "entrenador_pro": "P-9BV193147D126253PNJ46GCA",
+    "club": "P-4FN07762U83690721NJ46GCI"
+  },
+  "live_producto": "PROD-4W940827LP1957119"
 }
