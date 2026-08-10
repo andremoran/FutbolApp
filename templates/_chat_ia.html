@@ -1,5 +1,20 @@
 {# Cuerpo del chat con la IA, compartido por el jugador (IA Coach) y el
-   entrenador (IA). Espera `historial` y `sugerencias`. #}
+   entrenador (IA). Espera `historial` y `sugerencias`.
+
+   El plan gratuito NO tiene la IA cerrada: tiene cupo diario. Un candado seco
+   no convence —no sabes qué te pierdes— y en cambio probarla y quedarte con
+   ganas sí. El contador se enseña siempre, para que nadie descubra el tope al
+   pulsar enviar. #}
+
+{% if ia_restantes is not none %}
+<div class="ia-cupo" id="ia-cupo">
+  <i data-ico="zap" class="pf-ico--xs"></i>
+  <span class="pf-grow">
+    <b id="ia-quedan">{{ ia_restantes }}</b> de {{ ia_tope }} mensajes hoy
+  </span>
+  <a href="{{ url_for('futbol.planes') }}" class="ia-cupo__a">Sin límite con Pro →</a>
+</div>
+{% endif %}
 
 <div id="chat-hilo" style="padding:16px 16px 4px">
 

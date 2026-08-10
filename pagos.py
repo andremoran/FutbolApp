@@ -44,6 +44,11 @@ ARCHIVO_PLANES = os.path.join(os.path.dirname(__file__), 'planes_paypal.json')
 
 
 # ─── Catálogo (los planes de ProFoot) ────────────────────────────────────────
+#  Solo hay DOS planes que se venden solos, uno por rol. El de Club NO está
+#  aquí a propósito: cada club se monta a medida y eso no se puede cobrar con
+#  un botón — se agenda una reunión. Si estuviera en este diccionario, se le
+#  crearía billing plan en PayPal y aparecería un botón de pago, que es
+#  justo lo que no debe pasar.
 PLANES = {
     'jugador_pro': {
         'nombre': 'Jugador Pro',
@@ -52,16 +57,10 @@ PLANES = {
         'descripcion': 'Todo tu progreso, IA Coach y pruebas físicas.',
     },
     'entrenador_pro': {
-        'nombre': 'Entrenador Pro',
+        'nombre': 'Coach Pro',
         'precio': '14.99',
         'rol': 'especialista',
         'descripcion': 'Plantilla ilimitada, táctica, evaluaciones e IA.',
-    },
-    'club': {
-        'nombre': 'Club',
-        'precio': '49.00',
-        'rol': 'especialista',
-        'descripcion': 'Varios entrenadores y categorías.',
     },
 }
 
@@ -183,6 +182,35 @@ def checkout(plan):
 @login_required
 def listo():
     return render_template('pago_listo.html', hide_tabbar=True)
+
+
+@bp.route('/elegir/<plan>')
+@login_required
+def elegir(plan):
+    """Tarjeta o transferencia. Una pantalla, no dos botones sueltos.
+
+    Existe porque hay dos pasarelas con contrapartidas distintas y la gente
+    tiene que poder compararlas: la tarjeta se renueva sola pero la cobra
+    PayPal; DeUna no tiene comisión pero la activa una persona. Antes esa
+    elección estaba repartida entre dos botones de la pantalla de planes, sin
+    explicar la diferencia.
+    """
+    meta = PLANES.get(plan)
+    if not meta:
+        flash('Ese plan no existe.', 'error')
+        return redirect(url_for('futbol.planes'))
+
+    from admin import ajustes
+    cfg = ajustes()
+    deuna, _ = deuna_disponible()
+    precio = {'jugador_pro': cfg.get('precio_jugador'),
+              'entrenador_pro': cfg.get('precio_entrenador')}.get(plan) or meta['precio']
+
+    return render_template('pago_elegir.html',
+                           hide_tabbar=True,
+                           plan=plan, meta=meta, precio=precio,
+                           tarjeta=configurado() and bool(ids_planes().get(plan)),
+                           deuna=deuna)
 
 
 # ═══════════════════════ DEUNA (transferencia) ═══════════════════════

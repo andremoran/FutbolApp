@@ -86,8 +86,8 @@
       <span>Check-in de bienestar</span></div>
     <div class="pl-feat pl-feat--no"><i data-ico="x" class="pf-ico--sm"></i>
       <span>Nivel contra baremos internacionales</span></div>
-    <div class="pl-feat pl-feat--no"><i data-ico="x" class="pf-ico--sm"></i>
-      <span>Asistente de IA</span></div>
+    <div class="pl-feat"><i data-ico="check" class="pf-ico--sm"></i>
+      <span>Asistente de IA · 2 mensajes al día</span></div>
   </div>
 </div>
 
@@ -106,16 +106,10 @@
   </div>
 
   {% if not cuenta_activa %}
-    {% if tarjeta_activa %}
+    {% if tarjeta_activa or deuna_activo %}
     <a class="pf-btn pf-btn--primary pf-btn--block pf-mt-16"
-       href="{{ url_for('pagos.checkout', plan=plan_key) }}">
-      <i data-ico="credit-card" class="pf-ico--sm"></i> Pagar con tarjeta
-    </a>
-    {% endif %}
-    {% if deuna_activo %}
-    <a class="pf-btn pf-btn--secondary pf-btn--block pf-mt-8"
-       href="{{ url_for('pagos.deuna', plan=plan_key) }}">
-      📲 Pagar con DeUna
+       href="{{ url_for('pagos.elegir', plan=plan_key) }}">
+      <i data-ico="star" class="pf-ico--sm"></i> Pasar a {{ plan_nombre }}
     </a>
     {% endif %}
     {% if not tarjeta_activa and not deuna_activo %}
@@ -131,29 +125,27 @@
   {% endif %}
 </div>
 
-{# ── Club ── #}
-<div class="pl-card">
-  <h2 class="pl-nombre">Club</h2>
-  <div class="pl-precio">${{ ajustes.precio_club }} <span>/ mes</span></div>
+{# ── Club: no se compra con un botón ── #}
+<div class="pl-card" style="border-style:dashed">
+  <h2 class="pl-nombre">🏟️ Club</h2>
+  <div class="pl-precio" style="font-size:26px">desde ${{ ajustes.precio_club }}
+    <span>/ mes</span></div>
+  <p style="margin:6px 0 0;font-size:12.5px;color:var(--text-sec);line-height:1.6">
+    No es este plan multiplicado: es una plataforma montada para el club, con
+    su marca y todas sus categorías. Se cierra en una llamada.
+  </p>
   <div style="margin-top:14px">
     <div class="pl-feat"><i data-ico="check" class="pf-ico--sm"></i>
-      <span>Varios entrenadores y categorías</span></div>
+      <span>Todas las categorías y todo el cuerpo técnico</span></div>
     <div class="pl-feat"><i data-ico="check" class="pf-ico--sm"></i>
-      <span>Todos los jugadores del club incluidos</span></div>
+      <span>Vista de dirección deportiva</span></div>
     <div class="pl-feat"><i data-ico="check" class="pf-ico--sm"></i>
-      <span>Asistentes técnicos con acceso completo</span></div>
-    <div class="pl-feat"><i data-ico="check" class="pf-ico--sm"></i>
-      <span>Acompañamiento en la puesta en marcha</span></div>
+      <span>Personalización y puesta en marcha con vosotros</span></div>
   </div>
-  {% if tarjeta_activa %}
   <a class="pf-btn pf-btn--ghost pf-btn--block pf-mt-16"
-     href="{{ url_for('pagos.checkout', plan='club') }}">
-    <i data-ico="credit-card" class="pf-ico--sm"></i> Contratar Club
+     href="{{ url_for('auth.clubes') }}">
+    <i data-ico="calendar" class="pf-ico--sm"></i> Agendar una llamada
   </a>
-  {% elif deuna_activo %}
-  <a class="pf-btn pf-btn--ghost pf-btn--block pf-mt-16"
-     href="{{ url_for('pagos.deuna', plan='club') }}">📲 Pagar con DeUna</a>
-  {% endif %}
 </div>
 
 {# ── Código ── #}

@@ -1,0 +1,161 @@
+{% extends '_shell.html' %}
+{% block title %}ProFoot para clubes{% endblock %}
+{% block hero %}{% endblock %}
+
+{# El plan de Club no tiene botón de pago a propósito: cada club se monta a
+   medida y un cobro automático prometería algo que no se entrega solo. Esta
+   pantalla recoge los datos y avisa a los administradores. #}
+
+{% block head %}
+<style>
+  .cl-wrap { max-width: 480px; margin: 0 auto; padding: 20px 20px 44px; }
+  .cl-head { text-align: center; margin: calc(18px + env(safe-area-inset-top,0px)) 0 22px; }
+  .cl-e { font-size: 52px; line-height: 1; margin-bottom: 10px; }
+  .cl-h1 { font-size: 26px; font-weight: 800; margin: 0 0 6px; letter-spacing: -.6px; }
+  .cl-sub { font-size: 14.5px; color: var(--text-sec); margin: 0; line-height: 1.6; }
+  .cl-f { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; font-size: 14px; }
+  .cl-f svg, .cl-f i { flex: none; margin-top: 2px; color: var(--primary); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cl-wrap">
+
+  <div class="cl-head">
+    <div class="cl-e">🏟️</div>
+    <h1 class="cl-h1">ProFoot para tu club</h1>
+    <p class="cl-sub">
+      No es el plan de un entrenador multiplicado por diez: es una plataforma
+      montada para el club, con su marca y sus categorías.
+    </p>
+  </div>
+
+  <div class="pf-card" style="margin:0 0 16px">
+    <div class="cl-f"><i data-ico="check-circle" class="pf-ico--sm"></i>
+      <span><b>Todas las categorías</b> y todo el cuerpo técnico, cada uno con
+        su acceso y su equipo</span></div>
+    <div class="cl-f"><i data-ico="check-circle" class="pf-ico--sm"></i>
+      <span><b>Vista de dirección deportiva</b>: comparar categorías y seguir a
+        los jugadores que suben</span></div>
+    <div class="cl-f"><i data-ico="check-circle" class="pf-ico--sm"></i>
+      <span><b>Con la marca del club</b> y adaptada a cómo trabajáis</span></div>
+    <div class="cl-f"><i data-ico="check-circle" class="pf-ico--sm"></i>
+      <span><b>Puesta en marcha con vosotros</b>: cargamos las plantillas y
+        formamos al cuerpo técnico</span></div>
+    <p style="margin:12px 0 0;font-size:13px;color:var(--text-sec);line-height:1.6;
+              padding-top:12px;border-top:1px solid var(--border-soft)">
+      Desde <b style="color:var(--primary);font-size:17px">${{ desde }}</b> al mes,
+      según categorías y qué se personalice. Lo cerramos en una llamada de
+      quince minutos.
+    </p>
+  </div>
+
+  {# ── Formulario ── #}
+  <div class="pf-card" style="margin:0" id="caja-form">
+    <div class="pf-card__head">
+      <h2 class="pf-card__title">Cuéntanos del club</h2>
+    </div>
+
+    <div class="pf-field">
+      <label class="pf-label" for="c-club">Nombre del club</label>
+      <input class="pf-input" id="c-club" maxlength="80" placeholder="Club Deportivo…">
+    </div>
+
+    <div class="pf-row pf-mt-12" style="gap:10px">
+      <div class="pf-grow">
+        <label class="pf-label" for="c-nombre">Tu nombre</label>
+        <input class="pf-input" id="c-nombre" maxlength="80">
+      </div>
+      <div class="pf-grow">
+        <label class="pf-label" for="c-contacto">Teléfono o correo</label>
+        <input class="pf-input" id="c-contacto" maxlength="120" placeholder="09…">
+      </div>
+    </div>
+
+    <div class="pf-row pf-mt-12" style="gap:10px">
+      <div class="pf-grow">
+        <label class="pf-label" for="c-categorias">Categorías</label>
+        <input class="pf-input" id="c-categorias" maxlength="60"
+               placeholder="Sub-12 a primera">
+      </div>
+      <div style="width:130px;flex:none">
+        <label class="pf-label" for="c-jugadores">Jugadores</label>
+        <input class="pf-input" id="c-jugadores" type="number" min="1" max="5000"
+               placeholder="120">
+      </div>
+    </div>
+
+    <div class="pf-field pf-mt-12">
+      <label class="pf-label" for="c-mensaje">¿Qué necesitáis?</label>
+      <textarea class="pf-textarea" id="c-mensaje" rows="3" maxlength="800"
+                placeholder="Lo que hoy os cuesta más: seguimiento de canteranos, asistencia, evaluaciones…"></textarea>
+    </div>
+
+    <button class="pf-btn pf-btn--primary pf-btn--block pf-mt-16" type="button" id="c-enviar">
+      <i data-ico="calendar" class="pf-ico--sm"></i> Pedir una llamada
+    </button>
+
+    <p class="pf-center" style="font-size:11.5px;color:var(--text-muted);
+              margin:10px 0 0;line-height:1.6">
+      Te escribimos en menos de 24 horas. Sin compromiso.
+    </p>
+  </div>
+
+  {# ── Confirmación ── #}
+  <div class="pf-card pf-center" id="caja-listo" style="margin:0;display:none;padding:28px 20px">
+    <div style="font-size:44px;line-height:1">✅</div>
+    <h2 style="margin:12px 0 6px;font-size:19px;font-weight:800">Recibido</h2>
+    <p style="margin:0;font-size:14px;color:var(--text-sec);line-height:1.6" id="c-msg"></p>
+    <a class="pf-btn pf-btn--ghost pf-btn--block pf-mt-16"
+       href="{{ url_for('auth.rol') }}">Volver</a>
+  </div>
+
+  {# ── Contacto directo ── #}
+  {% if whatsapp or correo %}
+  <p class="pf-center" style="font-size:13px;color:var(--text-sec);
+            margin-top:20px;line-height:2">
+    ¿Prefieres escribir directamente?<br>
+    {% if whatsapp %}
+      <a href="https://wa.me/593{{ whatsapp|replace(' ', '')|trim('0') }}"
+         target="_blank" rel="noopener"
+         style="color:var(--primary);font-weight:700">WhatsApp {{ whatsapp }}</a>
+    {% endif %}
+    {% if whatsapp and correo %} · {% endif %}
+    {% if correo %}
+      <a href="mailto:{{ correo }}" style="color:var(--primary);font-weight:700">{{ correo }}</a>
+    {% endif %}
+  </p>
+  {% endif %}
+
+  <p class="pf-center" style="margin-top:18px;font-size:13.5px">
+    <a href="{{ url_for('auth.plan', rol='entrenador') }}"
+       style="color:var(--text-sec);font-weight:600">← Ver los planes individuales</a>
+  </p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('c-enviar').onclick = function () {
+  const boton = this;
+  const v = id => document.getElementById(id).value;
+  boton.disabled = true;
+  boton.innerHTML = 'Enviando…';
+
+  PF.api('/api/clubes', {
+    club: v('c-club'), nombre: v('c-nombre'), contacto: v('c-contacto'),
+    categorias: v('c-categorias'), jugadores: v('c-jugadores'),
+    mensaje: v('c-mensaje'),
+  }).then(j => {
+    document.getElementById('c-msg').textContent = j.mensaje;
+    document.getElementById('caja-form').style.display = 'none';
+    document.getElementById('caja-listo').style.display = '';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }).catch(e => {
+    PF.toast(e.message, 'error');
+    boton.disabled = false;
+    boton.innerHTML = 'Pedir una llamada';
+  });
+};
+</script>
+{% endblock %}

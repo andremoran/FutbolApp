@@ -86,16 +86,113 @@ def rol():
     return render_template('auth_role.html', hide_tabbar=True)
 
 
+@bp.route('/plan')
+def plan():
+    """Segundo paso del alta: qué plan.
+
+    Por qué va DESPUÉS del rol y no fundido con él
+    ──────────────────────────────────────────────
+    Se valoró partir la pantalla de roles en cuatro tarjetas (jugador gratis,
+    jugador pro, coach gratis, coach pro). Se descartó: quien acaba de llegar
+    todavía no sabe qué hace la app, y pedirle que elija plan a la vez que rol
+    le hace elegir a ciegas. Primero QUIÉN ERES —que sí sabe— y luego CUÁNTO
+    PAGAS, ya con las ventajas delante.
+
+    Y va antes del formulario, no después, porque el precio tiene que verse
+    antes de pedir datos: enseñarlo al final es lo que hace que la gente
+    abandone con la cuenta a medio crear.
+    """
+    if current_user.is_authenticated:
+        return redirect(url_for('futbol.home'))
+
+    from admin import ajustes
+    import roles
+
+    rol_sel = 'entrenador' if request.args.get('rol') == 'entrenador' else 'jugador'
+    es_coach = rol_sel == 'entrenador'
+    cfg = ajustes()
+
+    return render_template(
+        'auth_plan.html',
+        hide_tabbar=True,
+        rol_sel=rol_sel, es_coach=es_coach,
+        precio=(cfg.get('precio_entrenador') if es_coach else cfg.get('precio_jugador')),
+        precio_club=cfg.get('precio_club'),
+        limite_plantilla=roles.LIMITE_PLANTILLA_FREE,
+        mensajes_ia=roles.IA_MENSAJES_GRATIS,
+        aviso=cfg.get('aviso_panel'))
+
+
 @bp.route('/registro')
 def registro():
     if current_user.is_authenticated:
         return redirect(url_for('futbol.home'))
+
     rol_sel = request.args.get('rol', 'jugador')
+    plan_sel = request.args.get('plan', 'free')
+    if plan_sel not in ('free', 'pro', 'codigo'):
+        plan_sel = 'free'
+
     return render_template('auth_register.html',
                            hide_tabbar=True,
                            rol_sel=rol_sel,
+                           plan_sel=plan_sel,
                            role='especialista' if rol_sel == 'entrenador' else 'paciente',
                            codigo=request.args.get('codigo', ''))
+
+
+@bp.route('/api/clubes', methods=['POST'])
+def api_clubes():
+    """Recoge la solicitud de un club y avisa a los administradores.
+
+    Es un formulario público (sin sesión: quien pregunta todavía no tiene
+    cuenta), así que se limita por IP con el mismo freno que el acceso — si no,
+    es un buzón abierto para spam.
+    """
+    from flask import jsonify
+
+    ip = _ip()
+    if _limitado(ip):
+        return jsonify({'error': 'Demasiados envíos. Inténtalo en un rato.'}), 429
+
+    d = request.get_json(silent=True) or {}
+    club = (d.get('club') or '').strip()
+    nombre = (d.get('nombre') or '').strip()
+    contacto = (d.get('contacto') or '').strip()
+    if len(club) < 2 or len(nombre) < 2 or len(contacto) < 5:
+        return jsonify({'error': 'Faltan el club, tu nombre y un teléfono o correo.'}), 400
+
+    _apuntar_fallo(ip)          # cuenta para el límite, aunque salga bien
+
+    import avisos
+    avisos.avisar(
+        'info', f'Club interesado: {club[:80]}',
+        f'{nombre[:80]}\nContacto: {contacto[:120]}\n'
+        f'Categorías: {(d.get("categorias") or "—")[:60]}\n'
+        f'Jugadores: {(d.get("jugadores") or "—")[:20]}\n\n'
+        f'{(d.get("mensaje") or "")[:800]}',
+        datos={'club': club[:80], 'contacto': contacto[:120]})
+
+    return jsonify({'ok': True,
+                    'mensaje': 'Recibido. Te escribimos en menos de 24 horas '
+                               'para agendar una llamada.'})
+
+
+@bp.route('/clubes')
+def clubes():
+    """El plan de Club no se compra con un botón: se agenda.
+
+    Cada club se monta a medida (varias categorías, cuerpo técnico, marca
+    propia), así que un cobro automático prometería algo que no se entrega
+    solo. Aquí se recogen los datos y se avisa a los administradores.
+    """
+    from admin import ajustes
+    cfg = ajustes()
+    return render_template('clubes.html',
+                           hide_tabbar=True,
+                           desde=cfg.get('precio_club'),
+                           whatsapp=cfg.get('contacto_whatsapp'),
+                           correo=cfg.get('contacto_correo'))
 
 
 # ═══════════════════════ ACCESO ═══════════════════════
@@ -155,7 +252,11 @@ def signup():
 
     rol_form = request.form.get('role', 'paciente')
     es_coach = rol_form == 'especialista'
-    volver = url_for('auth.registro', rol='entrenador' if es_coach else 'jugador')
+    plan_sel = request.form.get('plan', 'free')
+    if plan_sel not in ('free', 'pro', 'codigo'):
+        plan_sel = 'free'
+    volver = url_for('auth.registro',
+                     rol='entrenador' if es_coach else 'jugador', plan=plan_sel)
 
     nombre = (request.form.get('name') or '').strip()
     correo = (request.form.get('correo') or '').strip().lower()
@@ -178,15 +279,27 @@ def signup():
 
     entrenador = None
     if es_coach:
-        if codigo not in CODIGOS_ENTRENADOR:
-            flash('El código de alta de entrenador no es válido.', 'error')
-            return redirect(volver)
+        # El código de alta dejó de ser OBLIGATORIO: un entrenador que descubre
+        # la app tiene que poder probarla el mismo día. Antes, sin código de un
+        # administrador no había forma de entrar, y eso frena el crecimiento en
+        # seco. Si trae uno válido se respeta (lo emitió un admin o un club);
+        # si trae uno inventado se avisa en vez de dejarle creer que sirvió.
+        if codigo and codigo not in CODIGOS_ENTRENADOR:
+            flash('Ese código de alta no es válido. Puedes crear la cuenta sin '
+                  'código y activar el plan cuando quieras.', 'warning')
+            codigo = ''
     else:
-        entrenador = db.one('usuarios', 'coach por codigo',
-                            codigo_equipo=codigo, rol='especialista')
-        if not entrenador:
-            flash('Ese código de equipo no existe. Pídeselo a tu entrenador.', 'error')
-            return redirect(volver)
+        # El jugador puede registrarse SIN código y unirse a un equipo después,
+        # desde /unirme. Antes el código era obligatorio y un chico que se
+        # bajaba la app sin tenerlo a mano se quedaba fuera.
+        if codigo:
+            entrenador = db.one('usuarios', 'coach por codigo',
+                                codigo_equipo=codigo, rol='especialista')
+            if not entrenador:
+                flash('Ese código de equipo no existe. Revísalo con tu '
+                      'entrenador, o entra ahora y únete al equipo después.',
+                      'error')
+                return redirect(volver)
 
     # ── Crear ──
     datos = {
@@ -240,8 +353,26 @@ def signup():
         logger.warning('No se pudo avisar del alta: %s', e)
 
     login_user(User(nuevo), remember=True)
-    flash('¡Cuenta creada! Bienvenido a ProFoot.' if es_coach
-          else f'¡Listo! Ya eres parte del equipo de {entrenador["nombre"]}.', 'success')
+
+    # A dónde va después según lo que eligió en el paso del plan.
+    # El cobro va SIEMPRE después de crear la cuenta, nunca antes: cobrar
+    # primero deja pagos huérfanos que no se pueden ligar a nadie y hay que
+    # casar a mano. Con la cuenta ya creada, la suscripción nace atada al
+    # usuario y el webhook de PayPal sabe a quién activar o desactivar.
+    if plan_sel == 'pro':
+        flash('Cuenta creada. Elige cómo quieres pagar y ya está.', 'success')
+        return redirect(url_for('pagos.elegir',
+                                plan='entrenador_pro' if es_coach else 'jugador_pro'))
+    if plan_sel == 'codigo':
+        flash('Cuenta creada. Canjea tu código y activamos el plan.', 'success')
+        return redirect(url_for('futbol.canjear'))
+
+    if entrenador:
+        flash(f'¡Listo! Ya eres parte del equipo de {entrenador["nombre"]}.', 'success')
+    elif es_coach:
+        flash('¡Cuenta creada! Comparte tu código de equipo con tus jugadores.', 'success')
+    else:
+        flash('¡Cuenta creada! Únete a tu equipo con el código del entrenador.', 'success')
     return redirect(url_for('futbol.home'))
 
 

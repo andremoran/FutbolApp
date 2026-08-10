@@ -25,6 +25,7 @@ pestaña **Live** → tu app → Client ID y Secret. Son las mismas que ya usa
 ElectroBiomed en Render (Environment → PAYPAL_CLIENT_ID / PAYPAL_SECRET).
 """
 import argparse
+import io
 import json
 import os
 import subprocess
@@ -179,13 +180,33 @@ def contabo_env(cid, sec):
 # ── Programa ────────────────────────────────────────────────────────────────
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--client-id', required=True)
-    ap.add_argument('--secret', required=True)
+    ap.add_argument('--client-id')
+    ap.add_argument('--secret')
     ap.add_argument('--solo-comprobar', action='store_true',
                     help='comprueba las claves y sale, sin tocar nada')
+    ap.add_argument('--si', action='store_true',
+                    help='no preguntar (para ejecutarlo desde un guion)')
+    ap.add_argument('--desde-env', action='store_true',
+                    help='lee las claves de las líneas #PAYPAL_*=... del .env')
     args = ap.parse_args()
 
-    cid, sec = args.client_id.strip(), args.secret.strip()
+    cid, sec = (args.client_id or '').strip(), (args.secret or '').strip()
+    if args.desde_env or not (cid and sec):
+        # Las claves live suelen quedar comentadas en el .env mientras se
+        # prueba; se leen de ahí para no pegarlas en la línea de comandos
+        # (donde acabarían en el historial de la consola).
+        import re
+        texto = io.open(os.path.join(AQUI, '.env'), encoding='utf-8').read()
+        m1 = re.search(r'^#\s*PAYPAL_CLIENT_ID=(\S+)', texto, re.M)
+        m2 = re.search(r'^#\s*PAYPAL_SECRET=(\S+)', texto, re.M)
+        cid = cid or (m1.group(1) if m1 else '')
+        sec = sec or (m2.group(1) if m2 else '')
+        if cid and sec:
+            ok('claves leídas de las líneas comentadas del .env')
+    if not (cid and sec):
+        mal('faltan las claves: pásalas con --client-id/--secret o déjalas '
+            'comentadas en el .env como #PAYPAL_CLIENT_ID=…')
+        return 1
 
     paso('1 · ¿Las claves valen contra el PayPal REAL?')
     tok = token_live(cid, sec)
@@ -200,9 +221,10 @@ def main():
         return 0
 
     print(f'\n{ROJO}A partir de aquí se cobra DINERO REAL.{FIN}')
-    if input('Escribe COBRAR para continuar: ').strip().upper() != 'COBRAR':
-        print('Cancelado. No se tocó nada.')
-        return 1
+    if not args.si:
+        if input('Escribe COBRAR para continuar: ').strip().upper() != 'COBRAR':
+            print('Cancelado. No se tocó nada.')
+            return 1
 
     paso('2 · Planes de cobro en la cuenta real')
     try:

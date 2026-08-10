@@ -384,12 +384,13 @@ def p_jugada(jid):
 # ═══════════════════════ 5. IA COACH ═══════════════════════
 @bp.route('/ia')
 @solo_jugador
-@roles.solo_pro('ia')
 def ia_jugador():
     historial = db.rows('fut_ia_chat', 'chat ia', user_id=current_user.id,
                         _order='creado', _limit=40)
     return render_template('p_ia.html',
-                           tab_activa='ia', historial=historial)
+                           tab_activa='ia', historial=historial,
+                           ia_restantes=roles.ia_restantes(current_user),
+                           ia_tope=roles.IA_MENSAJES_GRATIS)
 
 
 # ═══════════════════════ CHECK-IN DE BIENESTAR ═══════════════════════

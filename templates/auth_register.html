@@ -42,28 +42,49 @@
       <span class="reg-badge" style="background:#dbeafe;color:#1d4ed8">
         <i data-ico="user" class="pf-ico--xs"></i> Jugador
       </span>
-      <h1 class="reg-h1">Únete a tu equipo</h1>
-      <p class="reg-sub">Necesitas el código que te dio tu entrenador.</p>
+      <h1 class="reg-h1">Crea tu cuenta</h1>
+      <p class="reg-sub">Si tienes el código de tu equipo, ponlo; si no, te unes después.</p>
     {% endif %}
   </div>
+
+  {# Qué plan viene del paso anterior, para que no se pierda por el camino #}
+  {% if plan_sel == 'pro' %}
+  <div class="pf-flash pf-flash--info" style="margin:0 0 14px">
+    <i data-ico="star" class="pf-ico--sm"></i>
+    <span>Vas a por el plan <b>Pro</b>. Creas la cuenta y eliges cómo pagar
+      justo después.</span>
+  </div>
+  {% elif plan_sel == 'codigo' %}
+  <div class="pf-flash pf-flash--info" style="margin:0 0 14px">
+    <i data-ico="award" class="pf-ico--sm"></i>
+    <span>Crea la cuenta y en la pantalla siguiente canjeas tu código.</span>
+  </div>
+  {% endif %}
 
   <form class="reg-card" method="POST" action="{{ url_for('auth.signup') }}" autocomplete="on">
     <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <input type="hidden" name="role" value="{{ role }}">
+    <input type="hidden" name="plan" value="{{ plan_sel }}">
 
+    {# El código dejó de ser obligatorio: un entrenador que descubre la app
+       tiene que poder entrar hoy, y un jugador sin el código a mano también.
+       Se pide igual, porque quien lo tiene ahorra un paso. #}
     <div class="reg-group">
-      {{ 'Código de alta de entrenador' if role == 'especialista' else 'Código del equipo' }}
+      {{ 'Código de alta' if role == 'especialista' else 'Código del equipo' }}
+      <span style="font-weight:500;color:var(--text-muted);text-transform:none;
+                   letter-spacing:0"> · opcional</span>
     </div>
     <div class="pf-field">
-      <input class="pf-input reg-code" name="codigo_vinculacion" type="text" required
+      <input class="pf-input reg-code" name="codigo_vinculacion" type="text"
              value="{{ codigo }}" placeholder="ABC123" maxlength="24"
              oninput="this.value=this.value.toUpperCase()">
       <p class="reg-hint">
         {% if role == 'especialista' %}
-          Es el código que te entrega ProFoot al contratar. Al registrarte
-          recibirás el tuyo propio para que tus jugadores se unan.
+          Solo si te dieron uno. Sin código también puedes crear la cuenta:
+          recibirás tu propio código de equipo igual.
         {% else %}
-          Pídeselo a tu entrenador: aparece en su pantalla de Inicio.
+          Pídeselo a tu entrenador: aparece en su pantalla de Inicio. Si no lo
+          tienes ahora, entra y únete al equipo cuando lo consigas.
         {% endif %}
       </p>
     </div>

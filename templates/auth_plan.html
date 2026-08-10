@@ -1,0 +1,207 @@
+{% extends '_shell.html' %}
+{% block title %}Elige tu plan · ProFoot Assistant{% endblock %}
+{% block hero %}{% endblock %}
+
+{# Segundo paso del alta: el plan, con el mismo lenguaje visual que la pantalla
+   de roles (tarjetas grandes, color por opción) para que se lea como el mismo
+   asistente y no como otra pantalla pegada.
+
+   El plan gratuito va PRIMERO y sin asterisco: es el que quita el miedo a
+   empezar. El Pro va destacado al lado, con lo que de verdad añade. Y el de
+   Club no tiene botón de pago porque no se vende con un botón. #}
+
+{% block head %}
+<style>
+  .pl-wrap { max-width: 460px; margin: 0 auto; padding: 20px 20px 40px; }
+  .pl-head { text-align: center; margin: calc(16px + env(safe-area-inset-top,0px)) 0 8px; }
+  .pl-pasos {
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+    margin-bottom: 18px; font-size: 11.5px; color: var(--text-muted);
+  }
+  .pl-paso { display: flex; align-items: center; gap: 5px; }
+  .pl-punto {
+    width: 20px; height: 20px; border-radius: 50%; display: grid;
+    place-items: center; font-size: 10px; font-weight: 800;
+    background: var(--border-soft); color: var(--text-muted);
+  }
+  .pl-punto--hecho { background: var(--primary-soft); color: var(--primary); }
+  .pl-punto--ahora { background: var(--primary); color: #fff; }
+  .pl-h1 { font-size: 25px; font-weight: 800; margin: 0 0 5px; letter-spacing: -.6px; }
+  .pl-sub { font-size: 14.5px; color: var(--text-sec); margin: 0; }
+
+  .pl-cards { display: flex; flex-direction: column; gap: 14px; margin-top: 20px; }
+  .pl-c {
+    display: block; background: #fff; border-radius: var(--r-xl);
+    padding: 18px; border: 2px solid var(--border); color: inherit;
+    text-decoration: none; position: relative;
+    transition: border-color .18s, transform .12s, box-shadow .18s;
+  }
+  .pl-c:active { transform: scale(.99); }
+  .pl-c:hover { border-color: var(--primary); box-shadow: 0 8px 24px rgba(4,120,87,.12); }
+  .pl-c--pro { border-color: var(--primary); background: var(--primary-faint); }
+  .pl-c--club { border-style: dashed; }
+
+  .pl-cinta {
+    position: absolute; top: -10px; right: 16px;
+    padding: 4px 11px; border-radius: 100px;
+    background: var(--primary); color: #fff;
+    font-size: 10px; font-weight: 800; letter-spacing: .8px; text-transform: uppercase;
+  }
+  .pl-fila { display: flex; align-items: baseline; gap: 8px; margin-bottom: 3px; }
+  .pl-n { font-size: 19px; font-weight: 800; letter-spacing: -.3px; }
+  .pl-p { font-size: 26px; font-weight: 800; color: var(--primary); letter-spacing: -1px; }
+  .pl-p small { font-size: 13px; font-weight: 600; color: var(--text-sec); letter-spacing: 0; }
+  .pl-d { font-size: 13px; color: var(--text-sec); line-height: 1.55; margin: 0 0 12px; }
+  .pl-f { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; padding: 4px 0; }
+  .pl-f svg, .pl-f i { flex: none; margin-top: 2px; color: var(--primary); }
+  .pl-f--no { color: var(--text-muted); }
+  .pl-f--no svg { color: var(--text-muted); }
+  .pl-cta {
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+    margin-top: 14px; padding: 12px; border-radius: var(--r-lg);
+    font-size: 14.5px; font-weight: 700;
+    background: var(--border-soft); color: var(--text);
+  }
+  .pl-cta--pri { background: var(--primary); color: #fff; }
+  .pl-pie { text-align: center; margin-top: 22px; font-size: 13.5px; line-height: 2 }
+  .pl-pie a { color: var(--primary); font-weight: 700; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pl-wrap">
+
+  <div class="pl-pasos">
+    <span class="pl-paso"><span class="pl-punto pl-punto--hecho">✓</span> Rol</span>
+    <span>·</span>
+    <span class="pl-paso"><span class="pl-punto pl-punto--ahora">2</span> Plan</span>
+    <span>·</span>
+    <span class="pl-paso"><span class="pl-punto">3</span> Cuenta</span>
+  </div>
+
+  <div class="pl-head">
+    <h1 class="pl-h1">{{ 'Entrenador' if es_coach else 'Jugador' }}</h1>
+    <p class="pl-sub">Elige cómo quieres empezar</p>
+  </div>
+
+  {% if aviso %}
+  <div class="pf-flash pf-flash--info" style="margin:16px 0 0">
+    <i data-ico="info" class="pf-ico--sm"></i><span>{{ aviso }}</span>
+  </div>
+  {% endif %}
+
+  <div class="pl-cards">
+
+    {# ── Gratis ── #}
+    <a class="pl-c" href="{{ url_for('auth.registro', rol=rol_sel, plan='free') }}">
+      <div class="pl-fila">
+        <span class="pl-n">{{ 'Entrenador' if es_coach else 'Jugador' }}</span>
+        <span class="pl-p">$0<small> / siempre</small></span>
+      </div>
+      <p class="pl-d">Sin tarjeta y sin prueba con reloj. Funciona de verdad.</p>
+
+      {% if es_coach %}
+        <div class="pl-f"><i data-ico="check" class="pf-ico--xs"></i>
+          <span>Hasta {{ limite_plantilla }} jugadores</span></div>
+        <div class="pl-f"><i data-ico="check" class="pf-ico--xs"></i>
+          <span>Calendario, asistencia y partidos</span></div>
+        <div class="pl-f"><i data-ico="check" class="pf-ico--xs"></i>
+          <span>Tomar pruebas físicas y ver las marcas</span></div>
+        <div class="pl-f"><i data-ico="check" class="pf-ico--xs"></i>
+          <span>{{ mensajes_ia }} mensajes de IA al día</span></div>
+        <div class="pl-f pl-f--no"><i data-ico="x" class="pf-ico--xs"></i>
+          <span>Sin baremos, táctica ni evolución</span></div>
+      {% else %}
+        <div class="pl-f"><i data-ico="check" class="pf-ico--xs"></i>
+          <span>Hábitos, metas y entrenamientos</span></div>
+        <div class="pl-f"><i data-ico="check" class="pf-ico--xs"></i>
+          <span>Calendario del equipo</span></div>
+        <div class="pl-f"><i data-ico="check" class="pf-ico--xs"></i>
+          <span>Tus marcas en las pruebas</span></div>
+        <div class="pl-f"><i data-ico="check" class="pf-ico--xs"></i>
+          <span>{{ mensajes_ia }} mensajes de IA al día</span></div>
+        <div class="pl-f pl-f--no"><i data-ico="x" class="pf-ico--xs"></i>
+          <span>Sin tu nivel contra baremos ni evolución</span></div>
+      {% endif %}
+
+      <div class="pl-cta">Empezar gratis</div>
+    </a>
+
+    {# ── Pro ── #}
+    <a class="pl-c pl-c--pro" href="{{ url_for('auth.registro', rol=rol_sel, plan='pro') }}">
+      <span class="pl-cinta">Recomendado</span>
+      <div class="pl-fila">
+        <span class="pl-n">{{ 'Coach Pro' if es_coach else 'Jugador Pro' }}</span>
+        <span class="pl-p">${{ precio }}<small> / mes</small></span>
+      </div>
+      <p class="pl-d">Todo lo de arriba, sin topes, y lo que de verdad marca la diferencia.</p>
+
+      {% if es_coach %}
+        <div class="pl-f"><i data-ico="check" class="pf-ico--xs"></i>
+          <span><b>Plantilla sin límite</b></span></div>
+        <div class="pl-f"><i data-ico="check" class="pf-ico--xs"></i>
+          <span><b>30 pruebas con baremos internacionales</b>: cada marca sale
+            comparada con su categoría</span></div>
+        <div class="pl-f"><i data-ico="check" class="pf-ico--xs"></i>
+          <span>Evolución del equipo y de cada jugador</span></div>
+        <div class="pl-f"><i data-ico="check" class="pf-ico--xs"></i>
+          <span>Pizarra táctica y planes de sesión</span></div>
+        <div class="pl-f"><i data-ico="check" class="pf-ico--xs"></i>
+          <span>IA sin límite y control de lesiones</span></div>
+      {% else %}
+        <div class="pl-f"><i data-ico="check" class="pf-ico--xs"></i>
+          <span><b>Tu nivel contra baremos internacionales</b>: si tu sprint es
+            de élite o mejorable para tu edad</span></div>
+        <div class="pl-f"><i data-ico="check" class="pf-ico--xs"></i>
+          <span>Tu evolución prueba a prueba</span></div>
+        <div class="pl-f"><i data-ico="check" class="pf-ico--xs"></i>
+          <span>IA Coach sin límite, con tus datos</span></div>
+        <div class="pl-f"><i data-ico="check" class="pf-ico--xs"></i>
+          <span>Perfil completo y comparación con el equipo</span></div>
+      {% endif %}
+
+      <div class="pl-cta pl-cta--pri">
+        <i data-ico="star" class="pf-ico--sm"></i> Empezar con Pro
+      </div>
+    </a>
+
+    {# ── Club: no se compra, se agenda ── #}
+    {% if es_coach %}
+    <a class="pl-c pl-c--club" href="{{ url_for('auth.clubes') }}">
+      <div class="pl-fila">
+        <span class="pl-n">🏟️ Club</span>
+        <span class="pl-p" style="font-size:19px">desde ${{ precio_club }}<small> / mes</small></span>
+      </div>
+      <p class="pl-d">
+        Varias categorías, cuerpo técnico completo y una plataforma montada a
+        la medida del club, con su marca.
+      </p>
+      <div class="pl-f"><i data-ico="check" class="pf-ico--xs"></i>
+        <span>Todas las categorías y entrenadores</span></div>
+      <div class="pl-f"><i data-ico="check" class="pf-ico--xs"></i>
+        <span>Personalización y puesta en marcha con vosotros</span></div>
+      <div class="pl-cta">
+        <i data-ico="calendar" class="pf-ico--sm"></i> Agendar una llamada
+      </div>
+    </a>
+    {% endif %}
+
+  </div>
+
+  <p class="pl-pie">
+    ¿Tienes un código?
+    <a href="{{ url_for('auth.registro', rol=rol_sel, plan='codigo') }}">Canjéalo aquí</a>
+    <br>
+    <a href="{{ url_for('auth.rol') }}" style="color:var(--text-sec);font-weight:600">
+      ← Cambiar de rol</a>
+    &nbsp;·&nbsp;
+    ¿Ya tienes cuenta? <a href="{{ url_for('auth.entrar') }}">Entrar</a>
+  </p>
+
+  <p class="pf-center" style="font-size:11.5px;color:var(--text-muted);
+            margin-top:18px;line-height:1.65">
+    Con Pro creas la cuenta primero y pagas al final; puedes cancelar cuando
+    quieras. Lo que crees con el plan gratuito no se borra nunca.
+  </p>
+</div>
+{% endblock %}

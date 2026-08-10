@@ -38,13 +38,21 @@ DEUNA = {
 PRECIOS = {
     'precio_jugador': '4.99',
     'precio_entrenador': '14.99',
-    'precio_club': '49.00',
+    # El de Club es un precio DE PARTIDA («desde»), no una tarifa: cada club
+    # se cotiza según categorías y personalización. No hay botón de pago para
+    # él, así que este número solo ancla la conversación.
+    'precio_club': '199',
+}
+
+CONTACTO = {
+    'contacto_whatsapp': '0987553634',
+    'contacto_correo': '',
 }
 
 
 def main():
     actual = ajustes()
-    nuevos = {**DEUNA, **PRECIOS}
+    nuevos = {**DEUNA, **PRECIOS, **CONTACTO}
 
     print('Ajustes de cobro')
     print('─' * 60)

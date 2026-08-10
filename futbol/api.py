@@ -540,11 +540,23 @@ def api_checkin():
 @bp.route('/api/ia', methods=['POST'])
 @api
 def api_ia():
+    import roles
+
     pregunta = (body().get('mensaje') or '').strip()
     if not pregunta:
         return jsonify({'error': 'Escribe una pregunta.'}), 400
     if len(pregunta) > 1200:
         pregunta = pregunta[:1200]
+
+    # El plan gratuito tiene cupo diario, no candado: se comprueba aquí y no
+    # al abrir la pantalla, para que pueda leer lo que ya preguntó.
+    restantes = roles.ia_restantes(current_user)
+    if restantes is not None and restantes <= 0:
+        return jsonify({
+            'error': f'Gastaste tus {roles.IA_MENSAJES_GRATIS} mensajes de hoy. '
+                     'Vuelven mañana, o pásate a Pro y pregunta sin límite.',
+            'pro': True, 'agotado': True,
+            'url': url_for('futbol.planes')}), 402
 
     respuesta = responder_ia(current_user, pregunta)
 
@@ -555,4 +567,5 @@ def api_ia():
         'respuesta': respuesta,
         'creado': ahora(),
     })
-    return jsonify({'ok': True, 'respuesta': respuesta})
+    return jsonify({'ok': True, 'respuesta': respuesta,
+                    'restantes': (restantes - 1) if restantes is not None else None})

@@ -23,6 +23,18 @@
   }
   .ia-sug:active { background: var(--primary-soft); border-color: var(--primary); color: var(--primary); }
 
+  /* Cupo diario del plan gratuito */
+  .ia-cupo {
+    display: flex; align-items: center; gap: 8px;
+    margin: 12px 16px 0; padding: 9px 13px;
+    border-radius: var(--r-lg); font-size: 12.5px;
+    background: var(--primary-faint); color: var(--primary-dark);
+    border: 1px solid var(--primary-soft);
+  }
+  .ia-cupo__a { color: var(--primary); font-weight: 700; white-space: nowrap; }
+  .ia-cupo--agotado { background: var(--warning-bg); color: #92400e; border-color: #fcd34d; }
+  .ia-cupo--agotado .ia-cupo__a { color: #b45309; }
+
   /* Barra de escritura anclada encima de la barra de pestañas */
   .ia-bar {
     position: fixed; left: 0; right: 0; z-index: 250;
@@ -58,6 +70,15 @@
     return d;
   }
 
+  /* Contador de mensajes que quedan hoy (solo en el plan gratuito). */
+  function pintarCupo(n) {
+    var caja = document.getElementById('ia-cupo');
+    var num = document.getElementById('ia-quedan');
+    if (!caja || !num) return;
+    num.textContent = n;
+    caja.classList.toggle('ia-cupo--agotado', n <= 0);
+  }
+
   function preguntar(texto) {
     if (ocupado || !texto) return;
     ocupado = true;
@@ -76,12 +97,25 @@
       .then(function (r) {
         esperando.classList.remove('ia-msg--pensando');
         esperando.textContent = r.respuesta;
+        if (r.restantes !== null && r.restantes !== undefined) pintarCupo(r.restantes);
         alFinal();
       })
       .catch(function (e) {
         esperando.classList.remove('ia-msg--pensando');
         esperando.textContent = e.message;
         esperando.style.color = 'var(--danger)';
+        // Si se acabó el cupo, el botón de pasar a Pro va justo debajo del
+        // aviso: es el momento exacto en que la mejora tiene sentido.
+        if (/Pro y pregunta sin/.test(e.message)) {
+          pintarCupo(0);
+          var a = document.createElement('a');
+          a.className = 'pf-btn pf-btn--primary';
+          a.style.cssText = 'margin:10px 16px 0;display:flex';
+          a.href = '{{ url_for("futbol.planes") }}';
+          a.innerHTML = '⭐ Pasar a Pro y preguntar sin límite';
+          hilo.appendChild(a);
+        }
+        alFinal();
       })
       .finally(function () { ocupado = false; enviar.disabled = false; });
   }

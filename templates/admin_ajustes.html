@@ -168,11 +168,31 @@
         </div>
       </div>
 
+      <p class="adm-ayuda adm-mb">
+        El de <b>Club no se cobra con un botón</b>: cada club se monta a medida,
+        así que en la app aparece como «desde $X» y lleva a
+        <a href="/clubes" target="_blank" style="color:var(--a-verde-2)">/clubes</a>,
+        que recoge los datos y os avisa. Aquí solo se fija el precio de partida.
+      </p>
+
+      <div class="adm-fila">
+        <div class="adm-campo">
+          <label class="adm-lbl" for="s-contacto_whatsapp">WhatsApp para clubes</label>
+          <input class="adm-in" id="s-contacto_whatsapp" maxlength="30"
+                 value="{{ ajustes.contacto_whatsapp }}" placeholder="0987553634">
+        </div>
+        <div class="adm-campo">
+          <label class="adm-lbl" for="s-contacto_correo">Correo para clubes</label>
+          <input class="adm-in" id="s-contacto_correo" maxlength="120"
+                 value="{{ ajustes.contacto_correo }}" placeholder="clubes@…">
+        </div>
+      </div>
+
       <div class="adm-campo">
         <label class="adm-lbl" for="s-aviso_panel">Aviso en la pantalla de planes</label>
         <textarea class="adm-ta" id="s-aviso_panel" maxlength="600"
                   placeholder="Promoción de pretemporada: 3 meses al precio de 2">{{ ajustes.aviso_panel }}</textarea>
-        <p class="adm-ayuda">Se ve dentro de la app, encima de los planes. Vacío = no se muestra nada.</p>
+        <p class="adm-ayuda">Se ve dentro de la app y en el paso del plan al registrarse. Vacío = nada.</p>
       </div>
 
       <button class="adm-btn adm-btn--pri" onclick="guardar(this)">Guardar</button>
@@ -186,7 +206,8 @@
 <script>
 const CAMPOS = ['deuna_titular', 'deuna_documento', 'deuna_telefono', 'deuna_banco',
                 'deuna_qr', 'deuna_instrucciones', 'precio_jugador',
-                'precio_entrenador', 'precio_club', 'aviso_panel'];
+                'precio_entrenador', 'precio_club', 'aviso_panel',
+                'contacto_whatsapp', 'contacto_correo'];
 
 function guardar(boton) {
   const datos = { deuna_activo: document.getElementById('s-deuna_activo').checked };

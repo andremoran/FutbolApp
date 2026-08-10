@@ -1,0 +1,113 @@
+{% extends '_shell.html' %}
+{% block title %}Cómo pagar · ProFoot{% endblock %}
+
+{# Las dos pasarelas con sus contrapartidas a la vista. No son intercambiables
+   —una se renueva sola y la otra la aprueba una persona— y ocultarlo hace que
+   la gente elija mal y luego escriba preguntando por qué no se activó. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.planes') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">{{ meta.nombre }}</div>{% endblock %}
+{% block hero_title %}${{ precio }} al mes{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">Elige cómo quieres pagarlo</div>
+{% endblock %}
+{% block hero_actions %}{% endblock %}
+
+{% block head %}
+<style>
+  .pg-c {
+    display: block; margin: 16px; padding: 18px;
+    background: #fff; border: 2px solid var(--border); border-radius: var(--r-xl);
+    color: inherit; text-decoration: none;
+    transition: border-color .18s, transform .12s, box-shadow .18s;
+  }
+  .pg-c:active { transform: scale(.99); }
+  .pg-c:hover { border-color: var(--primary); box-shadow: 0 8px 24px rgba(4,120,87,.12); }
+  .pg-t { font-size: 17px; font-weight: 800; letter-spacing: -.3px; margin: 0 0 4px; }
+  .pg-d { font-size: 13px; color: var(--text-sec); line-height: 1.6; margin: 0; }
+  .pg-l { display: flex; align-items: center; gap: 8px; font-size: 12.5px; padding: 5px 0; }
+  .pg-l svg, .pg-l i { flex: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{% if tarjeta %}
+<a class="pg-c" href="{{ url_for('pagos.checkout', plan=plan) }}">
+  <div class="pf-row" style="gap:12px;margin-bottom:10px">
+    <div style="font-size:30px;line-height:1">💳</div>
+    <div class="pf-grow">
+      <h2 class="pg-t">Tarjeta</h2>
+      <p class="pg-d">Débito o crédito. No hace falta cuenta de PayPal.</p>
+    </div>
+  </div>
+  <div class="pg-l"><i data-ico="zap" class="pf-ico--xs" style="color:var(--success)"></i>
+    <span><b>Se activa al instante</b></span></div>
+  <div class="pg-l"><i data-ico="repeat" class="pf-ico--xs" style="color:var(--success)"></i>
+    <span>Se renueva sola cada mes; cancelas cuando quieras</span></div>
+  <div class="pg-l"><i data-ico="lock" class="pf-ico--xs" style="color:var(--text-muted)"></i>
+    <span>El número de la tarjeta nunca pasa por nosotros</span></div>
+  <div class="pf-btn pf-btn--primary pf-btn--block pf-mt-12">
+    Pagar con tarjeta
+  </div>
+</a>
+{% endif %}
+
+{% if deuna %}
+<a class="pg-c" href="{{ url_for('pagos.deuna', plan=plan) }}">
+  <div class="pf-row" style="gap:12px;margin-bottom:10px">
+    <div style="font-size:30px;line-height:1">📲</div>
+    <div class="pf-grow">
+      <h2 class="pg-t">DeUna · transferencia</h2>
+      <p class="pg-d">Desde tu banco, escaneando un código.</p>
+    </div>
+  </div>
+  <div class="pg-l"><i data-ico="check-circle" class="pf-ico--xs" style="color:var(--success)"></i>
+    <span>Sin comisión</span></div>
+  <div class="pg-l"><i data-ico="clock" class="pf-ico--xs" style="color:var(--warning)"></i>
+    <span><b>Lo revisamos a mano</b>: se activa en unas horas, no al momento</span></div>
+  <div class="pg-l"><i data-ico="refresh-cw" class="pf-ico--xs" style="color:var(--text-muted)"></i>
+    <span>No se renueva sola: cuando venza, vuelves a pagar</span></div>
+  <div class="pf-btn pf-btn--secondary pf-btn--block pf-mt-12">
+    Pagar con DeUna
+  </div>
+</a>
+{% endif %}
+
+{% if not tarjeta and not deuna %}
+<div class="pf-card">
+  <div class="pf-empty">
+    <div class="pf-empty__icon">💳</div>
+    <div class="pf-empty__title">El cobro no está disponible ahora mismo</div>
+    <div class="pf-empty__text">
+      Escríbenos y lo resolvemos. Mientras tanto tu cuenta funciona con el plan
+      gratuito.
+    </div>
+    <a class="pf-btn pf-btn--ghost pf-mt-16"
+       href="{{ url_for('futbol.home') }}">Ir a la app</a>
+  </div>
+</div>
+{% endif %}
+
+<div class="pf-card">
+  <a class="pf-item" href="{{ url_for('futbol.canjear') }}">
+    <div class="pf-item__icon">🎟️</div>
+    <div class="pf-item__body">
+      <div class="pf-item__title">Tengo un código</div>
+      <div class="pf-item__sub">De un club o de una cortesía</div>
+    </div>
+    <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+  </a>
+</div>
+
+<p class="pf-center" style="font-size:12px;color:var(--text-muted);
+          padding:4px 26px 34px;line-height:1.65">
+  Puedes seguir usando la app con el plan gratuito y pagar más adelante: nada
+  de lo que crees se pierde.
+</p>
+
+{% endblock %}

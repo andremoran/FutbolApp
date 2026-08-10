@@ -83,18 +83,19 @@ def rutas_de(rol):
         '/progreso/entrenos', '/progreso/metas', '/progreso/habitos',
         '/progreso/partidos', '/progreso/tests', '/ficha', '/mensajes',
         '/checkin', '/perfil', '/planes', '/evaluaciones',
-        '/medico', '/unirme', '/tactica',
+        '/medico', '/unirme', '/tactica', '/canjear', '/ia',
     ]
-    jugador_pro = jugador + ['/ia', '/evolucion']
+    jugador_pro = jugador + ['/evolucion']
     coach = [
         '/app', '/coach', '/coach/plantilla', '/coach/agenda', '/coach/calendario',
         '/coach/asistencia', '/coach/partidos', '/coach/mensajes',
         '/coach/observaciones', '/coach/mental', '/coach/mental/asignar',
         '/coach/equipo/editar', '/coach/tests', '/coach/solicitudes',
         '/coach/jugadores-manuales', '/perfil', '/planes', '/coach/evaluaciones',
+        '/coach/ia',
     ]
     coach_pro = coach + [
-        '/coach/ia', '/coach/tactica', '/coach/tactica/pizarra',
+        '/coach/tactica', '/coach/tactica/pizarra',
         '/coach/planes', '/coach/evaluaciones/catalogo', '/coach/evolucion',
         '/coach/medico', '/coach/evaluaciones/nueva', '/canjear',
     ]
@@ -182,6 +183,34 @@ def _pista(cuerpo):
     return ''
 
 
+def probar_alta():
+    """El embudo de alta completo, sin sesión: rol -> plan -> formulario."""
+    cliente = aplicacion.app.test_client()
+    print('\n── EMBUDO DE ALTA (sin sesión) ───────────────────')
+    casos = [
+        ('/rol', 'Paso 1: elegir rol'),
+        ('/plan?rol=jugador', 'Paso 2: plan del jugador'),
+        ('/plan?rol=entrenador', 'Paso 2: plan del entrenador'),
+        ('/registro?rol=jugador&plan=free', 'Paso 3: alta gratis'),
+        ('/registro?rol=entrenador&plan=pro', 'Paso 3: alta Pro'),
+        ('/registro?rol=entrenador&plan=codigo', 'Paso 3: alta con código'),
+        ('/clubes', 'Clubes: agendar llamada'),
+    ]
+    ok = mal = 0
+    for ruta, texto in casos:
+        r = cliente.get(ruta, follow_redirects=True)
+        cuerpo = r.get_data(as_text=True)
+        roto = (r.status_code >= 400 or 'jinja2.exceptions' in cuerpo
+                or 'Se nos cruzaron los cables' in cuerpo)
+        if roto:
+            mal += 1
+            print(f'{ROJO}  ✗ {texto:34s} {r.status_code} {_pista(cuerpo)}{FIN}')
+        else:
+            ok += 1
+            print(f'{VERDE}  ✓{FIN} {texto:34s} {r.status_code}')
+    return ok, mal
+
+
 def probar_candados():
     """Que los planes gratuitos NO entren donde no deben.
 
@@ -192,13 +221,13 @@ def probar_candados():
     aplicacion.app.config['SESSION_COOKIE_SECURE'] = False
     casos = [
         # (rol, ruta, dónde debería acabar, qué se comprueba)
-        ('jugador',    '/ia',              '/pro',    'IA cerrada al jugador gratis'),
+        ('jugador',    '/ia',              '/ia',     'IA ABIERTA al jugador gratis (con cupo)'),
         ('jugador',    '/evolucion',       '/pro',    'Evolución cerrada al jugador gratis'),
         ('jugador',    '/admin/',          '!',       'Jugador fuera del panel'),
         ('jugador_pro', '/ia',             '/ia',     'IA abierta al jugador Pro'),
         ('jugador_pro', '/evolucion',      '/evolucion', 'Evolución abierta al jugador Pro'),
         ('jugador_pro', '/admin/usuarios', '!',       'Jugador Pro fuera del panel'),
-        ('entrenador', '/coach/ia',        '/pro',    'IA cerrada al entrenador gratis'),
+        ('entrenador', '/coach/ia',        '/coach/ia', 'IA ABIERTA al entrenador gratis (con cupo)'),
         ('entrenador', '/coach/tactica',   '/pro',    'Táctica cerrada al entrenador gratis'),
         ('entrenador', '/coach/planes',    '/pro',    'Planes cerrados al entrenador gratis'),
         ('entrenador', '/coach/medico',    '/pro',    'Ficha médica cerrada al gratis'),
@@ -268,6 +297,10 @@ def main():
         total_ok += ok
         total_mal += mal
         todos += [(rol, *p) for p in problemas]
+
+    ok_a, mal_a = probar_alta()
+    total_ok += ok_a
+    total_mal += mal_a
 
     ok_c, mal_c = probar_candados()
     total_ok += ok_c

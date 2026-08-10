@@ -30,11 +30,29 @@
   .role-feat { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-sec); margin-bottom: 6px; }
   .role-back { text-align: center; margin-top: 26px; font-size: 14px; }
   .role-back a { color: var(--primary); font-weight: 700; }
+  .role-pasos {
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+    margin: calc(16px + env(safe-area-inset-top,0px)) 0 0;
+    font-size: 11.5px; color: var(--text-muted);
+  }
+  .role-pasos > span { display: flex; align-items: center; gap: 5px; }
+  .role-punto {
+    width: 20px; height: 20px; border-radius: 50%; display: grid;
+    place-items: center; font-size: 10px; font-weight: 800;
+    background: var(--border-soft); color: var(--text-muted);
+  }
+  .role-punto--ahora { background: var(--primary); color: #fff; }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="role-wrap">
+
+  <div class="role-pasos">
+    <span><span class="role-punto role-punto--ahora">1</span> Rol</span>
+    <span>·</span><span><span class="role-punto">2</span> Plan</span>
+    <span>·</span><span><span class="role-punto">3</span> Cuenta</span>
+  </div>
 
   <div class="role-head">
     <div class="role-ball">⚽</div>
@@ -44,7 +62,7 @@
 
   <div class="roles">
 
-    <a class="role-card role-card--player" href="{{ url_for('auth.registro', rol='jugador') }}">
+    <a class="role-card role-card--player" href="{{ url_for('auth.plan', rol='jugador') }}">
       <div class="role-icon" style="background:#3b82f6">
         <i data-ico="user" class="pf-ico--xxl"></i>
       </div>
@@ -54,10 +72,10 @@
       </p>
       <div class="role-feat"><i data-ico="check" class="pf-ico--xs" style="color:#3b82f6"></i> Entrenamientos personalizados</div>
       <div class="role-feat"><i data-ico="check" class="pf-ico--xs" style="color:#3b82f6"></i> Seguimiento de metas</div>
-      <div class="role-feat"><i data-ico="check" class="pf-ico--xs" style="color:#3b82f6"></i> IA Coach personal</div>
+      <div class="role-feat"><i data-ico="check" class="pf-ico--xs" style="color:#3b82f6"></i> IA Coach (2 mensajes al día gratis)</div>
     </a>
 
-    <a class="role-card role-card--coach" href="{{ url_for('auth.registro', rol='entrenador') }}">
+    <a class="role-card role-card--coach" href="{{ url_for('auth.plan', rol='entrenador') }}">
       <div class="role-icon" style="background:#f59e0b">
         <i data-ico="users" class="pf-ico--xxl"></i>
       </div>
@@ -74,6 +92,9 @@
 
   <p class="role-back">
     ¿Ya tienes cuenta? <a href="{{ url_for('auth.entrar') }}">Entrar</a>
+    <br>
+    <span style="color:var(--text-muted)">¿Eres un club?</span>
+    <a href="{{ url_for('auth.clubes') }}">Hablemos</a>
   </p>
 </div>
 {% endblock %}

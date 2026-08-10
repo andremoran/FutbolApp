@@ -84,7 +84,13 @@ PERMISOS_PRO = {
 # convocatoria; a partir de ahí ya es un equipo de verdad.
 LIMITE_PLANTILLA_FREE = 12
 LIMITE_EVENTOS_FREE = 40        # eventos futuros en el calendario
-LIMITE_TESTS_FREE = 3           # evaluaciones guardadas por jugador
+
+# La IA no se cierra del todo al plan gratuito: se dan DOS mensajes al día.
+# Un candado seco no convence a nadie —no sabes qué te pierdes— y en cambio
+# probarla dos veces y quedarte con ganas sí. Dos y no uno porque el primero
+# casi siempre se gasta tanteando ("hola, ¿qué haces?") y el segundo es el
+# que enseña de verdad para qué sirve.
+IA_MENSAJES_GRATIS = 2
 
 
 def clave_de(usuario):
@@ -202,3 +208,35 @@ def limite_plantilla(usuario):
 def plantilla_llena(usuario, n_actual):
     tope = limite_plantilla(usuario)
     return tope is not None and n_actual >= tope
+
+
+# ─── Cupo diario de IA ──────────────────────────────────────────────────────
+def ia_usados_hoy(usuario):
+    """Mensajes que ya gastó hoy. Se cuentan de `fut_ia_chat`.
+
+    Se cuenta la tabla en vez de llevar un contador aparte: el historial ya
+    existe, no puede desincronizarse y sobrevive a un reinicio. Con dos
+    mensajes al día la consulta no pesa.
+    """
+    from datetime import date, datetime, time, timezone
+
+    from futbol import db
+
+    inicio = datetime.combine(date.today(), time.min, tzinfo=timezone.utc).isoformat()
+    filas = db.q(
+        lambda: db.sb().table('fut_ia_chat').select('id')
+        .eq('user_id', usuario.id).gte('creado', inicio).execute().data or [],
+        [], 'cupo ia')
+    return len(filas)
+
+
+def ia_restantes(usuario):
+    """Mensajes que le quedan hoy. None = sin límite (es Pro)."""
+    if es_pro(usuario):
+        return None
+    return max(0, IA_MENSAJES_GRATIS - ia_usados_hoy(usuario))
+
+
+def ia_puede_preguntar(usuario):
+    restantes = ia_restantes(usuario)
+    return restantes is None or restantes > 0

@@ -151,8 +151,12 @@ def ajustes():
             'exacto y sube la captura del comprobante.'),
         'precio_jugador': '4.99',
         'precio_entrenador': '14.99',
-        'precio_club': '49.00',
+        # El de Club NO se cobra con un botón: cada club se monta a medida y
+        # esto es solo el precio de partida que se enseña en /clubes.
+        'precio_club': '199',
         'aviso_panel': '',
+        'contacto_whatsapp': '0987553634',
+        'contacto_correo': '',
     }
     base.update({k: v for k, v in guardado.items() if v is not None})
     return base
@@ -466,7 +470,8 @@ def api_ajustes():
     d = _cuerpo()
     permitidos = ('deuna_activo', 'deuna_titular', 'deuna_documento', 'deuna_telefono',
                   'deuna_banco', 'deuna_qr', 'deuna_instrucciones',
-                  'precio_jugador', 'precio_entrenador', 'precio_club', 'aviso_panel')
+                  'precio_jugador', 'precio_entrenador', 'precio_club', 'aviso_panel',
+                  'contacto_whatsapp', 'contacto_correo')
     nuevos = {k: (d[k] if k == 'deuna_activo' else str(d[k])[:600])
               for k in permitidos if k in d}
     if not nuevos:

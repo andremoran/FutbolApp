@@ -243,7 +243,6 @@ def c_pizarra(jid=None):
 # ═══════════════════════ 5. IA ═══════════════════════
 @bp.route('/coach/ia')
 @solo_entrenador
-@roles.solo_pro('ia')
 def c_ia():
     historial = db.rows('fut_ia_chat', 'chat ia coach', user_id=current_user.id,
                         _order='creado', _limit=40)
@@ -251,7 +250,9 @@ def c_ia():
     return render_template('c_ia.html',
                            tab_activa='ia',
                            historial=historial,
-                           n_jugadores=len(jugadores))
+                           n_jugadores=len(jugadores),
+                           ia_restantes=roles.ia_restantes(current_user),
+                           ia_tope=roles.IA_MENSAJES_GRATIS)
 
 
 # ═══════════════════════ TESTS (compartido) ═══════════════════════
