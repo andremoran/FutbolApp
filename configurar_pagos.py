@@ -29,10 +29,6 @@ DEUNA = {
         'Luego sube aquí la captura del comprobante: en cuanto lo verifiquemos '
         'se activa tu cuenta. Si prefieres, también puedes mandárnoslo por '
         'WhatsApp al 098 755 3634.'),
-    # Titular y cédula se dejan vacíos a propósito: el nombre que se enseña
-    # tiene que coincidir LETRA POR LETRA con el de la cuenta del banco, y
-    # ponerlo a ojo genera transferencias devueltas. Se rellenan desde
-    # /admin/ajustes. La transferencia funciona igual: va por el QR.
 }
 
 PRECIOS = {

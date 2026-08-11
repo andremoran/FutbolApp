@@ -325,6 +325,18 @@ def api_perfil_jugador():
         except (TypeError, ValueError):
             datos['dorsal'] = None
 
+    # Cómo se siente hoy. Lo pone EL JUGADOR y sí lo ve el entrenador (es el
+    # «Estado físico promedio» de su tablero). No confundir con el check-in de
+    # bienestar, cuyas respuestas son confidenciales.
+    for campo in ('energia', 'motivacion', 'estado_fisico'):
+        if campo in d:
+            try:
+                datos[campo] = max(0, min(100, int(d[campo])))
+            except (TypeError, ValueError):
+                pass
+    if any(c in datos for c in ('energia', 'motivacion', 'estado_fisico')):
+        datos['estado_actualizado'] = ahora()
+
     if not db.upsert('fut_player_profile', datos, 'perfil jug', on_conflict='user_id'):
         return jsonify({'error': 'No se pudo guardar la ficha.'}), 500
     return jsonify({'ok': True})

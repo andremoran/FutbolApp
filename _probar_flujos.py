@@ -122,7 +122,7 @@ def flujo_evaluacion(coach, jugador_pro):
     # Sprint 30 m: 4,18 s es élite en sub-18 (corte 4,15) → debería salir "bueno"
     cod, j = post(coach, '/api/eval/resultado', {
         'test': 'sprint_30m',
-        'resultados': [{'player_id': str(pro_id), 'valores': {'tiempo': '4.18'},
+        'resultados': [{'player_id': str(pro_id), 'valores': {'time_seconds': '4.18'},
                         'fecha': date.today().isoformat()}],
     })
     if not comprobar('El entrenador anota un sprint de 30 m',
@@ -132,8 +132,8 @@ def flujo_evaluacion(coach, jugador_pro):
 
     fila = db.one('fut_eval_results', 'r', id=j['ids'][0])
     comprobar('Queda clasificado contra el baremo internacional',
-              fila and (fila.get('niveles') or {}).get('tiempo') == 'bueno',
-              f"nivel={(fila.get('niveles') or {}).get('tiempo')} (sub-18: élite ≤4,15)")
+              fila and (fila.get('niveles') or {}).get('time_seconds') == 'bueno',
+              f"nivel={(fila.get('niveles') or {}).get('time_seconds')} (sub-18: élite ≤4,15)")
     comprobar('Le pone un puntaje 0-100 comparable',
               fila and isinstance(fila.get('puntaje'), int) and 0 <= fila['puntaje'] <= 100,
               f"puntaje={fila.get('puntaje')}")
@@ -143,8 +143,8 @@ def flujo_evaluacion(coach, jugador_pro):
 
     # El mismo tiempo en categoría de élite tiene que dar peor
     from futbol import tests_catalogo as cat
-    j_elite = cat.evaluar_valor('sprint_30m', 'tiempo', 4.18, 'general', 'elite')
-    j_sub14 = cat.evaluar_valor('sprint_30m', 'tiempo', 4.18, 'sub_14', 'general')
+    j_elite = cat.evaluar_valor('sprint_30m', 'time_seconds', 4.18, 'general', 'elite')
+    j_sub14 = cat.evaluar_valor('sprint_30m', 'time_seconds', 4.18, 'sub_14', 'general')
     comprobar('El mismo 4,18 s vale distinto según con quién se compare',
               j_elite['puntaje'] < j_sub14['puntaje'],
               f"élite={j_elite['nivel']}({j_elite['puntaje']}) · "
@@ -154,7 +154,7 @@ def flujo_evaluacion(coach, jugador_pro):
     cod, j2 = post(coach, '/api/eval/resultado', {
         'test': 'yoyo_ir1',
         'resultados': [{'player_id': str(pro_id),
-                        'valores': {'distancia': '1880', 'nivel': '18.5'}}],
+                        'valores': {'total_distance': '1880', 'level': '18.5'}}],
     })
     comprobar('Admite pruebas con varias medidas (Yo-Yo)',
               cod == 200 and j2.get('n') == 1, j2.get('error', ''))
@@ -163,7 +163,7 @@ def flujo_evaluacion(coach, jugador_pro):
     # Valor imposible
     cod, j3 = post(coach, '/api/eval/resultado', {
         'test': 'sprint_30m',
-        'resultados': [{'player_id': str(pro_id), 'valores': {'tiempo': '0.5'}}],
+        'resultados': [{'player_id': str(pro_id), 'valores': {'time_seconds': '0.5'}}],
     })
     comprobar('Rechaza una marca imposible con un mensaje claro',
               cod == 400 and 'entre' in (j3.get('error') or ''),
@@ -230,14 +230,14 @@ def flujo_deuna(admin, coach):
     print('\n── PAGO CON DEUNA ────────────────────────────────')
 
     cod, j = post(admin, '/admin/api/ajustes', {
-        'deuna_activo': True, 'deuna_titular': 'Prueba Automática',
-        'deuna_telefono': '0999999999', 'deuna_documento': '1700000000',
+        'deuna_activo': True, 'deuna_qr': '/static/de_una_qr.jpg',
+        'deuna_telefono': '0987553634',
     })
     comprobar('El admin configura la cuenta DeUna', cod == 200, j.get('error', ''))
 
     r = coach.get('/pagos/deuna/entrenador_pro')
     comprobar('El coach ve la pantalla de DeUna con los datos',
-              r.status_code == 200 and '0999999999' in r.get_data(as_text=True))
+              r.status_code == 200 and '0987553634' in r.get_data(as_text=True))
 
     cod, j = post(coach, '/pagos/api/deuna', {
         'plan': 'entrenador_pro', 'referencia': 'REF-PRUEBA-001', 'meses': 3,
@@ -338,7 +338,7 @@ def flujo_manuales_y_solicitudes(coach, jugador):
         cod, j2 = post(coach, '/api/eval/resultado', {
             'test': 'cmj',
             'resultados': [{'player_id': mid, 'manual': True,
-                            'valores': {'altura': '32.5'}}],
+                            'valores': {'height_cm': '32.5'}}],
         })
         comprobar('Se le puede evaluar igual que a los demás',
                   cod == 200 and j2.get('n') == 1, j2.get('error', ''))

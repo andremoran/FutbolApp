@@ -332,6 +332,11 @@ def ficha():
 
     return render_template('p_ficha.html',
                            tab_activa='ficha',
+                           estado={
+                               'energia': perfil.get('energia'),
+                               'motivacion': perfil.get('motivacion'),
+                               'estado_fisico': perfil.get('estado_fisico'),
+                           },
                            atributos=atributos,
                            media=db.media_atributos(uid),
                            perfil=perfil,

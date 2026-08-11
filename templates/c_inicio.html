@@ -1,214 +1,321 @@
 {% extends '_shell.html' %}
 {% block title %}Inicio · ProFoot{% endblock %}
 
-{# screens/CoachDashboardScreen.tsx + components/SetupChecklist.tsx.
-   Lo primero que necesita un entrenador nuevo es el código de su equipo: va arriba. #}
+{# Tablero del entrenador — misma estructura y mismo orden que
+   screens/CoachDashboardScreen.tsx de la app original:
 
+     código de equipo · Plantel/Activos/Partidos · solicitudes ·
+     Evaluaciones (morado) · Salud mental (rosa) · Estado físico promedio ·
+     Cuerpo técnico
+
+   Los colores de los dos banners son los del MVP: #7c3aed y #ec4899. #}
+
+{# El hero necesita hueco extra abajo: la tarjeta del código se solapa 26px y
+   sin él se comería el nombre del equipo. #}
+{% block hero_pb %}pf-hero--dash{% endblock %}
 {% block hero_label %}<div class="pf-hero__label">Dashboard · Entrenador</div>{% endblock %}
-{% block hero_title %}Hola, {{ (current_user.name or 'Entrenador').split(' ')[0] }}{% endblock %}
+{% block hero_title %}Hola, {{ current_user.name }}{% endblock %}
 {% block hero_subtitle %}
-<div class="pf-hero__subtitle">{{ equipo.nombre }}{% if equipo.categoria %} · {{ equipo.categoria }}{% endif %}</div>
-{% endblock %}
-
-{% block hero_extra %}
-<div style="display:flex;gap:10px;margin-top:18px">
-  <div class="pf-hero-kpi"><span class="pf-hero-kpi__v">{{ n_jugadores }}</span><span class="pf-hero-kpi__l">jugadores</span></div>
-  <div class="pf-hero-kpi"><span class="pf-hero-kpi__v">{{ eventos|length }}</span><span class="pf-hero-kpi__l">próximos<br>eventos</span></div>
-  <div class="pf-hero-kpi"><span class="pf-hero-kpi__v">{{ pendientes }}</span><span class="pf-hero-kpi__l">pasos por<br>completar</span></div>
+<div class="pf-hero__subtitle">
+  {{ equipo.nombre or 'Mi equipo' }}{% if equipo.categoria %} · {{ equipo.categoria }}{% endif %}
 </div>
+{% endblock %}
+{% block hero_actions %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_solicitudes') }}"
+   aria-label="Solicitudes" style="position:relative">
+  <i data-ico="bell"></i>
+  {% if solicitudes %}<span class="cd-pip">{{ solicitudes|length }}</span>{% endif %}
+</a>
 {% endblock %}
 
 {% block head %}
 <style>
-  .pf-hero-kpi { flex:1; background:rgba(255,255,255,.14); border-radius:12px; padding:10px 12px; }
-  .pf-hero-kpi__v { display:block; font-size:22px; font-weight:800; color:#fff; line-height:1.1; }
-  .pf-hero-kpi__l { display:block; font-size:10px; font-weight:600; color:rgba(255,255,255,.8);
-                    margin-top:3px; line-height:1.3; }
+  /* Hueco para que la tarjeta del código se solape sin tapar el nombre del equipo */
+  .pf-hero--dash { padding-bottom: 46px; }
 
-  .cd-codigo {
-    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-    font-size: 26px; font-weight: 800; letter-spacing: 5px;
-    color: var(--primary); text-align: center; padding: 14px 0 4px;
+  /* ── Código de equipo ── */
+  .cd-cod {
+    display: flex; align-items: center; gap: 13px;
+    margin: -26px 16px 0; padding: 15px 16px;
+    background: #fff; border-radius: var(--r-xl);
+    box-shadow: var(--sh-md); position: relative; z-index: 2;
   }
-  .cd-check { display:flex; align-items:center; gap:12px; padding:12px 4px;
-              border-top:1px solid var(--border-soft); }
-  .cd-check:first-of-type { border-top:none; }
-  .cd-check__box {
-    width:26px; height:26px; border-radius:13px; flex:none;
-    display:flex; align-items:center; justify-content:center;
-    border:2px solid var(--border); color:transparent;
+  .cd-cod__ico {
+    width: 46px; height: 46px; flex: none; border-radius: 13px;
+    display: grid; place-items: center; font-size: 21px; font-weight: 800;
+    background: var(--primary-soft); color: var(--primary);
   }
-  .cd-check__box.is-on { background:var(--primary); border-color:var(--primary); color:#fff; }
-  .cd-check.is-done .cd-check__t { color: var(--text-muted); text-decoration: line-through; }
-  .cd-check__t { font-size:14px; font-weight:600; }
-  .cd-quick { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:16px; }
-  .cd-quick a {
-    background:#fff; border:1px solid var(--border-soft); border-radius:var(--r-lg);
-    padding:14px; box-shadow:var(--sh-sm); display:flex; align-items:center; gap:10px;
-    font-size:13px; font-weight:700;
+  .cd-cod__et {
+    font-size: 10.5px; font-weight: 800; letter-spacing: 1.1px;
+    text-transform: uppercase; color: var(--text-muted);
   }
-  .cd-quick a:active { transform:scale(.98); }
+  .cd-cod__n {
+    font-size: 23px; font-weight: 800; letter-spacing: 2.5px;
+    line-height: 1.25; font-family: inherit;
+  }
+  .cd-cod__b {
+    flex: none; display: flex; align-items: center; gap: 5px;
+    padding: 11px 16px; border-radius: var(--r-lg);
+    background: var(--primary); color: #fff;
+    font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
+    border: none;
+  }
+  .cd-cod__b:active { transform: scale(.96); }
+
+  /* ── Tres cifras con su curva ── */
+  .cd-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 16px 0; }
+  .cd-stat {
+    background: #fff; border-radius: var(--r-xl); padding: 13px 12px 11px;
+    box-shadow: var(--sh-sm); border: 1px solid var(--border-soft);
+  }
+  .cd-stat__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; }
+  .cd-stat__n { font-size: 27px; font-weight: 800; letter-spacing: -1.2px; line-height: 1; }
+  .cd-stat__l { font-size: 12.5px; color: var(--text-sec); margin-top: 7px; }
+  .cd-spark { width: 52px; height: 26px; flex: none; overflow: visible; }
+
+  /* ── Banners de acceso ── */
+  .cd-ban {
+    display: flex; align-items: center; gap: 13px;
+    margin: 12px 16px 0; padding: 16px;
+    border-radius: var(--r-xl); color: #fff; text-decoration: none;
+    box-shadow: 0 8px 22px -10px rgba(0,0,0,.4);
+    transition: transform .13s;
+  }
+  .cd-ban:active { transform: scale(.985); }
+  .cd-ban__ico {
+    width: 44px; height: 44px; flex: none; border-radius: 13px;
+    display: grid; place-items: center;
+    background: rgba(255,255,255,.22);
+  }
+  .cd-ban__t { font-size: 16.5px; font-weight: 800; letter-spacing: -.3px; }
+  .cd-ban__s { font-size: 12.5px; opacity: .92; margin-top: 3px; line-height: 1.45; }
+  .cd-ban--eval   { background: #7c3aed; }
+  .cd-ban--mental { background: #ec4899; }
+  .cd-ban--sol    { background: var(--primary); }
+  .cd-pro {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 2px 8px; border-radius: 100px; margin-left: 7px;
+    background: rgba(0,0,0,.25);
+    font-size: 9.5px; font-weight: 800; letter-spacing: .7px;
+  }
+  .cd-pip {
+    position: absolute; top: -3px; right: -3px;
+    min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+    background: var(--danger); color: #fff;
+    font-size: 10px; font-weight: 800; line-height: 18px; text-align: center;
+  }
+
+  /* ── Estado físico ── */
+  .cd-fila { display: flex; align-items: center; gap: 11px; padding: 9px 0; }
+  .cd-fila__ico {
+    width: 32px; height: 32px; flex: none; border-radius: 10px;
+    display: grid; place-items: center; font-size: 15px;
+  }
+  .cd-fila__et { flex: 1; font-size: 15px; font-weight: 600; }
+  .cd-fila__v { font-size: 16px; font-weight: 800; }
+  .cd-barra { height: 7px; border-radius: 4px; background: var(--border-soft); overflow: hidden; }
+  .cd-barra > i { display: block; height: 100%; border-radius: 4px; }
+
+  /* ── Cuerpo técnico ── */
+  .cd-miembro { display: flex; align-items: center; gap: 11px; padding: 10px 0; }
+  .cd-sigla {
+    padding: 3px 9px; border-radius: 100px;
+    background: var(--primary-soft); color: var(--primary);
+    font-size: 10px; font-weight: 800; letter-spacing: .6px;
+  }
 </style>
 {% endblock %}
 
 {% block content %}
 
-{# ── Código del equipo: lo que el coach comparte para que se le unan ── #}
+{# ══════════ CÓDIGO DE EQUIPO ══════════ #}
+<div class="cd-cod">
+  <div class="cd-cod__ico">#</div>
+  <div class="pf-grow">
+    <div class="cd-cod__et">Código de equipo</div>
+    <div class="cd-cod__n">{{ codigo or '—' }}</div>
+  </div>
+  {% if codigo %}
+  <button type="button" class="cd-cod__b" onclick="invitar()">
+    <i data-ico="plus" class="pf-ico--sm"></i> Invitar
+  </button>
+  {% endif %}
+</div>
+
+{# ══════════ PLANTEL · ACTIVOS · PARTIDOS ══════════ #}
+<div class="cd-stats">
+  {% for s in [
+      {'n': n_jugadores, 'l': 'Plantel',  'c': '#047857', 'url': url_for('futbol.c_equipo')},
+      {'n': activos,     'l': 'Activos',  'c': '#10b981', 'url': url_for('futbol.c_equipo')},
+      {'n': n_partidos,  'l': 'Partidos', 'c': '#3b82f6', 'url': url_for('futbol.c_partidos')}] %}
+  <a class="cd-stat" href="{{ s.url }}" style="text-decoration:none;color:inherit">
+    <div class="cd-stat__top">
+      <div class="cd-stat__n" style="color:{{ s.c }}">{{ s.n }}</div>
+      {# Curva decorativa, como en la app: sugiere tendencia sin fingir un dato
+         que todavía no tenemos. Sube si hay algo que contar y es plana si no. #}
+      <svg class="cd-spark" viewBox="0 0 52 26" preserveAspectRatio="none" aria-hidden="true">
+        <path d="{{ 'M0,20 C10,19 16,14 24,12 C32,10 40,5 52,3' if s.n else 'M0,17 L52,17' }}"
+              fill="none" stroke="{{ s.c }}" stroke-width="2.4"
+              stroke-linecap="round" opacity="{{ '1' if s.n else '.28' }}"></path>
+      </svg>
+    </div>
+    <div class="cd-stat__l">{{ s.l }}</div>
+  </a>
+  {% endfor %}
+</div>
+
+{# ══════════ SOLICITUDES PENDIENTES ══════════ #}
+{% if solicitudes %}
+<a class="cd-ban cd-ban--sol" href="{{ url_for('futbol.c_solicitudes') }}">
+  <div class="cd-ban__ico" style="position:relative">
+    <i data-ico="user-plus" class="pf-ico--sm"></i>
+    <span class="cd-pip">{{ solicitudes|length }}</span>
+  </div>
+  <div class="pf-grow">
+    <div class="cd-ban__t">
+      {{ solicitudes|length }} solicitud{{ '' if solicitudes|length == 1 else 'es' }} pendiente{{ '' if solicitudes|length == 1 else 's' }}
+    </div>
+    <div class="cd-ban__s">Tócalo para revisar y aceptar</div>
+  </div>
+  <i data-ico="chevron-right" class="pf-ico--sm"></i>
+</a>
+{% endif %}
+
+{# ══════════ EVALUACIONES ══════════ #}
+<a class="cd-ban cd-ban--eval" href="{{ url_for('futbol.c_evaluaciones') }}">
+  <div class="cd-ban__ico"><i data-ico="clipboard" class="pf-ico--sm"></i></div>
+  <div class="pf-grow">
+    <div class="cd-ban__t">Evaluaciones</div>
+    <div class="cd-ban__s">Tests con análisis IA · físico, técnico, mental</div>
+  </div>
+  <i data-ico="chevron-right" class="pf-ico--sm"></i>
+</a>
+
+{# ══════════ SALUD MENTAL ══════════ #}
+<a class="cd-ban cd-ban--mental" href="{{ url_for('futbol.c_mental') }}">
+  <div class="cd-ban__ico"><i data-ico="heart" class="pf-ico--sm"></i></div>
+  <div class="pf-grow">
+    <div class="cd-ban__t">
+      Salud mental del equipo
+      {% if not es_pro %}<span class="cd-pro"><i data-ico="lock" class="pf-ico--xs"></i> PRO</span>{% endif %}
+    </div>
+    <div class="cd-ban__s">Asignar check-ins y ver estado simplificado por jugador</div>
+  </div>
+  <i data-ico="chevron-right" class="pf-ico--sm"></i>
+</a>
+
+{# ══════════ ESTADO FÍSICO PROMEDIO ══════════ #}
 <div class="pf-card">
   <div class="pf-card__head">
-    <h2 class="pf-card__title">Código del equipo</h2>
-    <a href="{{ url_for('futbol.c_equipo_editar') }}" class="pf-item__right">Editar</a>
+    <h2 class="pf-card__title">Estado físico promedio</h2>
+    <span class="pf-pill pf-pill--muted">
+      <i data-ico="users" class="pf-ico--xs"></i> {{ n_reportan }}
+    </span>
   </div>
 
-  {% if codigo %}
-    <div class="cd-codigo" id="cod-txt">{{ codigo }}</div>
-    <p class="pf-center" style="font-size:12px;color:var(--text-sec);margin:0 0 14px">
-      Tus jugadores se registran con este código y entran directo a tu plantilla.
-    </p>
-    <div class="pf-row" style="gap:8px">
-      <button class="pf-btn pf-btn--secondary pf-grow" type="button" id="btn-copiar">
-        <i data-ico="copy" class="pf-ico--sm"></i> Copiar
-      </button>
-      <button class="pf-btn pf-btn--primary pf-grow" type="button" id="btn-compartir">
-        <i data-ico="share-2" class="pf-ico--sm"></i> Compartir
-      </button>
+  {% if estado %}
+    {% for e in estado %}
+    <div>
+      <div class="cd-fila">
+        <div class="cd-fila__ico" style="background:{{ e.color }}1f">{{ e.icono }}</div>
+        <div class="cd-fila__et">{{ e.etiqueta }}</div>
+        <div class="cd-fila__v"
+             style="color:{{ '#10b981' if e.valor >= 70 else ('#f59e0b' if e.valor >= 50 else '#ef4444') }}">
+          {{ e.valor }}%
+        </div>
+      </div>
+      <div class="cd-barra" style="margin-bottom:6px">
+        <i style="width:{{ e.valor }}%;background:{{ '#10b981' if e.valor >= 70 else ('#f59e0b' if e.valor >= 50 else '#ef4444') }}"></i>
+      </div>
     </div>
+    {% endfor %}
+    <p style="margin:10px 0 0;font-size:11.5px;color:var(--text-muted);line-height:1.55">
+      Lo reporta cada jugador desde su ficha. No son las respuestas del check-in
+      de bienestar, que son confidenciales.
+    </p>
   {% else %}
-    <div class="pf-flash pf-flash--warning" style="margin:12px 0 0">
-      <i data-ico="alert-circle" class="pf-ico--sm"></i>
-      <span>Tu código de equipo aún no se ha generado. Cierra sesión y vuelve a
-            entrar; si sigue igual, escríbenos.</span>
+    <div class="pf-empty" style="padding:20px 8px">
+      <div class="pf-empty__icon" style="background:var(--primary-soft);color:var(--primary)">
+        <i data-ico="activity" class="pf-ico--xxl"></i>
+      </div>
+      <div class="pf-empty__title">Todavía sin datos</div>
+      <div class="pf-empty__text">
+        Aparecerá cuando tus jugadores digan cómo se sienten desde su ficha.
+      </div>
     </div>
   {% endif %}
 </div>
 
-{# ── Checklist de puesta en marcha ── #}
-{% if pendientes %}
+{# ══════════ CUERPO TÉCNICO ══════════ #}
 <div class="pf-card">
   <div class="pf-card__head">
-    <h2 class="pf-card__title">Primeros pasos</h2>
-    <span class="pf-card__badge">{{ checklist|selectattr('hecho')|list|length }}/{{ checklist|length }}</span>
+    <h2 class="pf-card__title">Cuerpo técnico</h2>
+    <span class="pf-pill pf-pill--muted">
+      <i data-ico="users" class="pf-ico--xs"></i> {{ cuerpo|length }}
+    </span>
   </div>
-  {% for c in checklist %}
-  <a class="cd-check {{ 'is-done' if c.hecho }}" href="{{ c.url }}">
-    <span class="cd-check__box {{ 'is-on' if c.hecho }}"><i data-ico="check" class="pf-ico--xs"></i></span>
-    <span class="cd-check__t pf-grow">{{ c.texto }}</span>
-    {% if not c.hecho %}<i data-ico="chevron-right" class="pf-ico--sm" style="color:var(--text-muted)"></i>{% endif %}
-  </a>
+  {% for m in cuerpo %}
+  <div class="cd-miembro">
+    <div class="pf-avatar pf-avatar--sm">
+      {%- if m.foto %}<img src="{{ m.foto }}" alt="">
+      {%- else %}{{ (m.nombre or '?')[:1]|upper }}{% endif -%}
+    </div>
+    <div class="pf-grow">
+      <div style="font-weight:650;font-size:14.5px">
+        {{ m.nombre }}{% if m.yo %} <span style="color:var(--text-muted)">(tú)</span>{% endif %}
+      </div>
+      <div style="font-size:12px;color:var(--text-sec)">{{ m.rol }}</div>
+    </div>
+    <span class="cd-sigla">{{ m.sigla }}</span>
+  </div>
   {% endfor %}
 </div>
-{% endif %}
 
-{# ── Accesos rápidos ── #}
-<div class="cd-quick">
-  <a href="{{ url_for('futbol.c_equipo') }}">
-    <i data-ico="users" class="pf-ico--lg" style="color:var(--primary)"></i> Plantilla
-  </a>
-  <a href="{{ url_for('futbol.c_agenda') }}">
-    <i data-ico="calendar" class="pf-ico--lg" style="color:var(--info)"></i> Agendar
-  </a>
-  <a href="{{ url_for('futbol.c_partidos') }}">
-    <i data-ico="award" class="pf-ico--lg" style="color:var(--danger)"></i> Partidos
-  </a>
-  <a href="{{ url_for('futbol.c_tests') }}">
-    <i data-ico="bar-chart-2" class="pf-ico--lg" style="color:var(--purple)"></i> Pruebas
-  </a>
-  <a href="{{ url_for('futbol.c_mental') }}">
-    <i data-ico="heart" class="pf-ico--lg" style="color:var(--success)"></i> Bienestar
-  </a>
-  <a href="{{ url_for('futbol.c_mensajes') }}">
-    <i data-ico="mail" class="pf-ico--lg" style="color:var(--warning)"></i> Mensajes
-  </a>
-  <a href="{{ url_for('futbol.c_observaciones') }}">
-    <i data-ico="file-text" class="pf-ico--lg" style="color:var(--text-sec)"></i> Notas
-  </a>
-  <a href="{{ url_for('futbol.c_pizarra') }}">
-    <i data-ico="target" class="pf-ico--lg" style="color:var(--primary-light)"></i> Pizarra
-  </a>
-</div>
-
-{# ── Lo que viene ── #}
+{# ══════════ LO QUE VIENE ══════════ #}
 {% if eventos %}
 <div class="pf-card">
   <div class="pf-card__head">
-    <h2 class="pf-card__title">Próximos eventos</h2>
-    <a href="{{ url_for('futbol.c_agenda') }}" class="pf-item__right">Ver todo</a>
+    <h2 class="pf-card__title">Lo que viene</h2>
+    <a href="{{ url_for('futbol.c_calendario') }}" class="pf-item__right">Calendario</a>
   </div>
   {% for e in eventos %}
   <a class="pf-item" href="{{ url_for('futbol.c_evento', eid=e.id) }}">
-    <span class="pf-item__icon"><i data-ico="calendar" class="pf-ico--sm"></i></span>
-    <span class="pf-item__body">
-      <span class="pf-item__title">{{ e.titulo }}</span>
-      <span class="pf-item__sub">
-        {{ e.fecha }}{% if e.hora %} · {{ e.hora[:5] }}{% endif %}
+    <div class="pf-item__icon">
+      {{ {'entreno':'🏃','partido':'⚽','descanso':'🌙','reunion':'👥',
+          'medico':'🏥','test':'📊'}.get(e.tipo, '🏃') }}
+    </div>
+    <div class="pf-item__body">
+      <div class="pf-item__title">{{ e.titulo }}</div>
+      <div class="pf-item__sub">
+        {{ e._fecha.strftime('%d/%m') if e._fecha else '' }}
+        {%- if e.hora %} · {{ e.hora[:5] }}{% endif %}
         {%- if e.lugar %} · {{ e.lugar }}{% endif %}
-      </span>
-    </span>
-    <span class="pf-item__chev"><i data-ico="chevron-right" class="pf-ico--sm"></i></span>
+      </div>
+    </div>
+    <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
   </a>
   {% endfor %}
 </div>
 {% endif %}
 
-{# ── Jugadores sin evaluar hace tiempo ── #}
-{% if sin_evaluar %}
-<div class="pf-card">
-  <div class="pf-card__head">
-    <h2 class="pf-card__title">Llevan más de un mes sin evaluar</h2>
-    <span class="pf-card__badge" style="background:var(--warning-bg);color:#b45309">
-      {{ sin_evaluar|length }}
-    </span>
-  </div>
-  {% for j in sin_evaluar %}
-  <a class="pf-item" href="{{ url_for('futbol.c_evaluar', pid=j.id) }}">
-    <span class="pf-avatar pf-avatar--sm">
-      {%- if j.profile_photo %}<img src="{{ j.profile_photo }}" alt="">
-      {%- else %}{{ (j.name or '?')[:1]|upper }}{% endif -%}
-    </span>
-    <span class="pf-item__body">
-      <span class="pf-item__title">{{ j.name }}</span>
-      <span class="pf-item__sub">{{ (j.fut or {}).get('posicion') or 'Sin posición' }}</span>
-    </span>
-    <span class="pf-item__right">Evaluar</span>
-  </a>
-  {% endfor %}
-</div>
-{% endif %}
-
-{# ── Plantilla vacía: el paso que desbloquea todo ── #}
-{% if not n_jugadores %}
-<div class="pf-empty">
-  <div class="pf-empty__icon"><i data-ico="users" class="pf-ico--xxl"></i></div>
-  <h2 class="pf-empty__title">Tu plantilla está vacía</h2>
-  <p class="pf-empty__text">
-    Comparte el código de arriba con tus jugadores. Al registrarse con él entran
-    automáticamente a tu equipo y todo lo demás empieza a llenarse solo.
-  </p>
-</div>
-{% endif %}
-
+<div style="height:20px"></div>
 {% endblock %}
 
 {% block scripts %}
-{% if codigo %}
 <script>
-(function () {
-  var codigo = {{ codigo|tojson }};
-  var mensaje = 'Únete a mi equipo en ProFoot Assistant con el código: ' + codigo +
-                '\n' + window.location.origin + '/futbol/registro?rol=jugador&codigo=' + encodeURIComponent(codigo);
-
-  document.getElementById('btn-copiar').addEventListener('click', function () {
-    PF.copy(codigo, 'Código copiado');
-  });
-
-  document.getElementById('btn-compartir').addEventListener('click', function () {
-    if (navigator.share) {
-      navigator.share({ title: 'Únete a mi equipo', text: mensaje }).catch(function () {});
-    } else {
-      PF.copy(mensaje, 'Invitación copiada');
-    }
-  });
-})();
+function invitar() {
+  const codigo = '{{ codigo }}';
+  const texto = 'Únete a mi equipo en ProFoot con el código ' + codigo +
+                ': {{ url_for("auth.registro", rol="jugador", _external=True) }}?codigo=' + codigo;
+  // En el móvil abre la hoja de compartir del sistema; en escritorio, que no
+  // la tiene, se copia al portapapeles y se avisa.
+  if (navigator.share) {
+    navigator.share({ title: 'ProFoot', text: texto }).catch(() => {});
+  } else {
+    navigator.clipboard.writeText(texto)
+      .then(() => PF.toast('Invitación copiada', 'success'))
+      .catch(() => PF.toast('Código: ' + codigo, 'info'));
+  }
+}
 </script>
-{% endif %}
 {% endblock %}

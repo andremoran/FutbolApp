@@ -385,3 +385,18 @@ begin
   raise notice '  Esquema v2 aplicado';
   raise notice '════════════════════════════════════';
 end $$;
+
+
+-- ════════════════════════════════════════════════════════════════════════════
+--  14. ESTADO DEL JUGADOR (autoinforme)
+-- ════════════════════════════════════════════════════════════════════════════
+--  Los tres números que el MVP enseña en «Estado físico promedio» del tablero
+--  del entrenador. Vienen de `user_profiles` en la app original: los pone EL
+--  PROPIO JUGADOR y NO son confidenciales — no tienen nada que ver con las
+--  respuestas del check-in de bienestar, que el entrenador no ve nunca.
+alter table fut_player_profile add column if not exists energia       int;
+alter table fut_player_profile add column if not exists motivacion    int;
+alter table fut_player_profile add column if not exists estado_fisico int;
+alter table fut_player_profile add column if not exists estado_actualizado timestamptz;
+
+notify pgrst, 'reload schema';

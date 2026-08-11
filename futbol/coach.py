@@ -34,44 +34,67 @@ def solo_entrenador(f):
 @bp.route('/coach')
 @solo_entrenador
 def c_inicio():
+    """El tablero del entrenador, con la misma estructura que CoachDashboardScreen.
+
+    Orden de la app original, de arriba abajo: código de equipo · tres cifras
+    (Plantel, Activos, Partidos) · solicitudes pendientes si las hay ·
+    Evaluaciones · Salud mental · Estado físico promedio · Cuerpo técnico.
+    """
+    import roles
+
     uid = current_user.id
     equipo = db.equipo_del_entrenador(uid)
     jugadores = db.jugadores_del_entrenador(uid)
-
     hoy = date.today()
-    eventos = db.eventos_equipo(uid, desde=hoy.isoformat(),
-                                hasta=(hoy + timedelta(days=14)).isoformat())
-    for e in eventos:
+    ids = [j['id'] for j in jugadores]
+
+    # ── Activos hoy: quien marcó al menos un hábito ──
+    activos = 0
+    if ids:
+        marcas = db.q(
+            lambda: db.sb().table('fut_habit_completions').select('player_id')
+            .in_('player_id', ids).eq('fecha', hoy.isoformat())
+            .eq('hecho', True).execute().data or [], [], 'activos hoy')
+        activos = len({m['player_id'] for m in marcas})
+
+    n_partidos = len(db.rows('fut_matches', 'partidos', coach_id=uid) or [])
+
+    # ── Estado físico promedio ──
+    #  Sale del AUTOINFORME del jugador (fut_player_profile), igual que en la
+    #  app original. NO tiene nada que ver con las respuestas del check-in de
+    #  bienestar, que el entrenador no ve nunca.
+    estado, n_reportan = [], 0
+    if ids:
+        perfiles = db.q(
+            lambda: db.sb().table('fut_player_profile')
+            .select('user_id, energia, motivacion, estado_fisico')
+            .in_('user_id', ids).execute().data or [], [], 'estado equipo')
+        for etiqueta, campo, icono, color in (
+                ('Energía', 'energia', '⚡', '#f59e0b'),
+                ('Motivación', 'motivacion', '💗', '#ec4899'),
+                ('Estado físico', 'estado_fisico', '📈', '#10b981')):
+            valores = [p[campo] for p in perfiles if p.get(campo) is not None]
+            if valores:
+                estado.append({'etiqueta': etiqueta, 'icono': icono, 'color': color,
+                               'valor': round(sum(valores) / len(valores))})
+        n_reportan = len([p for p in perfiles
+                          if any(p.get(c) is not None
+                                 for c in ('energia', 'motivacion', 'estado_fisico'))])
+
+    # ── Solicitudes pendientes ──
+    from .equipo import solicitudes_pendientes
+    solicitudes = solicitudes_pendientes(uid)
+
+    # ── Cuerpo técnico ──
+    #  Por ahora el entrenador es uno. Se deja como lista para que añadir
+    #  asistentes no obligue a rehacer la tarjeta.
+    cuerpo = [{'nombre': current_user.name, 'rol': 'Entrenador Principal',
+               'sigla': 'MAIN', 'foto': current_user.profile_photo, 'yo': True}]
+
+    proximos = db.eventos_equipo(uid, desde=hoy.isoformat(),
+                                 hasta=(hoy + timedelta(days=14)).isoformat())
+    for e in proximos:
         e['_fecha'] = db.parse_fecha(e.get('fecha'))
-
-    # Checklist de puesta en marcha (components/SetupChecklist.tsx)
-    plays = db.rows('fut_tactical_plays', 'jugadas', coach_id=uid, _limit=1)
-    checklist = [
-        {'clave': 'equipo',    'texto': 'Ponle nombre a tu equipo',
-         'hecho': bool(equipo.get('nombre') and not equipo.get('_provisional')),
-         'url': url_for('futbol.c_equipo_editar')},
-        {'clave': 'jugadores', 'texto': 'Suma jugadores a la plantilla',
-         'hecho': len(jugadores) > 0, 'url': url_for('futbol.c_equipo')},
-        {'clave': 'agenda',    'texto': 'Agenda tu primer entrenamiento',
-         'hecho': len(eventos) > 0, 'url': url_for('futbol.c_agenda')},
-        {'clave': 'tactica',   'texto': 'Crea una jugada táctica',
-         'hecho': len(plays) > 0, 'url': url_for('futbol.c_tactica')},
-    ]
-
-    # Jugadores que llevan mucho sin evaluación: la alerta más útil del dashboard
-    sin_evaluar = []
-    if jugadores:
-        ids = [j['id'] for j in jugadores]
-        evals = db.q(
-            lambda: db.sb().table('fut_evaluations').select('player_id, fecha')
-            .in_('player_id', ids).execute().data or [], [], 'evals equipo')
-        ultima = {}
-        for e in evals:
-            f = db.parse_fecha(e.get('fecha'))
-            if f and (e['player_id'] not in ultima or f > ultima[e['player_id']]):
-                ultima[e['player_id']] = f
-        limite = hoy - timedelta(days=30)
-        sin_evaluar = [j for j in jugadores if ultima.get(j['id'], date.min) < limite]
 
     return render_template('c_inicio.html',
                            tab_activa='inicio',
@@ -79,10 +102,14 @@ def c_inicio():
                            codigo=db.codigo_equipo(uid),
                            jugadores=jugadores,
                            n_jugadores=len(jugadores),
-                           eventos=eventos[:4],
-                           checklist=checklist,
-                           pendientes=len([c for c in checklist if not c['hecho']]),
-                           sin_evaluar=sin_evaluar[:5])
+                           activos=activos,
+                           n_partidos=n_partidos,
+                           estado=estado,
+                           n_reportan=n_reportan,
+                           solicitudes=solicitudes,
+                           cuerpo=cuerpo,
+                           eventos=proximos[:3],
+                           es_pro=roles.es_pro(current_user))
 
 
 @bp.route('/coach/equipo/editar')
