@@ -4,7 +4,7 @@
   "description": "Gestión de equipos y jugadores de fútbol: entrenamientos, tácticas, evaluaciones y seguimiento del rendimiento.",
   "lang": "es",
   "dir": "ltr",
-  "start_url": "/futbol/",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
@@ -12,8 +12,8 @@
   "theme_color": "#047857",
   "categories": ["sports", "health", "productivity"],
   "icons": [
-    { "src": "/static/futbol/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/static/futbol/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
-    { "src": "/static/futbol/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+    { "src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/static/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
