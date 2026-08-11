@@ -86,7 +86,7 @@
     <h2 class="pf-card__title">Tomar una prueba</h2>
     <a href="{{ url_for('futbol.c_eval_catalogo') }}"
        style="font-size:12.5px;font-weight:650;color:var(--primary);text-decoration:none">
-      Ver las 30 →
+      Ver las {{ n_pruebas }} →
     </a>
   </div>
 </div>
@@ -95,8 +95,7 @@
   {% for t in destacadas %}
     {% if t %}
     <a class="pf-tarjeta" href="{{ url_for('futbol.c_eval_aplicar', clave=t.clave) }}">
-      <div class="pf-tarjeta__e">{{ {'fisico':'🏃','tecnico':'⚽','tactico':'🧠',
-                                     'mental':'💚','antropometria':'📏'}[t.categoria] }}</div>
+      <div class="pf-tarjeta__e">{{ {'fisico':'🏃','tecnico':'⚽','mental':'🧠'}.get(t.categoria, '📊') }}</div>
       <div class="pf-tarjeta__t">{{ t.nombre }}</div>
       <div class="pf-tarjeta__s">{{ t.subcategoria }}</div>
     </a>
@@ -136,6 +135,7 @@
         <div class="pf-jug__s">
           {{ r.test_nombre }} ·
           {{ r._fecha.strftime('%d/%m/%Y') if r._fecha else '' }}
+          {%- if r._firma %} · {{ r._firma }}{% endif %}
         </div>
       </div>
       <div style="text-align:right">

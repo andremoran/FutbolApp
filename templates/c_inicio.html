@@ -253,10 +253,14 @@
     <span class="pf-pill pf-pill--muted">
       <i data-ico="users" class="pf-ico--xs"></i> {{ cuerpo|length }}
     </span>
+    {% if es_principal %}
+    <a href="{{ url_for('futbol.c_asistentes') }}" class="pf-item__right">Gestionar</a>
+    {% endif %}
   </div>
   {% for m in cuerpo %}
   <div class="cd-miembro">
-    <div class="pf-avatar pf-avatar--sm">
+    <div class="pf-avatar pf-avatar--sm"
+         {% if m.rol == 'asistente' %}style="background:#ede9fe;color:#7c3aed"{% endif %}>
       {%- if m.foto %}<img src="{{ m.foto }}" alt="">
       {%- else %}{{ (m.nombre or '?')[:1]|upper }}{% endif -%}
     </div>
@@ -264,11 +268,21 @@
       <div style="font-weight:650;font-size:14.5px">
         {{ m.nombre }}{% if m.yo %} <span style="color:var(--text-muted)">(tú)</span>{% endif %}
       </div>
-      <div style="font-size:12px;color:var(--text-sec)">{{ m.rol }}</div>
+      <div style="font-size:12px;color:var(--text-sec)">{{ m.etiqueta }}</div>
     </div>
-    <span class="cd-sigla">{{ m.sigla }}</span>
+    <span class="cd-sigla"
+          {% if m.rol == 'asistente' %}style="background:#ede9fe;color:#7c3aed"{% endif %}>
+      {{ m.sigla }}
+    </span>
   </div>
   {% endfor %}
+
+  {% if es_principal and cuerpo|length == 1 %}
+  <a class="pf-btn pf-btn--ghost pf-btn--block pf-mt-12"
+     href="{{ url_for('futbol.c_asistentes') }}">
+    <i data-ico="user-plus" class="pf-ico--sm"></i> Sumar un asistente técnico
+  </a>
+  {% endif %}
 </div>
 
 {# ══════════ LO QUE VIENE ══════════ #}

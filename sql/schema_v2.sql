@@ -400,3 +400,51 @@ alter table fut_player_profile add column if not exists estado_fisico int;
 alter table fut_player_profile add column if not exists estado_actualizado timestamptz;
 
 notify pgrst, 'reload schema';
+
+
+-- ════════════════════════════════════════════════════════════════════════════
+--  15. CUERPO TÉCNICO: ENTRENADOR PRINCIPAL + ASISTENTES
+-- ════════════════════════════════════════════════════════════════════════════
+--  Un equipo puede tener varios entrenadores. El PRINCIPAL es el dueño del
+--  `codigo_equipo` y de la suscripción; los ASISTENTES evalúan, miden, pasan
+--  lista y anotan igual que él, y lo que anotan cae en los datos del equipo.
+--
+--  Por qué `principal_id` y no un `team_id` nuevo: en esta app el equipo YA se
+--  identifica por el id del entrenador principal (fut_plantilla.coach_id,
+--  fut_events.coach_id, fut_eval_results.coach_id…). Inventar un team_id
+--  obligaría a migrar nueve tablas y a reescribir cien consultas; con esto,
+--  `db.equipo_id()` traduce «quién soy» a «de qué equipo escribo» y el resto
+--  del código sigue igual.
+create table if not exists fut_team_coaches (
+  id           uuid primary key default gen_random_uuid(),
+  principal_id uuid not null references usuarios(id) on delete cascade,
+  coach_id     uuid not null references usuarios(id) on delete cascade,
+  rol          text not null default 'asistente',   -- principal | asistente
+  estado       text not null default 'activo',      -- activo | retirado
+  creado       timestamptz default now(),
+  retirado     timestamptz
+);
+-- Un entrenador pertenece a un equipo a la vez, como los jugadores.
+create unique index if not exists fut_team_coaches_uidx on fut_team_coaches(coach_id);
+create index        if not exists fut_team_coaches_pri  on fut_team_coaches(principal_id, estado);
+
+-- Las solicitudes de ingreso ahora distinguen jugador de asistente.
+alter table fut_join_requests add column if not exists tipo text default 'jugador';
+
+-- ── Firma de quién anota ──
+--  Sin esto, en un equipo con asistentes no hay forma de saber quién puso un
+--  número, y el primer dato raro se convierte en una discusión.
+alter table fut_eval_results   add column if not exists registrado_por uuid references usuarios(id) on delete set null;
+alter table fut_events         add column if not exists registrado_por uuid references usuarios(id) on delete set null;
+alter table fut_matches        add column if not exists registrado_por uuid references usuarios(id) on delete set null;
+alter table fut_match_stats    add column if not exists registrado_por uuid references usuarios(id) on delete set null;
+alter table fut_observaciones  add column if not exists registrado_por uuid references usuarios(id) on delete set null;
+alter table fut_injuries       add column if not exists registrado_por uuid references usuarios(id) on delete set null;
+alter table fut_manual_players add column if not exists registrado_por uuid references usuarios(id) on delete set null;
+
+do $$
+begin
+  execute 'alter table fut_team_coaches enable row level security';
+end $$;
+
+notify pgrst, 'reload schema';

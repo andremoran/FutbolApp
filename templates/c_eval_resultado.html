@@ -110,6 +110,12 @@
     </span>
   </div>
   {% endif %}
+  {% if r._firma %}
+  <div class="pf-medida">
+    <span class="pf-medida__et">Lo anotó</span>
+    <span style="font-size:13px;font-weight:650">{{ r._firma }}</span>
+  </div>
+  {% endif %}
   {% if r.notas %}
   <div style="padding-top:11px">
     <div class="pf-label">Notas del entrenador</div>

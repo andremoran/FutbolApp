@@ -349,7 +349,7 @@ def c_calendario():
     if fuera:
         return fuera
 
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     anio, mes = _mes_pedido()
 
     # Se cargan tres meses: el que se ve y sus vecinos, para que los días de
@@ -403,7 +403,7 @@ def c_asistencia():
     if fuera:
         return fuera
 
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     dias = 90
     try:
         dias = max(7, min(365, int(request.args.get('d') or 90)))
@@ -433,7 +433,7 @@ def c_pasar_lista(eid):
     if fuera:
         return fuera
 
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     evento = db.one('fut_events', 'evento lista', id=eid, coach_id=uid)
     if not evento:
         abort(404)
@@ -473,7 +473,7 @@ def c_planes():
     fuera = _coach_o_fuera()
     if fuera:
         return fuera
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     planes = db.rows('fut_training_plans', 'planes', coach_id=uid,
                      _order='creado', _desc=True) or []
     for p in planes:
@@ -495,7 +495,7 @@ def c_plan(plid):
     fuera = _coach_o_fuera()
     if fuera:
         return fuera
-    plan = db.one('fut_training_plans', 'plan', id=plid, coach_id=current_user.id)
+    plan = db.one('fut_training_plans', 'plan', id=plid, coach_id=db.equipo_id(current_user.id))
     if not plan:
         abort(404)
     plan['_bloques'] = plan.get('bloques') or []
@@ -600,7 +600,7 @@ def api_cal_evento():
         return error
 
     d = request.get_json(silent=True) or {}
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     datos = _campos_evento(d)
 
     eid = d.get('id')
@@ -620,7 +620,9 @@ def api_cal_evento():
                          'eventos por delante. Pásate a Pro para el calendario completo.',
                 'pro': True, 'url': url_for('futbol.planes')}), 402
 
-    datos.update({'coach_id': uid, 'creado': _ahora()})
+    # `uid` es el EQUIPO; la firma es la PERSONA que lo agenda.
+    datos.update({'coach_id': uid, 'registrado_por': current_user.id,
+                  'creado': _ahora()})
     if d.get('plan_id'):
         datos['plan_id'] = d['plan_id']
     fila = db.insert('fut_events', datos, 'evento nuevo')
@@ -645,7 +647,7 @@ def api_cal_borrar(eid):
     error = _guardia_coach()
     if error:
         return error
-    db.delete('fut_events', 'borrar evento', id=eid, coach_id=current_user.id)
+    db.delete('fut_events', 'borrar evento', id=eid, coach_id=db.equipo_id(current_user.id))
     return jsonify({'ok': True, 'mensaje': 'Evento borrado.'})
 
 
@@ -658,7 +660,7 @@ def api_pasar_lista():
         return error
 
     d = request.get_json(silent=True) or {}
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     eid = d.get('event_id')
     if not eid or not db.one('fut_events', 'evento mio', id=eid, coach_id=uid):
         return jsonify({'error': 'Ese evento no es tuyo.'}), 403
@@ -687,7 +689,7 @@ def api_pasar_lista():
             'jugador_nombre': (m.get('nombre') or '')[:120],
             'estado': estado,
             'motivo': (m.get('motivo') or '')[:200],
-            'registrado_por': uid,
+            'registrado_por': current_user.id,
             'actualizado': _ahora(),
         }
         previa = previas.get(pid)
@@ -714,7 +716,7 @@ def api_plan():
                         'pro': True, 'url': url_for('futbol.planes')}), 402
 
     d = request.get_json(silent=True) or {}
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     nombre = (d.get('nombre') or '').strip()
     if len(nombre) < 3:
         return jsonify({'error': 'Ponle un nombre al plan.'}), 400
@@ -763,7 +765,7 @@ def api_plan_borrar(plid):
     error = _guardia_coach()
     if error:
         return error
-    db.delete('fut_training_plans', 'borrar plan', id=plid, coach_id=current_user.id)
+    db.delete('fut_training_plans', 'borrar plan', id=plid, coach_id=db.equipo_id(current_user.id))
     return jsonify({'ok': True, 'mensaje': 'Plan borrado.'})
 
 
@@ -775,7 +777,7 @@ def api_plan_agendar(plid):
     if error:
         return error
 
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     plan = db.one('fut_training_plans', 'plan agendar', id=plid, coach_id=uid)
     if not plan:
         return jsonify({'error': 'Ese plan no es tuyo.'}), 404

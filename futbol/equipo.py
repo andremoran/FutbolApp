@@ -54,6 +54,69 @@ def solicitudes_pendientes(coach_id):
                    _order='creado', _desc=True) or []
 
 
+# ═══════════════════════ CUERPO TÉCNICO ═══════════════════════
+@bp.route('/coach/asistentes')
+@login_required
+@roles.solo_principal('asistentes')
+def c_asistentes():
+    """Quién más puede anotar en este equipo.
+
+    Un asistente hace lo mismo que el principal sobre los datos del equipo
+    —evalúa, mide, pasa lista, apunta lesiones— y lo que anota queda firmado
+    con su nombre. Lo que NO puede es tocar la suscripción ni el propio
+    cuerpo técnico: eso es del dueño del equipo.
+    """
+    fuera = _coach_o_fuera()
+    if fuera:
+        return fuera
+
+    uid = db.equipo_id(current_user.id)
+    cuerpo = db.cuerpo_tecnico(uid)
+    pendientes = [s for s in solicitudes_pendientes(uid)
+                  if s.get('tipo') == 'asistente']
+    if pendientes:
+        ids = [s['player_id'] for s in pendientes]
+        personas = db.q(
+            lambda: db.sb().table('usuarios').select('*').in_('id', ids)
+            .execute().data or [], [], 'aspirantes')
+        por_id = {p['id']: p for p in personas}
+        for s in pendientes:
+            s['_persona'] = por_id.get(s.get('player_id'), {})
+            s['_fecha'] = db.parse_fecha(s.get('creado'))
+
+    return render_template('c_asistentes.html',
+                           tab_activa='equipo', hide_tabbar=True,
+                           cuerpo=cuerpo,
+                           asistentes=[c for c in cuerpo if c['rol'] == 'asistente'],
+                           pendientes=pendientes,
+                           codigo=db.codigo_equipo(uid),
+                           es_pro=roles.es_pro(current_user))
+
+
+@bp.route('/api/asistente/<aid>', methods=['DELETE'])
+@login_required
+def api_asistente_quitar(aid):
+    error = _guardia_coach()
+    if error:
+        return error
+    if roles.es_asistente(current_user):
+        return jsonify({'error': 'Solo el entrenador principal gestiona el '
+                                 'cuerpo técnico.'}), 403
+
+    uid = db.equipo_id(current_user.id)
+    fila = db.one('fut_team_coaches', 'asistente', coach_id=aid, principal_id=uid)
+    if not fila:
+        return jsonify({'error': 'Esa persona no está en tu cuerpo técnico.'}), 404
+
+    # Se marca como retirado en vez de borrar: lo que anotó sigue firmado con
+    # su nombre y hay que poder saber quién era.
+    db.update('fut_team_coaches',
+              {'estado': 'retirado', 'retirado': _ahora()}, 'quitar asist',
+              id=fila['id'])
+    return jsonify({'ok': True, 'mensaje': 'Fuera del cuerpo técnico. Lo que '
+                                           'anotó se conserva con su firma.'})
+
+
 # ═══════════════════════ JUGADORES SIN CUENTA ═══════════════════════
 @bp.route('/coach/jugadores-manuales')
 @login_required
@@ -62,7 +125,7 @@ def c_manuales():
     if fuera:
         return fuera
 
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     lista = db.rows('fut_manual_players', 'manuales', coach_id=uid,
                     _order='nombre') or []
     activos = [m for m in lista if m.get('activo')]
@@ -93,7 +156,7 @@ def api_manual():
         return error
 
     d = request.get_json(silent=True) or {}
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     nombre = (d.get('nombre') or '').strip()
     if len(nombre) < 2:
         return jsonify({'error': 'Escribe el nombre del jugador.'}), 400
@@ -133,7 +196,8 @@ def api_manual():
                          'jugadores. Pásate a Pro para una plantilla sin límite.',
                 'pro': True, 'url': url_for('futbol.planes')}), 402
 
-    datos.update({'coach_id': uid, 'activo': True, 'creado': _ahora()})
+    datos.update({'coach_id': uid, 'activo': True,
+                  'registrado_por': current_user.id, 'creado': _ahora()})
     fila = db.insert('fut_manual_players', datos, 'manual nuevo')
     if not fila:
         return jsonify({'error': 'No se pudo guardar.'}), 500
@@ -150,7 +214,7 @@ def api_manual_archivar(mid):
     if error:
         return error
     db.update('fut_manual_players', {'activo': False}, 'archivar',
-              id=mid, coach_id=current_user.id)
+              id=mid, coach_id=db.equipo_id(current_user.id))
     return jsonify({'ok': True, 'mensaje': 'Jugador archivado. Su histórico se conserva.'})
 
 
@@ -161,7 +225,7 @@ def api_manual_restaurar(mid):
     if error:
         return error
     db.update('fut_manual_players', {'activo': True}, 'restaurar',
-              id=mid, coach_id=current_user.id)
+              id=mid, coach_id=db.equipo_id(current_user.id))
     return jsonify({'ok': True, 'mensaje': 'Jugador de vuelta en la plantilla.'})
 
 
@@ -173,7 +237,7 @@ def api_manual_vincular(mid):
     if error:
         return error
 
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     d = request.get_json(silent=True) or {}
     pid = d.get('player_id')
 
@@ -206,7 +270,7 @@ def c_solicitudes():
     if fuera:
         return fuera
 
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     todas = db.rows('fut_join_requests', 'solicitudes todas', coach_id=uid,
                     _order='creado', _desc=True) or []
     ids = [s['player_id'] for s in todas if s.get('player_id')]
@@ -237,7 +301,7 @@ def api_solicitud(sid):
     if error:
         return error
 
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     d = request.get_json(silent=True) or {}
     accion = d.get('accion')
     sol = db.one('fut_join_requests', 'solicitud', id=sid, coach_id=uid)
@@ -245,6 +309,31 @@ def api_solicitud(sid):
         return jsonify({'error': 'Esa solicitud no existe.'}), 404
     if sol.get('estado') != 'pendiente':
         return jsonify({'error': 'Esa solicitud ya estaba resuelta.'}), 400
+
+    es_asistente_sol = sol.get('tipo') == 'asistente'
+
+    if accion == 'aceptar' and es_asistente_sol:
+        # Meter a alguien en el cuerpo técnico es del dueño del equipo: un
+        # asistente no puede ampliar el equipo por su cuenta.
+        if roles.es_asistente(current_user):
+            return jsonify({'error': 'Solo el entrenador principal acepta '
+                                     'asistentes técnicos.'}), 403
+
+        previo = db.one('fut_team_coaches', 'ya en un cuerpo',
+                        coach_id=sol['player_id'])
+        datos = {'principal_id': uid, 'coach_id': sol['player_id'],
+                 'rol': 'asistente', 'estado': 'activo',
+                 'retirado': None, 'creado': _ahora()}
+        if previo:
+            db.update('fut_team_coaches', datos, 'cambiar cuerpo', id=previo['id'])
+        else:
+            db.insert('fut_team_coaches', datos, 'alta asistente')
+
+        db.update('fut_join_requests', {'estado': 'aceptada', 'resuelto': _ahora()},
+                  'aceptar asist', id=sid)
+        return jsonify({'ok': True,
+                        'mensaje': 'Asistente aceptado. Ya puede evaluar, medir '
+                                   'y pasar lista en tu equipo.'})
 
     if accion == 'aceptar':
         n = len(db.jugadores_del_entrenador(uid))
@@ -283,7 +372,7 @@ def c_sacar_jugador(pid):
     error = _guardia_coach()
     if error:
         return error
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     v = db.one('fut_plantilla', 'vinculo', player_id=pid, coach_id=uid)
     if not v:
         return jsonify({'error': 'Ese jugador no es de tu plantilla.'}), 404
@@ -292,12 +381,90 @@ def c_sacar_jugador(pid):
                                            'Su cuenta y su histórico siguen ahí.'})
 
 
+# ═══════════════════════ UNIRSE COMO ASISTENTE ═══════════════════════
+@bp.route('/unirme-equipo')
+@login_required
+def c_unirme_equipo():
+    """Un entrenador pide entrar al cuerpo técnico de otro.
+
+    Mismo código de equipo que usan los jugadores: no hace falta inventar un
+    segundo código ni que el principal genere invitaciones una a una.
+    """
+    if getattr(current_user, 'role', '') != 'especialista':
+        return redirect(url_for('futbol.p_unirme'))
+
+    uid = current_user.id
+    mia = db.one('fut_join_requests', 'mi solicitud', player_id=uid)
+    if mia:
+        mia['_fecha'] = db.parse_fecha(mia.get('creado'))
+        if mia.get('coach_id'):
+            mia['_coach'] = db._normalizar_usuario(
+                db.one('usuarios', 'coach sol', id=mia['coach_id']))
+
+    equipo_id = db.equipo_id(uid)
+    principal = None
+    if str(equipo_id) != str(uid):
+        principal = db._normalizar_usuario(db.one('usuarios', 'principal', id=equipo_id))
+
+    return render_template('c_unirme_equipo.html',
+                           tab_activa='', hide_tabbar=True,
+                           solicitud=mia,
+                           principal=principal,
+                           n_propios=len(db.jugadores_del_entrenador(uid)))
+
+
+@bp.route('/api/unirme-equipo', methods=['POST'])
+@login_required
+def api_unirme_equipo():
+    from .api import csrf_ok
+    if not csrf_ok():
+        return jsonify({'error': 'La sesión expiró. Recarga la página.'}), 400
+    if getattr(current_user, 'role', '') != 'especialista':
+        return jsonify({'error': 'Solo un entrenador puede ser asistente.'}), 403
+
+    uid = current_user.id
+    d = request.get_json(silent=True) or {}
+    codigo = (d.get('codigo') or '').strip().upper()
+    if not codigo:
+        return jsonify({'error': 'Escribe el código del equipo.'}), 400
+
+    principal = db.one('usuarios', 'coach por codigo',
+                       codigo_equipo=codigo, rol='especialista')
+    if not principal:
+        return jsonify({'error': 'Ese código no existe. Pídeselo al entrenador '
+                                 'principal del equipo.'}), 404
+    if str(principal['id']) == str(uid):
+        return jsonify({'error': 'Ese es tu propio código.'}), 400
+
+    # Ser asistente de otro NO borra tu equipo, pero sí deja de ser el que
+    # gestionas: se avisa para que nadie descubra después que "desaparecieron"
+    # sus jugadores.
+    datos = {
+        'coach_id': principal['id'], 'player_id': uid,
+        'tipo': 'asistente',
+        'mensaje': (d.get('mensaje') or '')[:400],
+        'posicion': '',
+        'estado': 'pendiente', 'resuelto': None, 'creado': _ahora(),
+    }
+    previa = db.one('fut_join_requests', 'previa',
+                    player_id=uid, coach_id=principal['id'])
+    if previa:
+        db.update('fut_join_requests', datos, 'resolicitar asist', id=previa['id'])
+    else:
+        db.insert('fut_join_requests', datos, 'solicitar asist')
+
+    return jsonify({'ok': True,
+                    'mensaje': f'Solicitud enviada a {principal["nombre"]}. '
+                               'Te avisará cuando te acepte en su cuerpo técnico.',
+                    'redirect': url_for('futbol.c_unirme_equipo')})
+
+
 # ═══════════════════════ LADO DEL JUGADOR ═══════════════════════
 @bp.route('/unirme')
 @login_required
 def p_unirme():
     if getattr(current_user, 'role', '') == 'especialista':
-        return redirect(url_for('futbol.c_equipo'))
+        return redirect(url_for('futbol.c_unirme_equipo'))
 
     uid = current_user.id
     mia = db.one('fut_join_requests', 'mi solicitud', player_id=uid)

@@ -63,8 +63,14 @@ def es_coach():
 
 
 def de_mi_plantilla(pid):
-    """Un entrenador solo puede escribir sobre jugadores de su propia plantilla."""
-    return any(str(j['id']) == str(pid) for j in db.jugadores_del_entrenador(current_user.id))
+    """¿Ese jugador es del equipo en el que estoy?
+
+    Se comprueba contra el EQUIPO y no contra mi id: un asistente técnico
+    trabaja sobre la plantilla del entrenador principal, y con `current_user.id`
+    no vería a nadie.
+    """
+    equipo = db.equipo_id(current_user.id)
+    return any(str(j['id']) == str(pid) for j in db.jugadores_del_entrenador(equipo))
 
 
 def ahora():
@@ -237,7 +243,7 @@ def api_evento_crear():
 def api_evento_borrar(eid):
     if not es_coach():
         return jsonify({'error': 'Solo el entrenador borra eventos.'}), 403
-    db.delete('fut_events', 'evento del', id=eid, coach_id=current_user.id)
+    db.delete('fut_events', 'evento del', id=eid, coach_id=db.equipo_id(current_user.id))
     return jsonify({'ok': True})
 
 
@@ -296,7 +302,7 @@ def api_equipo_guardar():
         'categoria': (d.get('categoria') or '')[:60],
         'codigo': db.codigo_equipo(current_user.id),
     }
-    existente = db.one('fut_teams', 'equipo', coach_id=current_user.id)
+    existente = db.one('fut_teams', 'equipo', coach_id=db.equipo_id(current_user.id))
     if existente:
         db.update('fut_teams', datos, 'equipo up', id=existente['id'])
     else:
@@ -490,7 +496,7 @@ def api_jugada_guardar():
     }
     jid = d.get('id')
     if jid:
-        db.update('fut_tactical_plays', datos, 'jugada up', id=jid, coach_id=current_user.id)
+        db.update('fut_tactical_plays', datos, 'jugada up', id=jid, coach_id=db.equipo_id(current_user.id))
         return jsonify({'ok': True, 'id': jid})
 
     datos['creado'] = ahora()
@@ -505,7 +511,7 @@ def api_jugada_guardar():
 def api_jugada_borrar(jid):
     if not es_coach():
         return jsonify({'error': 'Solo el entrenador borra jugadas.'}), 403
-    db.delete('fut_tactical_plays', 'jugada del', id=jid, coach_id=current_user.id)
+    db.delete('fut_tactical_plays', 'jugada del', id=jid, coach_id=db.equipo_id(current_user.id))
     return jsonify({'ok': True})
 
 

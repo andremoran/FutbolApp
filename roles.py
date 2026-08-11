@@ -29,6 +29,7 @@ JUGADOR      = 'jugador'
 JUGADOR_PRO  = 'jugador_pro'
 ENTRENADOR   = 'entrenador'
 COACH_PRO    = 'coach_pro'
+ASISTENTE    = 'asistente'
 ADMIN        = 'admin'
 
 ROLES = {
@@ -56,12 +57,26 @@ ROLES = {
         'descripcion': 'Plantilla sin límite, evaluaciones con baremos, táctica e IA.',
         'base': 'especialista', 'tier': 'pro',
     },
+    ASISTENTE: {
+        'etiqueta': 'Asistente Técnico',
+        'emoji': '🧢',
+        'descripcion': 'Evalúa, mide y pasa lista en el equipo de otro entrenador.',
+        'base': 'especialista', 'tier': 'equipo',
+    },
     ADMIN: {
         'etiqueta': 'Administrador',
         'emoji': '🛡️',
         'descripcion': 'Usuarios, cobros y códigos de suscripción.',
         'base': 'admin', 'tier': 'pro',
     },
+}
+
+# Lo que un asistente NO puede hacer, por mucho que sea entrenador: son las
+# decisiones del dueño del equipo, no del cuerpo técnico.
+SOLO_PRINCIPAL = {
+    'asistentes':   'Invitar o quitar asistentes técnicos',
+    'suscripcion':  'Contratar o cancelar el plan del equipo',
+    'borrar_equipo': 'Deshacer el equipo',
 }
 
 
@@ -94,15 +109,30 @@ IA_MENSAJES_GRATIS = 2
 
 
 def clave_de(usuario):
-    """El rol efectivo del usuario, como una de las cinco claves."""
+    """El rol efectivo del usuario, como una de las claves de ROLES."""
     if usuario is None or not getattr(usuario, 'is_authenticated', False):
         return None
     if getattr(usuario, 'is_admin', lambda: False)():
         return ADMIN
-    pro = es_pro(usuario)
     if getattr(usuario, 'role', '') == 'especialista':
-        return COACH_PRO if pro else ENTRENADOR
-    return JUGADOR_PRO if pro else JUGADOR
+        if es_asistente(usuario):
+            return ASISTENTE
+        return COACH_PRO if es_pro(usuario) else ENTRENADOR
+    return JUGADOR_PRO if es_pro(usuario) else JUGADOR
+
+
+def es_asistente(usuario):
+    """¿Es asistente técnico del equipo de otro?"""
+    if getattr(usuario, 'role', '') != 'especialista':
+        return False
+    from futbol import db
+    return db.es_asistente(usuario.id)
+
+
+def es_principal(usuario):
+    """¿Manda en su equipo? Solo el principal toca suscripción y asistentes."""
+    return (getattr(usuario, 'role', '') == 'especialista'
+            and not es_asistente(usuario))
 
 
 def etiqueta_de(usuario):
@@ -114,14 +144,41 @@ def es_pro(usuario):
 
     El administrador siempre lo tiene: si no, no podría ver lo que compran sus
     usuarios y no podría dar soporte.
+
+    Un ASISTENTE TÉCNICO hereda el plan del equipo. Si no lo heredara, tomaría
+    una prueba y no vería el nivel que sí ve su entrenador principal sobre el
+    mismo dato — dos personas mirando la misma pantalla con distinta
+    información. La suscripción sigue siendo UNA, la del principal: el
+    asistente no puede montar su propio equipo con ese Pro.
     """
     if usuario is None or not getattr(usuario, 'is_authenticated', False):
         return False
     if getattr(usuario, 'is_admin', lambda: False)():
         return True
+    if _pro_propio(usuario):
+        return True
+    return _pro_del_equipo(usuario)
+
+
+def _pro_propio(usuario):
     if (getattr(usuario, 'tier', 'free') or 'free') != 'pro':
         return False
     return not _vencido(getattr(usuario, 'pro_hasta', None))
+
+
+def _pro_del_equipo(usuario):
+    """El Pro que le llega por ser asistente del equipo de otro."""
+    if getattr(usuario, 'role', '') != 'especialista':
+        return False
+    from futbol import db
+
+    principal_id = db.equipo_id(usuario.id)
+    if not principal_id or str(principal_id) == str(usuario.id):
+        return False
+    principal = db.one('usuarios', 'principal del equipo', id=principal_id) or {}
+    if (principal.get('tier') or 'free') != 'pro':
+        return False
+    return not _vencido(principal.get('pro_hasta'))
 
 
 def _vencido(hasta):
@@ -180,6 +237,31 @@ def solo_pro(permiso):
                 return redirect(url_for('auth.entrar'))
             if not puede(current_user, permiso):
                 return _respuesta_bloqueo(permiso)
+            return f(*a, **kw)
+        return wrapper
+    return decorador
+
+
+def solo_principal(permiso):
+    """Cierra una ruta a los asistentes técnicos.
+
+        @bp.route('/coach/asistentes')
+        @solo_principal('asistentes')
+        def c_asistentes(): ...
+    """
+    def decorador(f):
+        @wraps(f)
+        def wrapper(*a, **kw):
+            if not getattr(current_user, 'is_authenticated', False):
+                return redirect(url_for('auth.entrar'))
+            if es_asistente(current_user):
+                texto = SOLO_PRINCIPAL.get(permiso, 'Esto')
+                if request.path.startswith('/api/') or request.is_json:
+                    return jsonify({'error': f'{texto} solo lo hace el '
+                                             'entrenador principal.'}), 403
+                flash(f'{texto} solo lo hace el entrenador principal '
+                      'del equipo.', 'warning')
+                return redirect(url_for('futbol.c_inicio'))
             return f(*a, **kw)
         return wrapper
     return decorador

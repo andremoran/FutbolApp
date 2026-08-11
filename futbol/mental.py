@@ -43,7 +43,7 @@ def _ahora():
 @bp.route('/coach/mental')
 @solo_entrenador
 def c_mental():
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     jugadores = db.jugadores_del_entrenador(uid)
 
     ultimos = {}
@@ -101,7 +101,7 @@ def c_asignar_checkin():
     return render_template('c_asignar_checkin.html',
                            tab_activa='equipo',
                            hide_tabbar=True,
-                           jugadores=db.jugadores_del_entrenador(current_user.id))
+                           jugadores=db.jugadores_del_entrenador(db.equipo_id(current_user.id)))
 
 
 # ═══════════════════════ API ═══════════════════════
@@ -119,7 +119,7 @@ def api_mental_asignar():
     mensaje = (d.get('mensaje') or '').strip()[:400]
     limite = d.get('fecha_limite') or None
 
-    mios = {str(j['id']) for j in db.jugadores_del_entrenador(current_user.id)}
+    mios = {str(j['id']) for j in db.jugadores_del_entrenador(db.equipo_id(current_user.id))}
     destinos = [p for p in destinos if str(p) in mios]
     if not destinos:
         return jsonify({'error': 'Elige al menos un jugador de tu plantilla.'}), 400

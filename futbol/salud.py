@@ -133,7 +133,7 @@ def c_medico():
     if getattr(current_user, 'role', '') != 'especialista':
         return redirect(url_for('futbol.p_medico'))
 
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     jugadores = db.jugadores_del_entrenador(uid)
     lesiones = decorar_lesiones(
         db.rows('fut_injuries', 'lesiones equipo', coach_id=uid,
@@ -182,7 +182,7 @@ def api_lesion():
     if getattr(current_user, 'role', '') != 'especialista':
         return jsonify({'error': 'El parte de lesiones lo lleva el entrenador.'}), 403
 
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     d = request.get_json(silent=True) or {}
     lid = d.get('id')
 
@@ -231,6 +231,7 @@ def api_lesion():
         db.update('fut_injuries', datos, 'lesion up', id=lid, coach_id=uid)
         return jsonify({'ok': True, 'id': lid, 'mensaje': 'Parte actualizado.'})
 
+    datos['registrado_por'] = current_user.id
     datos['creado'] = _ahora()
     fila = db.insert('fut_injuries', datos, 'lesion nueva')
     if not fila:
@@ -246,5 +247,5 @@ def api_lesion_borrar(lid):
         return error
     if getattr(current_user, 'role', '') != 'especialista':
         return jsonify({'error': 'Solo el entrenador borra partes.'}), 403
-    db.delete('fut_injuries', 'borrar lesion', id=lid, coach_id=current_user.id)
+    db.delete('fut_injuries', 'borrar lesion', id=lid, coach_id=db.equipo_id(current_user.id))
     return jsonify({'ok': True, 'mensaje': 'Parte borrado.'})

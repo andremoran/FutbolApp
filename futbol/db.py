@@ -101,6 +101,78 @@ def delete(table, ctx='', **filters):
     return q(_go, None, ctx or ('delete ' + table))
 
 
+# ─── Cuerpo técnico: principal y asistentes ──────────────────────────────────
+#  En esta app el EQUIPO se identifica por el id del entrenador principal:
+#  fut_plantilla.coach_id, fut_events.coach_id, fut_eval_results.coach_id…
+#  todos apuntan a él. Cuando entra un asistente, lo que anota tiene que caer
+#  en ese mismo equipo, no en uno suyo.
+#
+#  `equipo_id()` es la traducción: «quién soy» → «de qué equipo escribo». Las
+#  vistas hacen `uid = db.equipo_id(current_user.id)` al principio y todo lo
+#  demás sigue funcionando igual, sin tocar cien consultas.
+def equipo_id(coach_id):
+    """El id del equipo al que pertenece este entrenador.
+
+    Devuelve su propio id si es principal (o si no está en ningún cuerpo
+    técnico), y el del principal si es asistente.
+    """
+    if not coach_id:
+        return coach_id
+    fila = one('fut_team_coaches', 'equipo del coach',
+               coach_id=coach_id, estado='activo')
+    if fila and fila.get('rol') == 'asistente' and fila.get('principal_id'):
+        return fila['principal_id']
+    return coach_id
+
+
+def es_asistente(coach_id):
+    fila = one('fut_team_coaches', 'rol coach', coach_id=coach_id, estado='activo')
+    return bool(fila and fila.get('rol') == 'asistente')
+
+
+def cuerpo_tecnico(principal_id):
+    """El principal y sus asistentes, en orden, con sus datos de persona."""
+    filas = rows('fut_team_coaches', 'cuerpo', principal_id=principal_id,
+                 estado='activo') or []
+    ids = [principal_id] + [f['coach_id'] for f in filas
+                            if f.get('rol') == 'asistente']
+    if not ids:
+        return []
+    personas = q(
+        lambda: _sb.table('usuarios').select('id, nombre, correo, foto')
+        .in_('id', ids).execute().data or [], [], 'cuerpo tecnico')
+    por_id = {p['id']: p for p in personas}
+
+    salida = []
+    p = por_id.get(principal_id)
+    if p:
+        salida.append({'id': p['id'], 'nombre': p.get('nombre'),
+                       'correo': p.get('correo'), 'foto': p.get('foto'),
+                       'rol': 'principal', 'etiqueta': 'Entrenador Principal',
+                       'sigla': 'MAIN', 'desde': None})
+    for f in filas:
+        if f.get('rol') != 'asistente':
+            continue
+        a = por_id.get(f['coach_id'])
+        if a:
+            salida.append({'id': a['id'], 'nombre': a.get('nombre'),
+                           'correo': a.get('correo'), 'foto': a.get('foto'),
+                           'rol': 'asistente', 'etiqueta': 'Asistente Técnico',
+                           'sigla': 'ASST', 'desde': parse_fecha(f.get('creado'))})
+    return salida
+
+
+def nombres_de(ids):
+    """{id: nombre} para firmar quién anotó cada cosa, en una sola consulta."""
+    ids = [i for i in set(ids or []) if i]
+    if not ids:
+        return {}
+    personas = q(
+        lambda: _sb.table('usuarios').select('id, nombre').in_('id', ids)
+        .execute().data or [], [], 'nombres')
+    return {p['id']: p.get('nombre') for p in personas}
+
+
 # ─── Equipo: entrenador ↔ jugadores ──────────────────────────────────────────
 def _normalizar_usuario(u):
     """Traduce la fila de `usuarios` a las claves que esperan las plantillas.

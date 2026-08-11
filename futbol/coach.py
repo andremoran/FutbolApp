@@ -42,7 +42,7 @@ def c_inicio():
     """
     import roles
 
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     equipo = db.equipo_del_entrenador(uid)
     jugadores = db.jugadores_del_entrenador(uid)
     hoy = date.today()
@@ -86,10 +86,9 @@ def c_inicio():
     solicitudes = solicitudes_pendientes(uid)
 
     # ── Cuerpo técnico ──
-    #  Por ahora el entrenador es uno. Se deja como lista para que añadir
-    #  asistentes no obligue a rehacer la tarjeta.
-    cuerpo = [{'nombre': current_user.name, 'rol': 'Entrenador Principal',
-               'sigla': 'MAIN', 'foto': current_user.profile_photo, 'yo': True}]
+    cuerpo = db.cuerpo_tecnico(uid)
+    for m in cuerpo:
+        m['yo'] = str(m['id']) == str(current_user.id)
 
     proximos = db.eventos_equipo(uid, desde=hoy.isoformat(),
                                  hasta=(hoy + timedelta(days=14)).isoformat())
@@ -109,7 +108,8 @@ def c_inicio():
                            solicitudes=solicitudes,
                            cuerpo=cuerpo,
                            eventos=proximos[:3],
-                           es_pro=roles.es_pro(current_user))
+                           es_pro=roles.es_pro(current_user),
+                           es_principal=roles.es_principal(current_user))
 
 
 @bp.route('/coach/equipo/editar')
@@ -124,7 +124,7 @@ def c_equipo_editar():
 @bp.route('/coach/plantilla')
 @solo_entrenador
 def c_equipo():
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     jugadores = db.jugadores_del_entrenador(uid)
 
     # Media de atributos por jugador, para el badge de nivel
@@ -149,7 +149,7 @@ def c_equipo():
 @bp.route('/coach/jugador/<pid>')
 @solo_entrenador
 def c_jugador(pid):
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     # Solo se puede ver a un jugador de la propia plantilla.
     jugadores = db.jugadores_del_entrenador(uid)
     jugador = next((j for j in jugadores if str(j['id']) == str(pid)), None)
@@ -180,7 +180,7 @@ def c_jugador(pid):
 @bp.route('/coach/jugador/<pid>/evaluar')
 @solo_entrenador
 def c_evaluar(pid):
-    jugadores = db.jugadores_del_entrenador(current_user.id)
+    jugadores = db.jugadores_del_entrenador(db.equipo_id(current_user.id))
     jugador = next((j for j in jugadores if str(j['id']) == str(pid)), None)
     if not jugador:
         abort(404)
@@ -194,7 +194,7 @@ def c_evaluar(pid):
 @bp.route('/coach/agenda')
 @solo_entrenador
 def c_agenda():
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     desde = (date.today() - timedelta(days=30)).isoformat()
     hasta = (date.today() + timedelta(days=90)).isoformat()
     eventos = db.eventos_equipo(uid, desde, hasta)
@@ -222,7 +222,7 @@ def c_agenda():
 @bp.route('/coach/agenda/<eid>')
 @solo_entrenador
 def c_evento(eid):
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     evento = db.one('fut_events', 'evento', id=eid, coach_id=uid)
     if not evento:
         abort(404)
@@ -243,7 +243,7 @@ def c_evento(eid):
 @solo_entrenador
 @roles.solo_pro('tactica')
 def c_tactica():
-    jugadas = db.rows('fut_tactical_plays', 'jugadas', coach_id=current_user.id,
+    jugadas = db.rows('fut_tactical_plays', 'jugadas', coach_id=db.equipo_id(current_user.id),
                       _order='creado', _desc=True)
     for j in jugadas:
         j['_fecha'] = db.parse_fecha(j.get('creado'))
@@ -258,7 +258,7 @@ def c_tactica():
 def c_pizarra(jid=None):
     jugada = None
     if jid:
-        jugada = db.one('fut_tactical_plays', 'jugada', id=jid, coach_id=current_user.id)
+        jugada = db.one('fut_tactical_plays', 'jugada', id=jid, coach_id=db.equipo_id(current_user.id))
         if not jugada:
             abort(404)
     return render_template('c_pizarra.html',
@@ -273,7 +273,7 @@ def c_pizarra(jid=None):
 def c_ia():
     historial = db.rows('fut_ia_chat', 'chat ia coach', user_id=current_user.id,
                         _order='creado', _limit=40)
-    jugadores = db.jugadores_del_entrenador(current_user.id)
+    jugadores = db.jugadores_del_entrenador(db.equipo_id(current_user.id))
     return render_template('c_ia.html',
                            tab_activa='ia',
                            historial=historial,
@@ -286,7 +286,7 @@ def c_ia():
 @bp.route('/coach/tests')
 @solo_entrenador
 def c_tests():
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     pruebas = db.rows('fut_tests', 'tests', coach_id=uid, _order='fecha', _desc=True)
     for t in pruebas:
         t['_fecha'] = db.parse_fecha(t.get('fecha'))
@@ -299,7 +299,7 @@ def c_tests():
 @bp.route('/coach/tests/<tid>')
 @solo_entrenador
 def c_test_detalle(tid):
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     test = db.one('fut_tests', 'test', id=tid, coach_id=uid)
     if not test:
         abort(404)

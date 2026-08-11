@@ -199,7 +199,7 @@ def evaluar(clave, valores, edad='general', nivel='general', coach_id=None):
 
 
 def guardar_resultado(coach_id, jugador, clave, valores, fecha=None, notas='',
-                      manual_id=None):
+                      manual_id=None, registrado_por=None):
     """Anota la prueba y la deja ya clasificada. Devuelve (fila, error)."""
     t = prueba(clave, coach_id)
     if not t:
@@ -243,6 +243,9 @@ def guardar_resultado(coach_id, jugador, clave, valores, fecha=None, notas='',
         'contexto_edad': edad,
         'contexto_nivel': nivel,
         'notas': (notas or '')[:1500],
+        # Quién puso el número. En un equipo con asistentes, sin esto el
+        # primer dato raro se convierte en una discusión sin árbitro.
+        'registrado_por': registrado_por,
         'creado': _ahora(),
     }, 'guardar evaluacion')
 
@@ -253,7 +256,12 @@ def guardar_resultado(coach_id, jugador, clave, valores, fecha=None, notas='',
 
 def enriquecer(filas, coach_id=None, con_nivel=True):
     """Añade a cada resultado lo que la pantalla necesita para dibujarlo."""
+    # Quién anotó cada marca, en UNA consulta para toda la lista. En un equipo
+    # con asistentes es la diferencia entre un número y un número con dueño.
+    firmas = db.nombres_de([f.get('registrado_por') for f in (filas or [])])
+
     for f in filas or []:
+        f['_firma'] = firmas.get(f.get('registrado_por'))
         t = prueba(f.get('test_clave'), coach_id) or {}
         f['_test'] = t
         f['_fecha'] = db.parse_fecha(f.get('fecha'))
@@ -371,7 +379,7 @@ def c_evaluaciones():
     if fuera:
         return fuera
 
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     jugadores = db.jugadores_del_entrenador(uid)
     manuales = db.rows('fut_manual_players', 'manuales', coach_id=uid, activo=True) or []
     resultados = enriquecer(resultados_equipo(uid, 60), uid,
@@ -402,8 +410,11 @@ def c_evaluaciones():
         edades=cat.CATEGORIAS_EDAD, niveles=cat.NIVELES_COMPETITIVOS,
         # Jinja no admite `dict((k, v) for ...)`: la tabla se arma aquí.
         descripciones_nivel={c: d for c, _, d in cat.NIVELES_COMPETITIVOS},
+        n_pruebas=len(catalogo_completo(uid)),
+        # Las seis del MVP que más se usan, en su orden del catálogo.
         destacadas=[cat.test(c) for c in
-                    ('sprint_30m', 'cooper', 'cmj', 'yoyo_ir1', 'illinois', 'lspt')])
+                    ('sprint_30m', 'cooper', 'yoyo_ir1', 'cmj',
+                     'pase_precision', 'perfil_mental')])
 
 
 @bp.route('/coach/evaluaciones/catalogo')
@@ -413,7 +424,7 @@ def c_eval_catalogo():
     if fuera:
         return fuera
 
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     categoria = request.args.get('c') or ''
     todas = catalogo_completo(uid)
     if categoria:
@@ -445,7 +456,7 @@ def c_eval_aplicar(clave):
     if fuera:
         return fuera
 
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     t = prueba(clave, uid)
     if not t:
         abort(404)
@@ -489,7 +500,7 @@ def c_eval_ranking(clave):
     if not roles.es_pro(current_user):
         return redirect(url_for('futbol.pro', f='ranking'))
 
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     t = prueba(clave, uid)
     if not t:
         abort(404)
@@ -539,7 +550,7 @@ def c_eval_jugador(pid):
     if fuera:
         return fuera
 
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     jugadores = db.jugadores_del_entrenador(uid)
     jugador = next((j for j in jugadores if str(j['id']) == str(pid)), None)
     manual = None
@@ -578,7 +589,7 @@ def c_eval_resultado(rid):
     if fuera:
         return fuera
 
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     fila = db.one('fut_eval_results', 'resultado', id=rid, coach_id=uid)
     if not fila:
         abort(404)
@@ -615,7 +626,7 @@ def c_evolucion():
     if fuera:
         return fuera
 
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     jugadores = db.jugadores_del_entrenador(uid)
     todos = enriquecer(resultados_equipo(uid, 400), uid)
 
@@ -775,7 +786,7 @@ def api_eval_guardar():
         return error
 
     d = request.get_json(silent=True) or {}
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     clave = d.get('test')
     entradas = d.get('resultados') or []
     if not clave or not entradas:
@@ -808,7 +819,8 @@ def api_eval_guardar():
 
         fila, error = guardar_resultado(uid, jugador, clave, e.get('valores'),
                                         e.get('fecha'), e.get('notas'),
-                                        manual_id=manual_id)
+                                        manual_id=manual_id,
+                                        registrado_por=current_user.id)
         if error:
             nombre = jugador.get('nombre') or jugador.get('name') or '?'
             errores.append(f'{nombre}: {error}')
@@ -830,7 +842,7 @@ def api_eval_borrar(rid):
     error = _guardia_coach()
     if error:
         return error
-    db.delete('fut_eval_results', 'borrar eval', id=rid, coach_id=current_user.id)
+    db.delete('fut_eval_results', 'borrar eval', id=rid, coach_id=db.equipo_id(current_user.id))
     return jsonify({'ok': True})
 
 
@@ -914,5 +926,5 @@ def api_eval_test_borrar(tid):
     error = _guardia_coach()
     if error:
         return error
-    db.delete('fut_eval_templates', 'borrar prueba', id=tid, coach_id=current_user.id)
+    db.delete('fut_eval_templates', 'borrar prueba', id=tid, coach_id=db.equipo_id(current_user.id))
     return jsonify({'ok': True})

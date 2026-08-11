@@ -34,6 +34,8 @@ CUENTAS = {
                         tier='free', nombre='Prueba Entrenador'),
     'coach_pro':   dict(correo=f'coachpro@{DOMINIO}',    rol='especialista',
                         tier='pro',  nombre='Prueba Coach Pro'),
+    'asistente':   dict(correo=f'asistente@{DOMINIO}',   rol='especialista',
+                        tier='free', nombre='Prueba Asistente'),
     'admin':       dict(correo=f'admin@{DOMINIO}',       rol='especialista',
                         tier='pro',  nombre='Prueba Admin', es_admin=True),
 }
@@ -65,6 +67,12 @@ def preparar():
             if not nuevo:
                 raise SystemExit(f'No se pudo crear la cuenta de prueba {clave}')
             ids[clave] = nuevo['id']
+
+    # El asistente entra al cuerpo técnico del coach de prueba.
+    if not db.one('fut_team_coaches', 'asist prueba', coach_id=ids['asistente']):
+        db.insert('fut_team_coaches', {
+            'principal_id': ids['coach_pro'], 'coach_id': ids['asistente'],
+            'rol': 'asistente', 'estado': 'activo'}, 'asist prueba')
 
     # Los jugadores de prueba van a la plantilla del coach de prueba.
     for jugador in ('jugador', 'jugador_pro'):
@@ -105,8 +113,11 @@ def rutas_de(rol):
         return jugador_pro
     if rol == 'entrenador':
         return coach
+    if rol == 'asistente':
+        # Ve y anota como el principal; lo que no toca es el cuerpo técnico.
+        return [r for r in coach_pro if r != '/coach/asistentes'] + ['/unirme-equipo']
     if rol == 'coach_pro':
-        return coach_pro
+        return coach_pro + ['/coach/asistentes']
     return coach_pro + ['/admin/', '/admin/usuarios', '/admin/codigos',
                         '/admin/pagos', '/admin/avisos', '/admin/ajustes']
 
@@ -240,6 +251,16 @@ def probar_candados():
         # Cerrar sesión tiene que cerrar de verdad, incluida la cookie de
         # "recordarme": en un móvil prestado es la diferencia entre salir y no.
         ('_salir',     '/app',             '/entrar', 'Tras cerrar sesión no se entra a la app'),
+        ('asistente',  '/coach/plantilla', '/coach/plantilla',
+         'El asistente ve la plantilla del equipo'),
+        ('asistente',  '/coach/evaluaciones', '/coach/evaluaciones',
+         'El asistente puede evaluar'),
+        ('asistente',  '/coach/ia',        '/coach/ia',
+         'El asistente hereda el Pro del equipo (IA sin cupo)'),
+        ('asistente',  '/coach/asistentes', '!',
+         'El asistente NO gestiona el cuerpo técnico'),
+        ('coach_pro',  '/coach/asistentes', '/coach/asistentes',
+         'El principal sí lo gestiona'),
         ('admin',      '/admin/',          '/admin/', 'Admin entra al panel'),
         ('admin',      '/coach/ia',        '/coach/ia',   'Admin tiene Pro'),
     ]

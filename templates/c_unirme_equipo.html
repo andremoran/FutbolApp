@@ -1,0 +1,140 @@
+{% extends '_shell.html' %}
+{% block title %}Unirme a un equipo · ProFoot{% endblock %}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_inicio') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Cuerpo técnico</div>{% endblock %}
+{% block hero_title %}Unirme a un equipo{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {% if principal %}Asistente de {{ principal.name }}{% else %}Como asistente técnico{% endif %}
+</div>
+{% endblock %}
+{% block hero_actions %}{% endblock %}
+
+{% block content %}
+
+{% if principal %}
+<div class="pf-card">
+  <div class="pf-row" style="gap:12px">
+    <div class="pf-avatar">
+      {%- if principal.profile_photo %}<img src="{{ principal.profile_photo }}" alt="">
+      {%- else %}{{ (principal.name or '?')[:1]|upper }}{% endif -%}
+    </div>
+    <div class="pf-grow">
+      <div style="font-weight:700;font-size:15px">{{ principal.name }}</div>
+      <div style="font-size:12.5px;color:var(--text-sec)">
+        Eres asistente de su equipo{% if principal.club %} · {{ principal.club }}{% endif %}
+      </div>
+    </div>
+    <span class="pf-pill pf-pill--purple">ASST</span>
+  </div>
+  <p style="margin:12px 0 0;font-size:12.5px;color:var(--text-muted);line-height:1.65">
+    Evalúas, mides y pasas lista sobre su plantilla, y todo lo que anotas queda
+    firmado con tu nombre. Para dejar de serlo, pídeselo a él.
+  </p>
+</div>
+{% endif %}
+
+{% if solicitud and solicitud.estado == 'pendiente' %}
+<div class="pf-card" style="border-color:var(--warning)">
+  <div class="pf-alerta pf-alerta--warn" style="margin-top:0">
+    <i data-ico="clock" class="pf-ico--xs"></i>
+    <span>
+      Mandaste una solicitud
+      {%- if solicitud._coach %} a <b>{{ solicitud._coach.name }}</b>{% endif %}
+      {%- if solicitud._fecha %} el {{ solicitud._fecha.strftime('%d/%m/%Y') }}{% endif %}.
+      Está esperando su respuesta.
+    </span>
+  </div>
+</div>
+{% endif %}
+
+{% if n_propios and not principal %}
+<div class="pf-card">
+  <div class="pf-alerta pf-alerta--info" style="margin-top:0">
+    <i data-ico="info" class="pf-ico--xs"></i>
+    <span>
+      Ya tienes {{ n_propios }} jugador{{ '' if n_propios == 1 else 'es' }} en tu
+      propio equipo. Si entras como asistente de otro, pasarás a trabajar sobre
+      SU plantilla; la tuya no se borra, pero deja de ser la que gestionas.
+    </span>
+  </div>
+</div>
+{% endif %}
+
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Código del equipo</h2>
+  </div>
+  <p style="margin:0 0 12px;font-size:12.5px;color:var(--text-sec);line-height:1.6">
+    Es el mismo código que usan los jugadores. Pídeselo al entrenador principal:
+    lo tiene en su pantalla de Inicio.
+  </p>
+
+  <div class="pf-field">
+    <input class="pf-input" id="u-codigo" maxlength="10" autocomplete="off"
+           placeholder="ABC123"
+           style="text-transform:uppercase;font-family:monospace;font-size:22px;
+                  letter-spacing:5px;text-align:center;font-weight:800">
+  </div>
+
+  <div class="pf-field pf-mt-12">
+    <label class="pf-label" for="u-mensaje">Mensaje (opcional)</label>
+    <textarea class="pf-textarea" id="u-mensaje" rows="3" maxlength="400"
+              placeholder="Preséntate: qué haces en el club, de qué te encargas…"></textarea>
+  </div>
+
+  <button class="pf-btn pf-btn--primary pf-btn--block pf-mt-16" type="button" id="btn-unirme">
+    <i data-ico="send" class="pf-ico--sm"></i> Pedir ser asistente
+  </button>
+</div>
+
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Qué podrás hacer</h2>
+  </div>
+  {% for texto in ['Tomar evaluaciones y anotar marcas',
+                   'Pasar lista y agendar entrenamientos',
+                   'Apuntar jugadores, partidos y lesiones'] %}
+  <div class="pf-medida">
+    <i data-ico="check" class="pf-ico--sm" style="color:var(--primary)"></i>
+    <span class="pf-medida__et">{{ texto }}</span>
+  </div>
+  {% endfor %}
+  <div class="pf-medida">
+    <i data-ico="x" class="pf-ico--sm" style="color:var(--text-muted)"></i>
+    <span class="pf-medida__et" style="color:var(--text-muted)">
+      Tocar la suscripción o el cuerpo técnico
+    </span>
+  </div>
+  <p style="margin:11px 0 0;font-size:11.5px;color:var(--text-muted);line-height:1.6">
+    Trabajas con el plan del equipo: si el principal tiene Pro, tú ves los
+    baremos igual que él.
+  </p>
+</div>
+
+<div style="height:34px"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('btn-unirme').onclick = function () {
+  const boton = this;
+  boton.disabled = true;
+  PF.api('/api/unirme-equipo', {
+    codigo: document.getElementById('u-codigo').value,
+    mensaje: document.getElementById('u-mensaje').value,
+  }).then(j => {
+    PF.toast(j.mensaje, 'success');
+    setTimeout(() => { location.href = j.redirect; }, 1300);
+  }).catch(e => {
+    PF.toast(e.message, 'error');
+    boton.disabled = false;
+  });
+};
+</script>
+{% endblock %}

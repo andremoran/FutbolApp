@@ -36,7 +36,7 @@ def _ahora():
 @bp.route('/coach/mensajes')
 @solo_entrenador
 def c_mensajes():
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     jugadores = db.jugadores_del_entrenador(uid)
     por_id = {j['id']: j for j in jugadores}
 
@@ -95,7 +95,7 @@ def api_mensaje():
 
     destino = d.get('player_id') or None
     if destino:
-        mios = {str(j['id']) for j in db.jugadores_del_entrenador(current_user.id)}
+        mios = {str(j['id']) for j in db.jugadores_del_entrenador(db.equipo_id(current_user.id))}
         if str(destino) not in mios:
             return jsonify({'error': 'Ese jugador no es de tu plantilla.'}), 403
 
@@ -119,7 +119,7 @@ def api_mensaje_borrar(mid):
     err = api_guard(solo_coach=True)
     if err:
         return err
-    db.delete('fut_messages', 'borrar mensaje', id=mid, coach_id=current_user.id)
+    db.delete('fut_messages', 'borrar mensaje', id=mid, coach_id=db.equipo_id(current_user.id))
     return jsonify({'ok': True})
 
 
@@ -127,7 +127,7 @@ def api_mensaje_borrar(mid):
 @bp.route('/coach/partidos')
 @solo_entrenador
 def c_partidos():
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     partidos = db.rows('fut_matches', 'partidos coach', coach_id=uid,
                        _order='fecha', _desc=True, _limit=40)
 
@@ -148,7 +148,7 @@ def c_partidos():
 @bp.route('/coach/partidos/<mid>')
 @solo_entrenador
 def c_partido(mid):
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     partido = db.one('fut_matches', 'partido', id=mid, coach_id=uid)
     if not partido:
         abort(404)
@@ -168,7 +168,7 @@ def c_partido(mid):
 @bp.route('/coach/observaciones')
 @solo_entrenador
 def c_observaciones():
-    uid = current_user.id
+    uid = db.equipo_id(current_user.id)
     lista = db.rows('fut_observaciones', 'observaciones', coach_id=uid,
                     _order='fecha', _desc=True, _limit=40)
     jugadores = {j['id']: j for j in db.jugadores_del_entrenador(uid)}
@@ -199,7 +199,7 @@ def api_observacion():
 
     destino = d.get('player_id') or None
     if destino:
-        mios = {str(j['id']) for j in db.jugadores_del_entrenador(current_user.id)}
+        mios = {str(j['id']) for j in db.jugadores_del_entrenador(db.equipo_id(current_user.id))}
         if str(destino) not in mios:
             return jsonify({'error': 'Ese jugador no es de tu plantilla.'}), 403
 
@@ -224,5 +224,5 @@ def api_observacion_borrar(oid):
     err = api_guard(solo_coach=True)
     if err:
         return err
-    db.delete('fut_observaciones', 'borrar obs', id=oid, coach_id=current_user.id)
+    db.delete('fut_observaciones', 'borrar obs', id=oid, coach_id=db.equipo_id(current_user.id))
     return jsonify({'ok': True})

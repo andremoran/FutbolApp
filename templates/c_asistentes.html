@@ -1,0 +1,188 @@
+{% extends '_shell.html' %}
+{% block title %}Cuerpo técnico · ProFoot{% endblock %}
+
+{# Quién más puede anotar en este equipo. Un asistente hace lo mismo que el
+   principal sobre los datos del equipo y todo lo que anota queda firmado con
+   su nombre; lo que no puede tocar es la suscripción ni este mismo cuerpo
+   técnico. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_inicio') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Mi equipo</div>{% endblock %}
+{% block hero_title %}Cuerpo técnico{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {{ cuerpo|length }} persona{{ '' if cuerpo|length == 1 else 's' }}
+  {%- if asistentes %} · {{ asistentes|length }} asistente{{ '' if asistentes|length == 1 else 's' }}{% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+
+{# ══════════ SOLICITUDES ══════════ #}
+{% if pendientes %}
+<div class="pf-card" style="border-color:var(--warning)">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Quieren ser tus asistentes</h2>
+    <span class="pf-pill pf-pill--warning">{{ pendientes|length }}</span>
+  </div>
+
+  {% for s in pendientes %}
+  <div style="padding:13px 0;border-bottom:1px solid var(--border-soft)">
+    <div class="pf-row" style="gap:11px;margin-bottom:9px">
+      <div class="pf-avatar pf-avatar--sm" style="background:#ede9fe;color:#7c3aed">
+        {{ (s._persona.nombre or '?')[:1]|upper }}
+      </div>
+      <div class="pf-grow">
+        <div class="pf-jug__n">{{ s._persona.nombre or 'Entrenador' }}</div>
+        <div class="pf-jug__s">
+          {{ s._persona.correo or '' }}
+          {%- if s._fecha %} · {{ s._fecha.strftime('%d/%m/%Y') }}{% endif %}
+        </div>
+      </div>
+    </div>
+    {% if s.mensaje %}
+    <p style="margin:0 0 10px;font-size:13px;line-height:1.6;color:var(--text-sec);
+              background:var(--border-soft);padding:10px 12px;border-radius:var(--r-md)">
+      "{{ s.mensaje }}"
+    </p>
+    {% endif %}
+    <div class="pf-row" style="gap:8px">
+      <button class="pf-btn pf-btn--primary pf-grow" type="button"
+              onclick="resolver('{{ s.id }}', 'aceptar', this)">
+        <i data-ico="check" class="pf-ico--sm"></i> Aceptar
+      </button>
+      <button class="pf-btn pf-btn--ghost pf-grow" type="button"
+              onclick="resolver('{{ s.id }}', 'rechazar', this)">Rechazar</button>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ══════════ EL CUERPO TÉCNICO ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">En tu equipo</h2>
+  </div>
+
+  {% for m in cuerpo %}
+  <div class="pf-jug">
+    <div class="pf-avatar pf-avatar--sm"
+         {% if m.rol == 'asistente' %}style="background:#ede9fe;color:#7c3aed"{% endif %}>
+      {%- if m.foto %}<img src="{{ m.foto }}" alt="">
+      {%- else %}{{ (m.nombre or '?')[:1]|upper }}{% endif -%}
+    </div>
+    <div class="pf-grow">
+      <div class="pf-jug__n">{{ m.nombre }}</div>
+      <div class="pf-jug__s">
+        {{ m.etiqueta }}
+        {%- if m.desde %} · desde {{ m.desde.strftime('%d/%m/%Y') }}{% endif %}
+      </div>
+    </div>
+    {% if m.rol == 'asistente' %}
+      <button class="pf-btn pf-btn--ghost" type="button"
+              style="padding:6px 11px;font-size:12px"
+              onclick="quitar('{{ m.id }}', '{{ m.nombre|e }}')">Quitar</button>
+    {% else %}
+      <span class="pf-pill pf-pill--info">principal</span>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+{# ══════════ CÓMO SUMAR UNO ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Sumar un asistente</h2>
+  </div>
+  <p style="margin:0 0 12px;font-size:13px;color:var(--text-sec);line-height:1.65">
+    Que se registre como <b>entrenador</b> y, desde
+    <i>Ver más → Unirme a un equipo</i>, meta tu código. Te llegará la
+    solicitud aquí.
+  </p>
+
+  <div class="pf-center" style="padding:16px;border-radius:var(--r-lg);
+              background:var(--primary-faint);border:1px dashed var(--primary-light)">
+    <div style="font-family:monospace;font-size:30px;font-weight:800;
+                letter-spacing:5px;color:var(--primary)">{{ codigo or '—' }}</div>
+  </div>
+  {% if codigo %}
+  <button class="pf-btn pf-btn--ghost pf-btn--block pf-mt-12" type="button"
+          onclick="copiar()">
+    <i data-ico="copy" class="pf-ico--sm"></i> Copiar el código
+  </button>
+  {% endif %}
+</div>
+
+{# ══════════ QUÉ PUEDE Y QUÉ NO ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Qué puede hacer un asistente</h2>
+  </div>
+  {% for texto in ['Tomar evaluaciones y anotar marcas',
+                   'Pasar lista y agendar entrenamientos',
+                   'Apuntar jugadores, partidos y lesiones',
+                   'Ver la plantilla y el calendario completos'] %}
+  <div class="pf-medida">
+    <i data-ico="check" class="pf-ico--sm" style="color:var(--primary)"></i>
+    <span class="pf-medida__et">{{ texto }}</span>
+  </div>
+  {% endfor %}
+  {% for texto in ['Contratar o cancelar el plan del equipo',
+                   'Invitar o quitar a otros asistentes'] %}
+  <div class="pf-medida">
+    <i data-ico="x" class="pf-ico--sm" style="color:var(--text-muted)"></i>
+    <span class="pf-medida__et" style="color:var(--text-muted)">{{ texto }}</span>
+  </div>
+  {% endfor %}
+
+  <p style="margin:12px 0 0;font-size:12px;color:var(--text-sec);line-height:1.65">
+    <b>Todo lo que anota queda firmado con su nombre</b>, así que siempre se
+    sabe quién puso cada dato.
+    {% if es_pro %}
+      Tus asistentes trabajan con tu mismo plan Pro: ven los baremos igual que tú.
+    {% else %}
+      Con el plan gratuito, tus asistentes ven lo mismo que tú.
+    {% endif %}
+  </p>
+</div>
+
+<div style="height:34px"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function copiar() {
+  const t = '{{ codigo }}';
+  navigator.clipboard.writeText(t)
+    .then(() => PF.toast('Código copiado: ' + t, 'success'))
+    .catch(() => PF.toast('Código: ' + t, 'info'));
+}
+
+function resolver(sid, accion, boton) {
+  if (accion === 'rechazar' && !confirm('¿Rechazar la solicitud?')) return;
+  boton.disabled = true;
+  PF.api('/api/solicitud/' + sid, { accion: accion })
+    .then(j => {
+      PF.toast(j.mensaje, 'success');
+      setTimeout(() => location.reload(), 800);
+    })
+    .catch(e => { PF.toast(e.message, 'error'); boton.disabled = false; });
+}
+
+function quitar(aid, nombre) {
+  if (!confirm('¿Sacar a ' + nombre + ' del cuerpo técnico?\n\n' +
+               'Dejará de ver el equipo. Lo que anotó se conserva con su firma.')) return;
+  PF.api('/api/asistente/' + aid, {}, 'DELETE')
+    .then(j => {
+      PF.toast(j.mensaje, 'success');
+      setTimeout(() => location.reload(), 800);
+    })
+    .catch(e => PF.toast(e.message, 'error'));
+}
+</script>
+{% endblock %}
