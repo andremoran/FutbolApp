@@ -4,13 +4,29 @@
 {# screens/TeamPlayersScreen.tsx: la plantilla con buscador y badge de nivel.
    Los jugadores salen de especialista_paciente, la relación que ya existe. #}
 
-{% block hero_label %}<div class="pf-hero__label">Plantilla</div>{% endblock %}
-{% block hero_title %}{{ equipo.nombre }}{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Gestión · Plantilla</div>{% endblock %}
+{% block hero_title %}Mi equipo{% endblock %}
 {% block hero_subtitle %}
 <div class="pf-hero__subtitle">
-  {{ jugadores|length }} jugador{{ '' if jugadores|length == 1 else 'es' }}
-  {%- if codigo %} · Código {{ codigo }}{% endif %}
+  {% if jugadores %}
+    {{ jugadores|length }} jugador{{ '' if jugadores|length == 1 else 'es' }} · ordenado por nivel
+  {% else %}
+    Aún no hay jugadores
+  {% endif %}
 </div>
+{% endblock %}
+
+{# Los dos botones de la cabecera, como en la app: ajustes del equipo y sumar
+   un jugador. #}
+{% block hero_actions %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_equipo_editar') }}"
+   aria-label="Ajustes del equipo">
+  <i data-ico="settings" class="pf-ico--sm"></i>
+</a>
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_manuales') }}"
+   aria-label="Agregar jugador">
+  <i data-ico="user-plus" class="pf-ico--sm"></i>
+</a>
 {% endblock %}
 
 {% block head %}
@@ -23,6 +39,22 @@
   .tp-buscar { padding: 16px 16px 0; position: relative; }
   .tp-buscar input { padding-left: 40px; }
   .tp-buscar .pf-ico { position: absolute; left: 30px; top: 29px; color: var(--text-muted); }
+
+  /* Filtros por posición, en fila que se desplaza (filterChip de la app). */
+  .tp-chips {
+    display: flex; gap: 8px; overflow-x: auto; padding: 14px 16px 0;
+    scrollbar-width: none;
+  }
+  .tp-chips::-webkit-scrollbar { display: none; }
+  .tp-chip {
+    flex: none; padding: 7px 14px; border-radius: 100px; cursor: pointer;
+    background: #fff; border: 1px solid var(--border);
+    font: inherit; font-size: 13px; font-weight: 600; color: var(--text-sec);
+    white-space: nowrap;
+  }
+  .tp-chip[aria-pressed="true"] {
+    background: var(--primary); border-color: var(--primary); color: #fff;
+  }
 </style>
 {% endblock %}
 
@@ -45,18 +77,27 @@
   <input class="pf-input" id="tp-q" type="search" placeholder="Buscar jugador…"
          aria-label="Buscar jugador">
 </div>
+
+{# Las mismas posiciones que POSITIONS en la app, en el mismo orden. #}
+<div class="tp-chips" role="group" aria-label="Filtrar por posición">
+  {% for pos in ['Todos', 'Portero', 'Defensa', 'Mediocampista', 'Delantero', 'Sin posición'] %}
+  <button class="tp-chip" type="button" data-pos="{{ pos }}"
+          aria-pressed="{{ 'true' if loop.first else 'false' }}">{{ pos }}</button>
+  {% endfor %}
+</div>
 {% endif %}
 
 <div class="pf-card">
   <div class="pf-card__head">
-    <h2 class="pf-card__title">Jugadores</h2>
-    <a href="{{ url_for('futbol.c_tests') }}" class="pf-item__right">Pruebas</a>
+    <h2 class="pf-card__title" id="tp-cab">Plantilla ({{ jugadores|length }})</h2>
+    <a href="{{ url_for('futbol.c_evaluaciones') }}" class="pf-item__right">Evaluaciones</a>
   </div>
 
   <div id="tp-lista">
     {% for j in jugadores %}
     <a class="pf-item" href="{{ url_for('futbol.c_jugador', pid=j.id) }}"
-       data-nombre="{{ (j.name or '')|lower }}">
+       data-nombre="{{ (j.name or '')|lower }}"
+       data-pos="{{ (j.fut or {}).get('posicion') or 'Sin posición' }}">
       <span class="pf-avatar">
         {%- if j.profile_photo %}<img src="{{ j.profile_photo }}" alt="">
         {%- else %}{{ (j.name or '?')[:1]|upper }}{% endif -%}
@@ -119,18 +160,42 @@
 <script>
 (function () {
   var q = document.getElementById('tp-q');
-  if (q) {
-    q.addEventListener('input', function () {
-      var t = q.value.trim().toLowerCase();
-      var visibles = 0;
-      document.querySelectorAll('#tp-lista [data-nombre]').forEach(function (fila) {
-        var ok = !t || fila.dataset.nombre.indexOf(t) !== -1;
-        fila.classList.toggle('pf-hide', !ok);
-        if (ok) visibles++;
-      });
-      document.getElementById('tp-vacio').classList.toggle('pf-hide', visibles > 0);
+  var chips = document.querySelectorAll('.tp-chip');
+  var cab = document.getElementById('tp-cab');
+  var filas = document.querySelectorAll('#tp-lista [data-nombre]');
+  var posicion = 'Todos';
+
+  // Buscador y filtro de posición actúan a la vez: una fila se ve si pasa los
+  // dos. Y la cabecera dice cuántas quedan, como el listHeader de la app.
+  function filtrar() {
+    var t = q ? q.value.trim().toLowerCase() : '';
+    var visibles = 0;
+    filas.forEach(function (fila) {
+      var porNombre = !t || fila.dataset.nombre.indexOf(t) !== -1;
+      var porPos = posicion === 'Todos' || fila.dataset.pos === posicion;
+      var ok = porNombre && porPos;
+      fila.classList.toggle('pf-hide', !ok);
+      if (ok) visibles++;
     });
+    document.getElementById('tp-vacio').classList.toggle('pf-hide', visibles > 0);
+    if (cab) {
+      cab.textContent = visibles === filas.length
+        ? 'Plantilla (' + filas.length + ')'
+        : visibles + ' de ' + filas.length;
+    }
   }
+
+  if (q) { q.addEventListener('input', filtrar); }
+
+  chips.forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      posicion = chip.dataset.pos;
+      chips.forEach(function (c) {
+        c.setAttribute('aria-pressed', c === chip ? 'true' : 'false');
+      });
+      filtrar();
+    });
+  });
 
   var inv = document.getElementById('btn-invitar');
   if (inv) {

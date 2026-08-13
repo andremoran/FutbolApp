@@ -19,16 +19,92 @@
 </div>
 {% endblock %}
 
+{% block head %}
+<style>
+  .pj-acciones { display: flex; gap: 10px; padding: 0 16px 10px; }
+  .pj-acciones:first-of-type { padding-top: 16px; }
+  .pj-accion { flex: 1; color: #fff; }
+  .pj-cifras { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+  .pj-cifra { background: var(--border-soft); border-radius: var(--r-lg);
+              padding: 16px 10px; text-align: center; }
+  .pj-cifra__v { font-size: 22px; font-weight: 800; margin-top: 6px; line-height: 1; }
+  .pj-cifra__e { font-size: 11.5px; color: var(--text-sec); margin-top: 3px; }
+  .pj-apunte { padding: 12px 0; border-top: 1px solid var(--border-soft); }
+  .pj-apunte:first-of-type { border-top: none; }
+  .pj-apunte__t { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; }
+  .pj-apunte__f { font-size: 11px; color: var(--text-muted); margin-top: 5px; }
+</style>
+{% endblock %}
+
 {% block content %}
 
 {# ── Acciones ── #}
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:16px">
-  <a class="pf-btn pf-btn--primary" href="{{ url_for('futbol.c_evaluar', pid=jugador.id) }}">
-    <i data-ico="star" class="pf-ico--sm"></i> Evaluar
+{# Los tres botones de PlayerDetailScreen, con sus colores: evaluación en
+   verde, ficha médica en rojo y mensaje en azul. #}
+<div class="pj-acciones">
+  <a class="pf-btn pj-accion" style="background:var(--primary)"
+     href="{{ url_for('futbol.c_evaluar', pid=jugador.id) }}">
+    <i data-ico="clipboard" class="pf-ico--sm"></i> Evaluación
   </a>
-  <a class="pf-btn pf-btn--secondary" href="{{ url_for('futbol.c_tests') }}">
-    <i data-ico="bar-chart-2" class="pf-ico--sm"></i> Pruebas
+  <a class="pf-btn pj-accion" style="background:#ef4444"
+     href="{{ url_for('futbol.c_medico') }}">
+    <i data-ico="heart" class="pf-ico--sm"></i> Ficha médica
   </a>
+</div>
+<div class="pj-acciones">
+  <a class="pf-btn pj-accion" style="background:#3b82f6"
+     href="{{ url_for('futbol.c_mensajes') }}">
+    <i data-ico="message-circle" class="pf-ico--sm"></i> Enviar mensaje
+  </a>
+</div>
+
+{# ── Estado físico actual ── #}
+{# Lo que el jugador reporta de sí mismo, no lo que valora el entrenador: son
+   dos cosas distintas y en la app van en tarjetas separadas. #}
+{% set estado = [('Energía', perfil.energia, 'zap', '#f59e0b'),
+                 ('Motivación', perfil.motivacion, 'heart', '#ef4444'),
+                 ('Estado físico', perfil.estado_fisico, 'activity', '#10b981')] %}
+{% if estado | selectattr(1) | list %}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Estado físico actual</h2></div>
+  {% for etiqueta, valor, ico, color in estado %}
+    {% if valor is number %}
+    {% set tono = 'var(--primary)' if valor >= 70 else ('var(--warning)' if valor >= 50 else 'var(--danger)') %}
+    <div style="margin-top:14px">
+      <div class="pf-row pf-row--between" style="margin-bottom:6px">
+        <span style="display:flex;align-items:center;gap:8px">
+          <span style="width:26px;height:26px;border-radius:8px;display:grid;
+                       place-items:center;background:{{ color }}20;color:{{ color }}">
+            <i data-ico="{{ ico }}" class="pf-ico--xs"></i>
+          </span>
+          <span style="font-size:13px;font-weight:600">{{ etiqueta }}</span>
+        </span>
+        <span style="font-size:14px;font-weight:800;color:{{ tono }}">{{ valor }}%</span>
+      </div>
+      <div class="pf-bar"><div class="pf-bar__fill"
+           style="width:{{ valor }}%;background:{{ tono }}"></div></div>
+    </div>
+    {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ── Estadísticas ── #}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Estadísticas</h2></div>
+  <div class="pj-cifras">
+    {% for ico, valor, etiqueta in [
+        ('activity', cifras.entrenos, 'Entrenamientos'),
+        ('award', cifras.goles, 'Goles'),
+        ('target', cifras.metas, 'Metas logradas'),
+        ('zap', cifras.racha, 'Racha actual')] %}
+    <div class="pj-cifra">
+      <i data-ico="{{ ico }}" class="pf-ico--lg" style="color:var(--primary)"></i>
+      <div class="pj-cifra__v">{% if valor is number %}{{ valor }}{% else %}0{% endif %}</div>
+      <div class="pj-cifra__e">{{ etiqueta }}</div>
+    </div>
+    {% endfor %}
+  </div>
 </div>
 
 {# ── Atributos ── #}
@@ -151,29 +227,61 @@
 </div>
 {% endif %}
 
-{# ── Evaluaciones ── #}
+{# ── Observaciones (los apuntes del entrenador) ── #}
+{# En la app son notas sueltas con su fecha. Aquí salen de la nota que el
+   entrenador escribe al evaluar, que es donde ya las venía dejando. #}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Observaciones</h2>
+    <a href="{{ url_for('futbol.c_evaluar', pid=jugador.id) }}"
+       class="pf-item__right" aria-label="Escribir una observación">+ Nueva</a>
+  </div>
+
+  {% if apuntes %}
+    {% for e in apuntes %}
+    <div class="pj-apunte">
+      <div class="pj-apunte__t">{{ e.notas }}</div>
+      <div class="pj-apunte__f">
+        {{ e._fecha.strftime('%d/%m/%Y') if e._fecha else e.fecha }}
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="pf-empty" style="padding:22px 8px">
+      <div class="pf-empty__icon"><i data-ico="clipboard" class="pf-ico--xxl"></i></div>
+      <div class="pf-empty__title">No hay observaciones</div>
+      <div class="pf-empty__text">
+        Lo que anotes aquí lo lee el jugador en su ficha.
+      </div>
+    </div>
+  {% endif %}
+</div>
+
+{# ── Historial de evaluaciones ── #}
+{% if evaluaciones %}
 <div class="pf-card">
   <div class="pf-card__head">
     <h2 class="pf-card__title">Evaluaciones</h2>
-    <a href="{{ url_for('futbol.c_evaluar', pid=jugador.id) }}" class="pf-item__right">Nueva</a>
+    <span class="pf-pill pf-pill--muted">{{ evaluaciones|length }}</span>
   </div>
-  {% for e in evaluaciones %}
-  <div class="pf-item" style="align-items:flex-start">
-    <span class="pf-item__icon" style="background:rgba(139,92,246,.12);color:var(--purple)">
+  {% for e in evaluaciones[:5] %}
+  <div class="pf-item">
+    <span class="pf-item__icon" style="background:rgba(139,92,246,.12);color:#8b5cf6">
       <i data-ico="file-text" class="pf-ico--sm"></i>
     </span>
     <span class="pf-item__body">
-      <span class="pf-item__title">{{ e.fecha }}</span>
-      {% if e.notas %}<span class="pf-item__sub" style="white-space:normal">{{ e.notas }}</span>{% endif %}
+      <span class="pf-item__title">
+        {{ e._fecha.strftime('%d/%m/%Y') if e._fecha else e.fecha }}
+      </span>
+      <span class="pf-item__sub">
+        {%- set vals = [e.tecnica, e.fisico, e.tactico, e.mental] | select('number') | list -%}
+        {% if vals %}Media {{ (vals | sum / vals | length) | round | int }}/100{% else %}Sin puntuar{% endif %}
+      </span>
     </span>
   </div>
   {% endfor %}
-  {% if not evaluaciones %}
-  <p style="font-size:13px;color:var(--text-sec);padding:14px 4px 4px;margin:0;line-height:1.5">
-    Todavía no lo has evaluado. La primera evaluación fija su punto de partida.
-  </p>
-  {% endif %}
 </div>
+{% endif %}
 
 {% endblock %}
 

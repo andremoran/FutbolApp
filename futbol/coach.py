@@ -59,6 +59,15 @@ def c_inicio():
 
     n_partidos = len(db.rows('fut_matches', 'partidos', coach_id=uid) or [])
 
+    # ── Primeros pasos (onboarding) ──
+    #  Se marcan con datos reales, nunca a mano: igual que SetupChecklist.tsx
+    #  de la app original. Basta con saber si existe al menos uno, de ahi el
+    #  _limit=1 en vez de traerse la tabla entera para contarla.
+    hay_evaluacion = bool(db.rows('fut_eval_results', 'primeros pasos',
+                                  coach_id=uid, _limit=1))
+    hay_evento = bool(db.rows('fut_events', 'primeros pasos',
+                              coach_id=uid, _limit=1))
+
     # ── Estado físico promedio ──
     #  Sale del AUTOINFORME del jugador (fut_player_profile), igual que en la
     #  app original. NO tiene nada que ver con las respuestas del check-in de
@@ -108,6 +117,8 @@ def c_inicio():
                            solicitudes=solicitudes,
                            cuerpo=cuerpo,
                            eventos=proximos[:3],
+                           hay_evaluacion=hay_evaluacion,
+                           hay_evento=hay_evento,
                            es_pro=roles.es_pro(current_user),
                            es_principal=roles.es_principal(current_user))
 
@@ -138,6 +149,9 @@ def c_equipo():
             a = by_id.get(j['id'])
             vals = [a.get(k) for k in db.ATRIBUTOS if a and a.get(k) is not None] if a else []
             j['_media'] = round(sum(vals) / len(vals)) if vals else 50
+        # De mejor a peor, como TeamPlayersScreen: la plantilla se lee de un
+        # vistazo y arriba está quien está rindiendo.
+        jugadores.sort(key=lambda j: -j['_media'])
 
     return render_template('c_equipo.html',
                            tab_activa='equipo',
@@ -160,10 +174,32 @@ def c_jugador(pid):
                        _order='fecha', _desc=True, _limit=10)
     for e in entrenos:
         e['_fecha'] = db.parse_fecha(e.get('fecha'))
+    # Los apuntes del entrenador sobre este jugador. En la app son
+    # «Observaciones» y van sueltas; aquí viven en la nota de cada evaluación,
+    # que es donde el entrenador ya las escribe.
     evaluaciones = db.rows('fut_evaluations', 'evals jug', player_id=pid,
-                           _order='fecha', _desc=True, _limit=5)
+                           _order='fecha', _desc=True, _limit=20)
     for e in evaluaciones:
         e['_fecha'] = db.parse_fecha(e.get('fecha'))
+    apuntes = [e for e in evaluaciones if (e.get('notas') or '').strip()]
+
+    # Las cuatro cifras de PlayerDetailScreen.
+    metas = db.rows('fut_goals', 'metas jug', player_id=pid) or []
+    goles = 0
+    partidos = db.rows('fut_matches', 'partidos', coach_id=uid, _limit=60) or []
+    if partidos:
+        marcas = db.q(
+            lambda: db.sb().table('fut_match_stats').select('goles')
+            .in_('match_id', [m['id'] for m in partidos])
+            .eq('player_id', pid).execute().data or [], [], 'goles jugador')
+        goles = sum(int(s.get('goles') or 0) for s in marcas)
+
+    cifras = {
+        'entrenos': len(db.rows('fut_trainings', 'n entrenos', player_id=pid) or []),
+        'goles': goles,
+        'metas': len([m for m in metas if m.get('completada')]),
+        'racha': db.racha_actual(pid),
+    }
 
     return render_template('c_jugador.html',
                            tab_activa='equipo',
@@ -174,7 +210,9 @@ def c_jugador(pid):
                            media=db.media_atributos(pid),
                            entrenos=entrenos,
                            evaluaciones=evaluaciones,
-                           racha=db.racha_actual(pid))
+                           apuntes=apuntes,
+                           cifras=cifras,
+                           racha=cifras['racha'])
 
 
 @bp.route('/coach/jugador/<pid>/evaluar')
