@@ -848,6 +848,41 @@ CATEGORIA_META = {c: {'etiqueta': e, 'emoji': em, 'descripcion': d}
                   for c, e, em, d in CATEGORIAS}
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+#  QUÉ ATRIBUTO DE LA FICHA MUEVE CADA PRUEBA
+# ═══════════════════════════════════════════════════════════════════════════
+#  Una marca no se queda en una tabla aparte: sube o baja el atributo que le
+#  toca en la ficha del jugador, como hace teamTestAnalysis.ts en la app
+#  original. Es el principio del proyecto — lo que el entrenador mide cambia
+#  las estadísticas reales del jugador.
+#
+#  Manda la familia de la prueba. Solo se listan aparte las que miden algo
+#  distinto de lo que sugiere su familia; inventar pesos para las treinta y
+#  una sería precisión fingida.
+ATRIBUTO_DE_FAMILIA = {'fisico': 'fisico', 'tecnico': 'tecnica', 'mental': 'mental'}
+
+PESOS_PROPIOS = {
+    # Está entre las mentales porque se puntúa observando, pero lo que mide es
+    # lectura de juego y posicionamiento.
+    'perfil_tactico': {'tactico': 1.0},
+    # Conducir entre conos es técnica, pero el cronómetro premia la agilidad.
+    'conduccion_conos': {'tecnica': 0.7, 'fisico': 0.3},
+}
+
+
+def atributos_de(t):
+    """{atributo: peso} que mueve una prueba. Los pesos suman 1.
+
+    Acepta la prueba entera —no solo la clave— para que valga igual con las
+    pruebas que se inventa el entrenador, que no están en el catálogo.
+    """
+    propios = PESOS_PROPIOS.get((t or {}).get('clave'))
+    if propios:
+        return dict(propios)
+    familia = (t or {}).get('categoria') or 'fisico'
+    return {ATRIBUTO_DE_FAMILIA.get(familia, 'fisico'): 1.0}
+
+
 def test(clave):
     """Devuelve la prueba del catálogo, o None si la clave no existe."""
     t = CATALOGO.get(clave)

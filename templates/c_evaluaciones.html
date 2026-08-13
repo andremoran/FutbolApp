@@ -18,7 +18,143 @@
 </div>
 {% endblock %}
 
+{% block head %}
+<style>
+  /* ── Las tres cifras de la cabecera (statCard) ── */
+  .ev-cifras { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+               margin: 0 16px 16px; }
+  .ev-cifra { background: #fff; border: 1px solid var(--border);
+              border-radius: 12px; padding: 14px; }
+  .ev-cifra__v { font-size: 22px; font-weight: 800; margin-top: 6px; line-height: 1; }
+  .ev-cifra__e { font-size: 11px; color: var(--text-sec); margin-top: 4px; }
+
+  /* ── Botón grande verde (ctaButton) ── */
+  .ev-cta {
+    display: flex; align-items: center; gap: 14px;
+    margin: 0 16px 10px; padding: 16px; border-radius: 16px;
+    background: var(--primary); color: #fff; text-decoration: none;
+  }
+  .ev-cta__ico {
+    width: 48px; height: 48px; flex: none; border-radius: 24px;
+    display: grid; place-items: center; background: rgba(255,255,255,.2);
+  }
+  .ev-cta__t { font-size: 17px; font-weight: 700; }
+  .ev-cta__s { font-size: 12px; color: rgba(255,255,255,.85); margin-top: 2px; }
+
+  /* ── Botones secundarios en blanco (secondaryBtn) ── */
+  .ev-sec {
+    display: flex; align-items: center; gap: 10px;
+    margin: 0 16px 10px; padding: 14px; border-radius: 12px;
+    background: #fff; border: 1px solid var(--border);
+    color: inherit; text-decoration: none;
+  }
+  .ev-sec__t { flex: 1; font-size: 14px; font-weight: 600; }
+
+  /* ── Botón violeta para la prueba propia (customBtn) ── */
+  .ev-propia {
+    display: flex; align-items: center; gap: 12px;
+    margin: 0 16px 22px; padding: 14px; border-radius: 12px;
+    background: #8b5cf6; color: #fff; text-decoration: none;
+    box-shadow: 0 4px 8px rgba(139,92,246,.2);
+  }
+  .ev-propia__ico {
+    width: 40px; height: 40px; flex: none; border-radius: 12px;
+    display: grid; place-items: center; background: rgba(255,255,255,.22);
+  }
+  .ev-propia__t { font-size: 14px; font-weight: 700; }
+  .ev-propia__s { font-size: 11px; color: rgba(255,255,255,.9); margin-top: 2px; }
+
+  /* ── Cabecera de sección con su contador (sectionHeader) ── */
+  .ev-sec-cab { display: flex; align-items: center; justify-content: space-between;
+                margin: 0 16px 10px; }
+  .ev-sec-cab__t { font-size: 16px; font-weight: 700; }
+  .ev-sec-cab__n { font-size: 12px; font-weight: 600; color: var(--text-sec);
+                   background: var(--border-soft); padding: 2px 8px; border-radius: 10px; }
+
+  /* ── Tarjeta de resultado (resultCard) ── */
+  .ev-res {
+    display: flex; align-items: center; gap: 12px;
+    margin: 0 16px 8px; padding: 12px; border-radius: 12px;
+    background: #fff; border: 1px solid var(--border);
+    color: inherit; text-decoration: none;
+  }
+  .ev-res__ico { width: 44px; height: 44px; flex: none; border-radius: 22px;
+                 display: grid; place-items: center; font-size: 19px; }
+  .ev-res__cuerpo { flex: 1; min-width: 0; }
+  .ev-res__fila { display: flex; justify-content: space-between; gap: 8px; }
+  .ev-res__n { font-size: 14px; font-weight: 700; overflow: hidden;
+               text-overflow: ellipsis; white-space: nowrap; }
+  .ev-res__f { font-size: 11px; color: var(--text-sec); flex: none; }
+  .ev-res__t { font-size: 12px; color: var(--text-sec); margin-top: 2px; }
+  .ev-res__marca { font-size: 12px; margin-top: 4px; }
+  .ev-res__puntaje {
+    min-width: 38px; height: 38px; flex: none; border-radius: 19px;
+    display: grid; place-items: center; padding: 0 8px;
+    color: #fff; font-size: 14px; font-weight: 800;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
+
+{# ══════════ LAS TRES CIFRAS ══════════ #}
+{# Mismo trío que TestsHomeScreen: cuánto se midió, a cuántos y qué tal. #}
+<div class="ev-cifras">
+  {% set puntaje_color = '#10b981' if (puntaje_medio or 0) >= 80 else
+                         ('#3b82f6' if (puntaje_medio or 0) >= 60 else
+                         ('#f59e0b' if (puntaje_medio or 0) >= 40 else '#ef4444')) %}
+  {% for ico, color, valor, etiqueta in [
+      ('calendar', 'var(--primary)', este_mes, 'Este mes'),
+      ('users', '#3b82f6', evaluados, 'Jugadores'),
+      ('award', '#8b5cf6', puntaje_medio, 'Puntaje medio')] %}
+  <div class="ev-cifra">
+    <i data-ico="{{ ico }}" class="pf-ico--sm" style="color:{{ color }}"></i>
+    {# `is number` y no `if valor`: un 0 es un dato, no un hueco. #}
+    <div class="ev-cifra__v"
+         {% if etiqueta == 'Puntaje medio' %}style="color:{{ puntaje_color if puntaje_medio is number else 'var(--text-muted)' }}"{% endif %}>
+      {% if valor is number %}{{ valor }}{% else %}—{% endif %}
+    </div>
+    <div class="ev-cifra__e">{{ etiqueta }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+{# ══════════ TOMAR UNA PRUEBA ══════════ #}
+<a class="ev-cta" href="{{ url_for('futbol.c_eval_catalogo') }}">
+  <div class="ev-cta__ico"><i data-ico="plus" class="pf-ico--lg"></i></div>
+  <div class="pf-grow">
+    <div class="ev-cta__t">Nueva evaluación</div>
+    <div class="ev-cta__s">Elige la prueba → los jugadores → las marcas</div>
+  </div>
+  <i data-ico="arrow-right" class="pf-ico--sm"></i>
+</a>
+
+<a class="ev-sec" href="{{ url_for('futbol.c_eval_catalogo') }}">
+  <i data-ico="layers" class="pf-ico--sm"></i>
+  <span class="ev-sec__t">Ver las {{ n_pruebas }} pruebas</span>
+  <i data-ico="chevron-right" class="pf-ico--sm" style="color:var(--text-sec)"></i>
+</a>
+
+<a class="ev-sec" href="{{ url_for('futbol.c_evolucion') }}">
+  <i data-ico="bar-chart-2" class="pf-ico--sm"></i>
+  <span class="ev-sec__t">
+    Evolución del equipo
+    {% if not fut_es_pro %}<span class="pf-pro">Pro</span>{% endif %}
+  </span>
+  <i data-ico="chevron-right" class="pf-ico--sm" style="color:var(--text-sec)"></i>
+</a>
+
+<a class="ev-propia" href="{{ url_for('futbol.c_eval_nueva') }}">
+  <div class="ev-propia__ico"><i data-ico="edit-3" class="pf-ico--sm"></i></div>
+  <div class="pf-grow">
+    <div class="ev-propia__t">
+      Crear mi propia prueba
+      {% if not fut_es_pro %}<span class="pf-pro">Pro</span>{% endif %}
+    </div>
+    <div class="ev-propia__s">La que uses y no esté en el catálogo</div>
+  </div>
+  <i data-ico="chevron-right" class="pf-ico--sm"></i>
+</a>
 
 {# ══════════ CONTRA QUÉ SE COMPARA ══════════ #}
 <div class="pf-card">
@@ -80,111 +216,69 @@
 </div>
 {% endif %}
 
-{# ══════════ PRUEBAS MÁS USADAS ══════════ #}
-<div class="pf-card">
-  <div class="pf-card__head">
-    <h2 class="pf-card__title">Tomar una prueba</h2>
-    <a href="{{ url_for('futbol.c_eval_catalogo') }}"
-       style="font-size:12.5px;font-weight:650;color:var(--primary);text-decoration:none">
-      Ver las {{ n_pruebas }} →
-    </a>
-  </div>
+{# ══════════ PRUEBAS RECIENTES ══════════ #}
+{# «Tests recientes» en la app: cada fila lleva el círculo de color de su
+   familia a la izquierda y el puntaje en un globo a la derecha. #}
+<div class="ev-sec-cab">
+  <div class="ev-sec-cab__t">Pruebas recientes</div>
+  {% if resultados %}<div class="ev-sec-cab__n">{{ resultados|length }}</div>{% endif %}
 </div>
 
-<div class="pf-rej pf-rej--2">
-  {% for t in destacadas %}
-    {% if t %}
-    <a class="pf-tarjeta" href="{{ url_for('futbol.c_eval_aplicar', clave=t.clave) }}">
-      <div class="pf-tarjeta__e">{{ {'fisico':'🏃','tecnico':'⚽','mental':'🧠'}.get(t.categoria, '📊') }}</div>
-      <div class="pf-tarjeta__t">{{ t.nombre }}</div>
-      <div class="pf-tarjeta__s">{{ t.subcategoria }}</div>
-    </a>
-    {% endif %}
-  {% endfor %}
-</div>
-
-<div class="pf-rej pf-rej--2 pf-mt-12">
-  <a class="pf-tarjeta" href="{{ url_for('futbol.c_eval_catalogo') }}"
-     style="background:var(--primary-faint);border-color:var(--primary-light)">
-    <div class="pf-tarjeta__e">📚</div>
-    <div class="pf-tarjeta__t">Catálogo completo</div>
-    <div class="pf-tarjeta__s">Todas las pruebas por familia</div>
-  </a>
-  <a class="pf-tarjeta" href="{{ url_for('futbol.c_evolucion') }}"
-     style="background:var(--primary-faint);border-color:var(--primary-light)">
-    <div class="pf-tarjeta__e">📈</div>
-    <div class="pf-tarjeta__t">Evolución del equipo</div>
-    <div class="pf-tarjeta__s">
-      Cómo va el grupo {% if not fut_es_pro %}<span class="pf-pro">Pro</span>{% endif %}
+{% if resultados %}
+  {% set familia = {
+      'fisico':  {'emoji': '🏃', 'color': '#ef4444', 'fondo': '#fee2e2', 'et': 'Físico'},
+      'tecnico': {'emoji': '⚽', 'color': '#3b82f6', 'fondo': '#dbeafe', 'et': 'Técnico'},
+      'mental':  {'emoji': '🧠', 'color': '#8b5cf6', 'fondo': '#ede9fe', 'et': 'Mental'}} %}
+  {% for r in resultados %}
+  {% set f = familia.get(r.categoria or 'fisico', familia['fisico']) %}
+  <a class="ev-res" href="{{ url_for('futbol.c_eval_resultado', rid=r.id) }}">
+    <div class="ev-res__ico" style="background:{{ f.fondo }}">{{ f.emoji }}</div>
+    <div class="ev-res__cuerpo">
+      <div class="ev-res__fila">
+        <div class="ev-res__n">{{ r.jugador_nombre or 'Jugador' }}</div>
+        <div class="ev-res__f">{{ r._fecha.strftime('%d/%m/%Y') if r._fecha else '' }}</div>
+      </div>
+      <div class="ev-res__t">{{ r.test_nombre }} · {{ f.et }}</div>
+      <div class="ev-res__marca">
+        <strong>{{ '%g'|format(r._valor) if r._valor is not none else '—' }}</strong>
+        {{ r._unidad }}
+        {%- if r._nivel_meta %}
+          <span class="pf-nivel pf-nivel--{{ r._nivel }}">{{ r._nivel_meta.etiqueta }}</span>
+        {%- endif %}
+        {%- if r._firma %} · {{ r._firma }}{% endif %}
+      </div>
     </div>
+    {% if r.puntaje is not none %}
+    {% set c = '#10b981' if r.puntaje >= 80 else ('#3b82f6' if r.puntaje >= 60
+               else ('#f59e0b' if r.puntaje >= 40 else '#ef4444')) %}
+    <div class="ev-res__puntaje" style="background:{{ c }}">{{ r.puntaje }}</div>
+    {% endif %}
   </a>
-</div>
-
-{# ══════════ ÚLTIMAS EVALUACIONES ══════════ #}
-<div class="pf-card pf-mt-16">
-  <div class="pf-card__head">
-    <h2 class="pf-card__title">Lo último medido</h2>
-  </div>
-
-  {% if resultados %}
-    {% for r in resultados %}
-    <a class="pf-jug" href="{{ url_for('futbol.c_eval_resultado', rid=r.id) }}"
-       style="text-decoration:none;color:inherit">
-      <div class="pf-grow">
-        <div class="pf-jug__n">{{ r.jugador_nombre or 'Jugador' }}</div>
-        <div class="pf-jug__s">
-          {{ r.test_nombre }} ·
-          {{ r._fecha.strftime('%d/%m/%Y') if r._fecha else '' }}
-          {%- if r._firma %} · {{ r._firma }}{% endif %}
-        </div>
-      </div>
-      <div style="text-align:right">
-        <div class="pf-medida__v">
-          {{ '%g'|format(r._valor) if r._valor is not none else '—' }}<span
-            class="pf-medida__u"> {{ r._unidad }}</span>
-        </div>
-        {% if r._nivel_meta %}
-          <span class="pf-nivel pf-nivel--{{ r._nivel }}" style="margin-top:4px">
-            {{ r._nivel_meta.etiqueta }}
-          </span>
-        {% endif %}
-      </div>
-    </a>
-    {% endfor %}
-  {% else %}
+  {% endfor %}
+{% else %}
+  <div class="pf-card">
     <div class="pf-empty">
-      <div class="pf-empty__icon">📊</div>
-      <div class="pf-empty__title">Todavía no has medido nada</div>
+      <div class="pf-empty__icon">📥</div>
+      <div class="pf-empty__title">Sin evaluaciones todavía</div>
       <div class="pf-empty__text">
         Empieza por un sprint de 30 m o un Cooper: se toman en una sesión y
         dan la foto física del equipo.
       </div>
     </div>
-  {% endif %}
-</div>
+  </div>
+{% endif %}
 
-{# ══════════ ATAJOS ══════════ #}
-<div class="pf-card">
-  <a class="pf-item" href="{{ url_for('futbol.c_manuales') }}">
-    <div class="pf-item__icon">✍️</div>
-    <div class="pf-item__body">
-      <div class="pf-item__title">Jugadores sin cuenta</div>
-      <div class="pf-item__sub">{{ manuales|length }} apuntados a mano</div>
-    </div>
-    <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
-  </a>
-  <a class="pf-item" href="{{ url_for('futbol.c_eval_nueva') }}">
-    <div class="pf-item__icon">➕</div>
-    <div class="pf-item__body">
-      <div class="pf-item__title">
-        Crear una prueba propia
-        {% if not fut_es_pro %}<span class="pf-pro">Pro</span>{% endif %}
-      </div>
-      <div class="pf-item__sub">La que uses y no esté en el catálogo</div>
-    </div>
-    <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
-  </a>
-</div>
+{# Los jugadores apuntados a mano no existen en la app original —allí todos
+   tienen cuenta—, pero aquí sí, y desde algún sitio hay que llegar. #}
+<a class="ev-sec pf-mt-16" href="{{ url_for('futbol.c_manuales') }}">
+  <i data-ico="edit-2" class="pf-ico--sm"></i>
+  <span class="ev-sec__t">Jugadores sin cuenta
+    <span style="color:var(--text-sec);font-weight:500">· {{ manuales|length }}</span>
+  </span>
+  <i data-ico="chevron-right" class="pf-ico--sm" style="color:var(--text-sec)"></i>
+</a>
+
+<div style="height:24px"></div>
 
 {% endblock %}
 

@@ -19,6 +19,17 @@
 </div>
 {% endblock %}
 
+{% block head %}
+<style>
+  .ek-cifras { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .ek-cifra { text-align: center; padding: 10px 4px;
+              background: var(--border-soft); border-radius: var(--r-md); }
+  .ek-cifra__v { font-size: 17px; font-weight: 800; letter-spacing: -.4px; }
+  .ek-cifra__e { font-size: 10.5px; color: var(--text-sec); margin-top: 3px; }
+  .ek-pie { margin: 9px 0 0; font-size: 11px; color: var(--text-muted); }
+</style>
+{% endblock %}
+
 {% block content %}
 
 {% if resumen %}
@@ -28,6 +39,26 @@
   <p style="margin:7px 0 0;font-size:10.5px;color:var(--text-muted);font-style:italic">
     {{ test.fuente }}
   </p>
+</div>
+{% endif %}
+
+{# ── Cómo está el equipo en números ── #}
+{# La mediana va junto a la media a propósito: con un jugador muy destacado la
+   media sola miente sobre cómo está el resto. #}
+{% if stats and stats.n %}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">El equipo en números</h2></div>
+  <div class="ek-cifras">
+    {% for et, v in [('Media', stats.media), ('Mediana', stats.mediana),
+                     ('Mejor', stats.maximo if not menor_mejor else stats.minimo),
+                     ('Peor', stats.minimo if not menor_mejor else stats.maximo)] %}
+    <div class="ek-cifra">
+      <div class="ek-cifra__v">{{ '%g'|format(v) if v is not none else '—' }}</div>
+      <div class="ek-cifra__e">{{ et }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  <p class="ek-pie">{{ stats.n }} marca{{ '' if stats.n == 1 else 's' }} · en {{ unidad or 'la unidad de la prueba' }}</p>
 </div>
 {% endif %}
 
@@ -50,6 +81,12 @@
       <div class="pf-jug__s">
         {{ r._fecha.strftime('%d/%m/%Y') if r._fecha else '' }}
         {%- if r.puntaje is not none %} · {{ r.puntaje }}/100{% endif %}
+        {#- El percentil dice algo que el puesto no: ser 4º de 5 no es lo mismo
+            en un equipo de 5 que en uno de 25. Con menos de 3 no se enseña,
+            porque no significaría nada. -#}
+        {%- if r._percentil is not none and tabla|length >= 3 %}
+          · mejor que el {{ r._percentil }}% del equipo
+        {%- endif %}
       </div>
     </div>
     <div style="text-align:right">

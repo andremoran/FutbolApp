@@ -21,10 +21,12 @@ Se separó de coach.py porque son dieciséis rutas y allí dentro no se
 encontraría nada.
 """
 import logging
+import math
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
-from flask import abort, jsonify, redirect, render_template, request, url_for
+from flask import (abort, flash, jsonify, redirect, render_template, request,
+                   url_for)
 from flask_login import current_user, login_required
 
 import roles
@@ -251,7 +253,159 @@ def guardar_resultado(coach_id, jugador, clave, valores, fecha=None, notas='',
 
     if not fila:
         return None, 'No se pudo guardar. Inténtalo de nuevo.'
+
+    # La marca no se queda en una tabla aparte: mueve la ficha del jugador.
+    principal = cat.campo_principal(t)
+    fila['_cambios'] = aplicar_a_ficha(
+        coach_id, (jugador or {}).get('id') if not manual_id else None, t,
+        niveles.get(principal['clave']) if principal else None)
     return fila, None
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  LA MARCA MUEVE LA FICHA
+# ═══════════════════════════════════════════════════════════════════════════
+#  Igual que teamTestAnalysis.ts en la app original. El delta sale de dos
+#  lecturas y se queda con la más generosa para el jugador:
+#
+#    · Cómo quedó DENTRO DEL EQUIPO (percentil). Pide tres marcas o más:
+#      con dos jugadores, «último puesto» no significa nada.
+#    · Cómo quedó CONTRA EL BAREMO (nivel absoluto). Evita castigar a quien
+#      corre a nivel élite pero juega en un equipo aún mejor.
+#
+#  Luego se reparte según el peso del atributo y se limita a ±2, para que una
+#  sola tarde de pruebas no reescriba la ficha entera.
+
+DELTA_POR_NIVEL = {'elite': 2, 'bueno': 1, 'promedio': 0, 'debil': -1, 'muy_debil': -2}
+TOPE_DELTA = 2
+
+NOMBRE_ATRIBUTO = {'tecnica': 'Técnica', 'fisico': 'Físico',
+                   'tactico': 'Táctico', 'mental': 'Mental'}
+
+
+def percentil(puesto, total):
+    """100 es la mejor marca del equipo; 0, la peor."""
+    if not puesto or not total or total < 2:
+        return None
+    return round((total - puesto) / (total - 1) * 100)
+
+
+def _delta_por_percentil(p, total):
+    if p is None or total < 3:
+        return None
+    if p >= 85:
+        return 2
+    if p >= 65:
+        return 1
+    if p >= 35:
+        return 0
+    if p >= 15:
+        return -1
+    return -2
+
+
+def _redondear(x):
+    """El medio punto sube, como Math.round en la app original.
+
+    round() de Python redondea al par: round(0.5) da 0 y round(1.5) da 2. Con
+    un peso de 0.5 las dos apps darían números distintos para la misma marca.
+    """
+    return math.floor(x + 0.5)
+
+
+def estadisticas(valores):
+    """Media, mediana, mínimo y máximo de un conjunto de marcas.
+
+    La mediana importa tanto como la media: con un jugador muy destacado, la
+    media miente sobre cómo está el resto del equipo.
+    """
+    limpios = sorted(v for v in (valores or []) if v is not None)
+    if not limpios:
+        return {'n': 0, 'media': None, 'mediana': None,
+                'minimo': None, 'maximo': None}
+    n = len(limpios)
+    mitad = n // 2
+    mediana = limpios[mitad] if n % 2 else (limpios[mitad - 1] + limpios[mitad]) / 2
+    return {'n': n,
+            'media': round(sum(limpios) / n, 2),
+            'mediana': round(mediana, 2),
+            'minimo': limpios[0],
+            'maximo': limpios[-1]}
+
+
+def ranking_de(coach_id, clave, t=None):
+    """Mejor marca de cada jugador en una prueba, de mejor a peor.
+
+    Del ranking cuelgan tres cosas —la pantalla, el percentil y el delta de la
+    ficha—, así que vive aquí y no dentro de la vista.
+    """
+    t = t or prueba(clave, coach_id)
+    if not t:
+        return [], None, cat.MAYOR
+
+    principal = cat.campo_principal(t)
+    campo = principal['clave'] if principal else None
+    direccion = principal.get('direccion') if principal else cat.MAYOR
+
+    mejores = {}
+    for r in enriquecer([x for x in resultados_equipo(coach_id, 400)
+                         if x.get('test_clave') == clave], coach_id):
+        pid = r.get('player_id') or r.get('manual_player_id')
+        if not pid or r['_valor'] is None:
+            continue
+        actual = mejores.get(pid)
+        if not actual or (r['_valor'] < actual['_valor'] if direccion == cat.MENOR
+                          else r['_valor'] > actual['_valor']):
+            mejores[pid] = r
+
+    tabla = sorted(mejores.values(),
+                   key=lambda r: r['_valor'] * (1 if direccion == cat.MENOR else -1))
+    total = len(tabla)
+    for i, r in enumerate(tabla, 1):
+        r['_puesto'] = i
+        r['_percentil'] = percentil(i, total)
+    return tabla, campo, direccion
+
+
+def aplicar_a_ficha(coach_id, player_id, t, nivel_absoluto):
+    """Mueve los atributos del jugador según cómo le fue. Devuelve los cambios.
+
+    Solo afecta a jugadores con cuenta: uno anotado a mano no tiene ficha.
+    """
+    if not player_id:
+        return []
+
+    tabla, _, _ = ranking_de(coach_id, t.get('clave'), t)
+    mio = next((r for r in tabla if r.get('player_id') == player_id), None)
+    por_equipo = (_delta_por_percentil(mio.get('_percentil'), len(tabla))
+                  if mio else None)
+    por_baremo = DELTA_POR_NIVEL.get(nivel_absoluto)
+
+    lecturas = [d for d in (por_equipo, por_baremo) if d is not None]
+    if not lecturas:
+        return []
+    base = max(lecturas)
+    if base == 0:
+        return []
+
+    actuales = db.atributos(player_id)
+    nuevos, cambios = dict(actuales), []
+    for atributo, peso in cat.atributos_de(t).items():
+        delta = max(-TOPE_DELTA, min(TOPE_DELTA, _redondear(base * peso)))
+        antes = actuales.get(atributo, 50)
+        despues = max(1, min(100, antes + delta))
+        if despues == antes:
+            continue
+        nuevos[atributo] = despues
+        cambios.append({'atributo': atributo, 'delta': despues - antes,
+                        'antes': antes, 'despues': despues})
+
+    if cambios:
+        nuevos['player_id'] = player_id
+        nuevos['actualizado'] = _ahora()
+        db.upsert('fut_attributes', nuevos, 'ficha por prueba',
+                  on_conflict='player_id')
+    return cambios
 
 
 def enriquecer(filas, coach_id=None, con_nivel=True):
@@ -395,13 +549,25 @@ def c_evaluaciones():
     limite = date.today() - timedelta(days=45)
     pendientes = [j for j in jugadores if ultima.get(j['id'], date.min) < limite]
 
+    # Las tres cifras de la cabecera, como en TestsHomeScreen.
+    todos = resultados_equipo(uid, 400)
+    hoy = date.today()
+    este_mes = len([r for r in todos
+                    if (db.parse_fecha(r.get('fecha')) or date.min).month == hoy.month
+                    and (db.parse_fecha(r.get('fecha')) or date.min).year == hoy.year])
+    evaluados = len({r.get('player_id') or r.get('manual_player_id')
+                     for r in todos if r.get('player_id') or r.get('manual_player_id')})
+    puntajes = [r['puntaje'] for r in todos if r.get('puntaje') is not None]
+    puntaje_medio = int(round(sum(puntajes) / len(puntajes))) if puntajes else None
+
     edad, nivel = contexto_equipo(uid)
     return render_template(
         'c_evaluaciones.html',
         tab_activa='equipo', hide_tabbar=True,
         jugadores=jugadores, manuales=manuales,
         resultados=resultados[:20],
-        n_total=len(resultados_equipo(uid, 400)),
+        n_total=len(todos),
+        este_mes=este_mes, evaluados=evaluados, puntaje_medio=puntaje_medio,
         pendientes=pendientes,
         categorias=cat.CATEGORIAS,
         contexto_edad=edad, contexto_nivel=nivel,
@@ -507,36 +673,14 @@ def c_eval_ranking(clave):
 
     # El mejor registro de cada jugador, no el último: el ranking es de marcas.
     principal = cat.campo_principal(t)
-    campo = principal['clave'] if principal else None
-    direccion = principal.get('direccion') if principal else cat.MAYOR
-
-    mejores = {}
-    for r in enriquecer([x for x in resultados_equipo(uid, 400)
-                         if x.get('test_clave') == clave], uid):
-        pid = r.get('player_id') or r.get('manual_player_id')
-        if not pid or r['_valor'] is None:
-            continue
-        actual = mejores.get(pid)
-        if not actual:
-            mejores[pid] = r
-        else:
-            mejor = (r['_valor'] < actual['_valor'] if direccion == cat.MENOR
-                     else r['_valor'] > actual['_valor'])
-            if mejor:
-                mejores[pid] = r
-
-    tabla = sorted(mejores.values(),
-                   key=lambda r: (r['_valor'] * (1 if direccion == cat.MENOR else -1)))
-    for i, r in enumerate(tabla, 1):
-        r['_puesto'] = i
-
-    valores = [r['_valor'] for r in tabla]
-    media = round(sum(valores) / len(valores), 2) if valores else None
+    tabla, campo, direccion = ranking_de(uid, clave, t)
+    stats = estadisticas([r['_valor'] for r in tabla])
 
     edad, nivel = contexto_equipo(uid)
     return render_template('c_eval_ranking.html',
                            tab_activa='equipo', hide_tabbar=True,
-                           test=t, tabla=tabla, campo=campo, media=media,
+                           test=t, tabla=tabla, campo=campo,
+                           media=stats['media'], stats=stats,
                            unidad=(principal or {}).get('unidad', ''),
                            menor_mejor=(direccion == cat.MENOR),
                            resumen=cat.resumen_baremo(clave, campo or '', edad, nivel),
@@ -796,7 +940,7 @@ def api_eval_guardar():
     manuales = {str(m['id']): m for m in
                 (db.rows('fut_manual_players', 'manuales', coach_id=uid) or [])}
 
-    guardados, errores = [], []
+    guardados, errores, movidos = [], [], []
     for e in entradas:
         pid = str(e.get('player_id') or '')
         es_manual = bool(e.get('manual'))
@@ -826,9 +970,20 @@ def api_eval_guardar():
             errores.append(f'{nombre}: {error}')
         elif fila:
             guardados.append(fila['id'])
+            if fila.get('_cambios'):
+                movidos.append(fila['_cambios'])
 
     if not guardados:
         return jsonify({'error': errores[0] if errores else 'No se guardó nada.'}), 400
+
+    # Que el entrenador se entere de que la marca no se quedó en una tabla.
+    # Va por flash y no en la respuesta porque justo después hay redirección.
+    if movidos:
+        tocados = sorted({c['atributo'] for cambios in movidos for c in cambios})
+        flash('Esta prueba movió la ficha de {} jugador{}: {}.'.format(
+            len(movidos), '' if len(movidos) == 1 else 'es',
+            ', '.join(NOMBRE_ATRIBUTO.get(a, a) for a in tocados)), 'success')
+
     return jsonify({'ok': True, 'n': len(guardados), 'ids': guardados,
                     'avisos': errores,
                     'redirect': url_for('futbol.c_eval_ranking', clave=clave)
