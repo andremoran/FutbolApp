@@ -1,9 +1,9 @@
 {% extends '_shell.html' %}
 {% block title %}Lesiones · ProFoot{% endblock %}
 
-{# Quién está disponible y quién no. Del jugador solo se trae el contacto de
-   emergencia, el grupo sanguíneo y las alergias: la medicación y sus
-   condiciones ni siquiera se piden a la base. #}
+{# Quién está disponible y quién no, y la puerta a la ficha médica de cada uno
+   (c_medico_jugador.html). El cuerpo técnico ve la ficha completa, como en la
+   app; lo que declara un jugador con cuenta lo sigue escribiendo él. #}
 
 {% block hero_back %}
 <a class="pf-hero__btn" href="{{ url_for('futbol.c_equipo') }}" aria-label="Volver">
@@ -21,15 +21,6 @@
 
 {% block content %}
 
-<div class="pf-card">
-  <div class="pf-alerta pf-alerta--info" style="margin-top:0">
-    <i data-ico="lock" class="pf-ico--xs"></i>
-    <span>De la ficha médica de tus jugadores solo ves el contacto de
-      emergencia, el grupo sanguíneo y las alergias. La medicación y sus
-      condiciones son privadas.</span>
-  </div>
-</div>
-
 {# ══════════ REGISTRAR ══════════ #}
 {% if jugadores %}
 <div class="pf-card">
@@ -40,7 +31,11 @@
   <div class="pf-field">
     <label class="pf-label" for="l-jugador">Jugador</label>
     <select class="pf-select" id="l-jugador">
-      {% for j in jugadores %}<option value="{{ j.id }}">{{ j.name }}</option>{% endfor %}
+      {% for j in jugadores %}
+      <option value="{{ j.id }}" data-tipo="{{ j._tipo }}">
+        {{ j.name }}{% if j._tipo == 'manual' %} · sin cuenta{% endif %}
+      </option>
+      {% endfor %}
     </select>
   </div>
 
@@ -89,10 +84,31 @@
     </div>
   </div>
 
+  <div class="pf-row pf-mt-12" style="gap:10px">
+    <div class="pf-grow">
+      <label class="pf-label" for="l-estado">Estado</label>
+      <select class="pf-select" id="l-estado">
+        {% for clave, etiqueta, color in estados %}
+        <option value="{{ clave }}" {{ 'selected' if clave == 'activa' }}>{{ etiqueta }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="width:130px;flex:none">
+      <label class="pf-label" for="l-dias">Días estimados</label>
+      <input class="pf-input" id="l-dias" type="number" min="0" max="999">
+    </div>
+  </div>
+
   <div class="pf-field pf-mt-12">
     <label class="pf-label" for="l-descripcion">Qué pasó</label>
     <textarea class="pf-textarea" id="l-descripcion" rows="2" maxlength="1000"
               placeholder="Mecanismo, si hubo diagnóstico médico, qué se le indicó"></textarea>
+  </div>
+
+  <div class="pf-field">
+    <label class="pf-label" for="l-tratamiento">Tratamiento / protocolo</label>
+    <textarea class="pf-textarea" id="l-tratamiento" rows="2" maxlength="1000"
+              placeholder="Fisioterapia, reposo, medicación, pauta de vuelta"></textarea>
   </div>
 
   <button class="pf-btn pf-btn--primary pf-btn--block pf-mt-16" type="button" id="btn-lesion">
@@ -109,19 +125,28 @@
 
   {% for j in jugadores %}
   <div class="pf-jug">
-    <div class="pf-avatar pf-avatar--sm">
+    <a class="pf-avatar pf-avatar--sm" href="{{ url_for('futbol.c_medico_jugador', pid=j.id) }}"
+       style="{{ 'background:var(--purple-bg);color:var(--purple)' if j._tipo == 'manual' }}">
       {%- if j.profile_photo %}<img src="{{ j.profile_photo }}" alt="">
       {%- else %}{{ (j.name or '?')[:1]|upper }}{% endif -%}
-    </div>
-    <div class="pf-grow">
-      <div class="pf-jug__n">{{ j.name }}</div>
+    </a>
+    <a class="pf-grow" href="{{ url_for('futbol.c_medico_jugador', pid=j.id) }}"
+       style="text-decoration:none;color:inherit">
+      <div class="pf-jug__n">
+        {{ j.name }}
+        {%- if j._aptitud and j._aptitud.etiqueta != 'Apto' %}
+        <span class="pf-pill" style="background:{{ j._aptitud.color }}22;color:{{ j._aptitud.color }};margin-left:4px">
+          {{ j._aptitud.etiqueta }}</span>
+        {%- endif %}
+      </div>
       <div class="pf-jug__s">
-        {% if j._activa %}
-          {{ j._activa.zona }} · {{ j._activa._gravedad.etiqueta|lower }}
-          {%- if j._activa._dias is not none %} · {{ j._activa._dias }} día{{ '' if j._activa._dias == 1 else 's' }}{% endif %}
+        {% if j._baja %}
+          {{ j._baja.zona }} · {{ j._baja._gravedad.etiqueta|lower }}
+          {%- if j._baja._dias is not none %} · {{ j._baja._dias }} día{{ '' if j._baja._dias == 1 else 's' }}{% endif %}
         {% else %}
           Disponible
-          {%- if j._lesiones %} · {{ j._lesiones|length }} lesión{{ '' if j._lesiones|length == 1 else 'es' }} en el histórico{% endif %}
+          {%- if j._cronica %} · convive con una lesión crónica{% endif %}
+          {%- if j._lesiones and not j._cronica %} · {{ j._lesiones|length }} lesión{{ '' if j._lesiones|length == 1 else 'es' }} en el histórico{% endif %}
         {% endif %}
       </div>
       {% if j._medico.contacto_tel or j._medico.alergias %}
@@ -132,14 +157,14 @@
         {%- if j._medico.alergias %} · ⚠️ {{ j._medico.alergias|truncate(40) }}{% endif -%}
       </div>
       {% endif %}
-    </div>
-    {% if j._activa %}
-      <span class="pf-pill" style="background:{{ j._activa._estado.color }}22;
-            color:{{ j._activa._estado.color }}">{{ j._activa._estado.etiqueta }}</span>
+    </a>
+    {% if j._baja %}
+      <span class="pf-pill" style="background:{{ j._baja._estado.color }}22;
+            color:{{ j._baja._estado.color }}">{{ j._baja._estado.etiqueta }}</span>
       <button class="pf-btn pf-btn--ghost" type="button" style="padding:6px 10px;font-size:12px"
-              onclick="darAlta('{{ j._activa.id }}', '{{ j.name|e }}')">Alta</button>
+              onclick="darAlta('{{ j._baja.id }}', '{{ j.name|e }}')">Alta</button>
     {% else %}
-      <span class="pf-pill pf-pill--info">✅</span>
+      <i data-ico="chevron-right" class="pf-ico--sm" style="color:var(--text-muted)"></i>
     {% endif %}
   </div>
   {% else %}
@@ -179,13 +204,21 @@
 {% block scripts %}
 <script>
 /* Rellena la fecha de alta con el plazo típico de esa gravedad: es una
-   estimación de partida, no un diagnóstico, y el entrenador la corrige. */
+   estimación de partida, no un diagnóstico, y el entrenador la corrige.
+
+   El formulario entero solo existe si hay jugadores, así que sin plantilla
+   estos campos no están: sin esta guarda, abrir «Lesiones» con el equipo
+   vacío reventaba el script de la pantalla. */
 function sugerirAlta() {
+  const gravedad = document.getElementById('l-gravedad');
+  const fecha = document.getElementById('l-fecha');
+  const alta = document.getElementById('l-alta');
+  if (!gravedad || !fecha || !alta) return;
+
   const dias = { leve: 5, moderada: 18, grave: 45 };
-  const g = document.getElementById('l-gravedad').value;
-  const base = new Date(document.getElementById('l-fecha').value || Date.now());
-  base.setDate(base.getDate() + (dias[g] || 7));
-  document.getElementById('l-alta').value = base.toISOString().slice(0, 10);
+  const base = new Date(fecha.value || Date.now());
+  base.setDate(base.getDate() + (dias[gravedad.value] || 7));
+  alta.value = base.toISOString().slice(0, 10);
 }
 sugerirAlta();
 
@@ -193,13 +226,22 @@ const btn = document.getElementById('btn-lesion');
 if (btn) btn.onclick = function () {
   const boton = this;
   const v = id => document.getElementById(id).value;
+
+  // El jugador sin cuenta viaja por otra clave: no está en `usuarios`.
+  const sel = document.getElementById('l-jugador');
+  const opcion = sel.options[sel.selectedIndex];
+  const quien = opcion && opcion.dataset.tipo === 'manual'
+    ? { manual_player_id: sel.value }
+    : { player_id: sel.value };
+
   boton.disabled = true;
-  PF.api('/api/lesion', {
-    player_id: v('l-jugador'), zona: v('l-zona'), lado: v('l-lado'),
+  PF.api('/api/lesion', Object.assign(quien, {
+    zona: v('l-zona'), lado: v('l-lado'),
     tipo: v('l-tipo'), gravedad: v('l-gravedad'), fecha: v('l-fecha'),
     alta_prevista: v('l-alta'), descripcion: v('l-descripcion'),
-    estado: 'activa',
-  }).then(j => {
+    tratamiento: v('l-tratamiento'), dias_estimados: v('l-dias'),
+    estado: v('l-estado'),
+  })).then(j => {
     PF.toast(j.mensaje, 'success');
     setTimeout(() => location.reload(), 700);
   }).catch(e => {
@@ -211,8 +253,7 @@ if (btn) btn.onclick = function () {
 function darAlta(lid, nombre) {
   if (!confirm('¿Dar de alta a ' + nombre + '?\n\nVolverá a contar como disponible.')) return;
   PF.api('/api/lesion', { id: lid, estado: 'alta',
-                          alta_real: new Date().toISOString().slice(0, 10),
-                          player_id: null })
+                          alta_real: new Date().toISOString().slice(0, 10) })
     .then(() => location.reload())
     .catch(e => PF.toast(e.message, 'error'));
 }

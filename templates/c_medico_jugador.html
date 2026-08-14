@@ -1,0 +1,373 @@
+{% extends '_shell.html' %}
+{% from '_rating.html' import rating %}
+{% block title %}Ficha médica de {{ jugador.name }} · ProFoot{% endblock %}
+
+{# screens/PlayerMedicalScreen.tsx — la ficha que lleva el cuerpo técnico.
+
+   Quién escribe qué: lo clínico (aptitud, chequeo, talla, notas, lesiones) es
+   del cuerpo técnico siempre. Lo declarativo (alergias, medicación,
+   condiciones) lo escribe el jugador si tiene cuenta —el entrenador lo lee
+   pero no lo pisa— y el entrenador si no la tiene, porque entonces no hay
+   nadie más que pueda hacerlo. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_medico') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Ficha médica</div>{% endblock %}
+{% block hero_title %}{{ jugador.name }}{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {% if de_baja %}De baja · {{ de_baja[0].zona }}
+  {% elif aptitud %}{{ aptitud.etiqueta }}
+  {% else %}Sin reconocimiento médico{% endif %}
+  {%- if es_manual %} · sin cuenta{% endif %}
+</div>
+{% endblock %}
+
+{% block head %}
+<style>
+  .md-head { display: flex; align-items: center; gap: 10px; margin-bottom: 2px; }
+  .md-opciones { display: flex; gap: 8px; }
+  .md-opcion {
+    flex: 1; padding: 11px 8px; border-radius: var(--r-lg);
+    border: 1.5px solid var(--border); background: #fff;
+    font: inherit; font-size: 12.5px; font-weight: 700; color: var(--text-sec);
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+  }
+  .md-opcion[aria-pressed="true"] { color: #fff; border-color: transparent; }
+  .md-switch { display: flex; align-items: center; gap: 12px; padding: 12px 0; }
+  .md-switch__txt { flex: 1; }
+  .md-switch__t { font-size: 14px; font-weight: 700; }
+  .md-switch__s { font-size: 12px; color: var(--text-sec); margin-top: 2px; }
+  .md-switch__btn {
+    width: 50px; height: 30px; border-radius: 15px; flex: none;
+    background: var(--border); position: relative; transition: background .18s;
+  }
+  .md-switch__btn::after {
+    content: ''; position: absolute; top: 3px; left: 3px;
+    width: 24px; height: 24px; border-radius: 12px; background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,.2); transition: transform .18s;
+  }
+  .md-switch__btn[aria-pressed="true"] { background: var(--success); }
+  .md-switch__btn[aria-pressed="true"]::after { transform: translateX(20px); }
+
+  .md-lesion { padding: 12px 0; border-top: 1px solid var(--border-soft); }
+  .md-lesion:first-of-type { border-top: none; }
+  .md-lesion__t { display: flex; align-items: center; gap: 8px; }
+  .md-lesion__n { flex: 1; font-size: 14px; font-weight: 700; }
+  .md-lesion__s { font-size: 12px; color: var(--text-sec); margin-top: 3px; }
+  .md-lesion__tr {
+    margin-top: 7px; padding: 8px 10px; border-radius: var(--r-md);
+    background: var(--primary-faint); font-size: 12px; line-height: 1.5;
+  }
+  .md-solo-lectura {
+    display: flex; align-items: flex-start; gap: 6px;
+    background: var(--info-bg); color: #1e40af;
+    padding: 9px 11px; border-radius: var(--r-md);
+    font-size: 11.5px; line-height: 1.5; margin-bottom: 12px;
+  }
+  .md-dato { padding: 10px 0; border-top: 1px solid var(--border-soft); }
+  .md-dato:first-of-type { border-top: none; }
+  .md-dato__e { font-size: 11.5px; color: var(--text-sec); }
+  .md-dato__v { font-size: 13.5px; font-weight: 600; margin-top: 2px; line-height: 1.5; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ══════════ APTITUD ══════════ #}
+<div class="pf-card">
+  <div class="md-head">
+    <span class="pf-item__icon"><i data-ico="shield" class="pf-ico--sm"></i></span>
+    <h2 class="pf-card__title">Estado médico</h2>
+  </div>
+
+  <div class="pf-field pf-mt-12">
+    <label class="pf-label">Aptitud</label>
+    <div class="md-opciones" role="group" aria-label="Aptitud" id="md-apto">
+      {% for clave, etiqueta, color in aptitudes %}
+      <button type="button" class="md-opcion" data-apto="{{ clave }}" data-color="{{ color }}"
+              aria-pressed="{{ 'true' if clave == ficha.apto else 'false' }}"
+              style="{{ 'background:' ~ color ~ ';' if clave == ficha.apto }}">
+        <i data-ico="{{ 'check-circle' if clave == 'apto' else ('alert-triangle' if clave == 'precaucion' else 'x') }}" class="pf-ico--sm"></i>
+        {{ etiqueta }}
+      </button>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="md-switch">
+    <div class="md-switch__txt">
+      <div class="md-switch__t">Apto para competir</div>
+      <div class="md-switch__s">El alta para jugar, distinta del diagnóstico</div>
+    </div>
+    <button type="button" class="md-switch__btn" id="md-competir"
+            aria-pressed="{{ 'true' if ficha.apto_competir else 'false' }}"
+            aria-label="Apto para competir"></button>
+  </div>
+
+  <div class="pf-row" style="gap:10px">
+    <div class="pf-grow">
+      <label class="pf-label" for="md-chequeo">Último chequeo</label>
+      <input class="pf-input" id="md-chequeo" type="date" value="{{ ficha.ultimo_chequeo or '' }}">
+    </div>
+    <div class="pf-grow">
+      <label class="pf-label" for="md-certificado">Vence certificado</label>
+      <input class="pf-input" id="md-certificado" type="date" value="{{ ficha.certificado_vence or '' }}">
+    </div>
+  </div>
+
+  <div class="pf-row pf-mt-12" style="gap:10px">
+    <div class="pf-grow">
+      <label class="pf-label" for="md-estatura">Estatura (cm)</label>
+      <input class="pf-input" id="md-estatura" type="number" min="80" max="230" step="0.5"
+             value="{{ ficha.estatura_cm or '' }}">
+    </div>
+    <div class="pf-grow">
+      <label class="pf-label" for="md-peso">Peso (kg)</label>
+      <input class="pf-input" id="md-peso" type="number" min="20" max="150" step="0.1"
+             value="{{ ficha.peso_kg or '' }}">
+    </div>
+  </div>
+</div>
+
+{# ══════════ CARGA ══════════ #}
+<div class="pf-card">
+  <div class="md-head">
+    <span class="pf-item__icon"><i data-ico="activity" class="pf-ico--sm"></i></span>
+    <h2 class="pf-card__title">Carga y fatiga</h2>
+  </div>
+  <p style="margin:4px 0 12px;font-size:11.5px;color:var(--text-muted);line-height:1.55">
+    Son los mismos que mueve la evaluación semanal: se guardan en el Perfil
+    Dinámico, no en una copia aparte.
+  </p>
+
+  <div class="pf-field">
+    <label class="pf-label">Nivel de fatiga actual</label>
+    <div class="pf-riesgo" role="group" aria-label="Nivel de fatiga" id="md-fatiga">
+      {% for clave, etiqueta, _n in niveles_fatiga %}
+      <button type="button" class="pf-riesgo__btn" data-fatiga="{{ clave }}"
+              aria-pressed="{{ 'true' if clave == (fatiga_nivel or 'bajo') else 'false' }}">{{ etiqueta }}</button>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="pf-field" style="margin-bottom:0">
+    <label class="pf-label">Riesgo de sobrecarga</label>
+    <div class="pf-riesgo" role="group" aria-label="Riesgo" id="md-riesgo">
+      {% for clave, etiqueta, _c in riesgos %}
+      <button type="button" class="pf-riesgo__btn" data-riesgo="{{ clave }}"
+              aria-pressed="{{ 'true' if clave == (atributos.riesgo_sobrecarga or 'bajo') else 'false' }}">{{ etiqueta }}</button>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+{# ══════════ LO QUE DECLARA EL JUGADOR ══════════ #}
+<div class="pf-card">
+  <div class="md-head">
+    <span class="pf-item__icon"><i data-ico="user" class="pf-ico--sm"></i></span>
+    <h2 class="pf-card__title">Declaración del jugador</h2>
+  </div>
+
+  {% if not declaracion_editable %}
+  <div class="md-solo-lectura">
+    <i data-ico="lock" class="pf-ico--xs"></i>
+    <span>Esto lo escribe el jugador desde su cuenta. Lo ves entero, pero se
+      edita desde su ficha: si hay algo mal, díselo a él.</span>
+  </div>
+  {% endif %}
+
+  {% if declaracion_editable %}
+    <div class="pf-row" style="gap:10px">
+      <div style="width:130px;flex:none">
+        <label class="pf-label" for="md-sangre">Tipo de sangre</label>
+        <select class="pf-select" id="md-sangre">
+          <option value="">—</option>
+          {% for g in ['A+','A-','B+','B-','AB+','AB-','O+','O-'] %}
+          <option value="{{ g }}" {{ 'selected' if ficha.grupo_sanguineo == g }}>{{ g }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="pf-grow">
+        <label class="pf-label" for="md-seguro">Seguro médico</label>
+        <input class="pf-input" id="md-seguro" maxlength="120" value="{{ ficha.seguro or '' }}">
+      </div>
+    </div>
+    <div class="pf-field pf-mt-12">
+      <label class="pf-label" for="md-alergias">Alergias</label>
+      <textarea class="pf-textarea" id="md-alergias" rows="2" maxlength="600">{{ ficha.alergias or '' }}</textarea>
+    </div>
+    <div class="pf-field">
+      <label class="pf-label" for="md-condiciones">Condiciones médicas</label>
+      <textarea class="pf-textarea" id="md-condiciones" rows="2" maxlength="800">{{ ficha.condiciones or '' }}</textarea>
+    </div>
+    <div class="pf-field" style="margin-bottom:0">
+      <label class="pf-label" for="md-medicacion">Medicación habitual</label>
+      <textarea class="pf-textarea" id="md-medicacion" rows="2" maxlength="600">{{ ficha.medicacion or '' }}</textarea>
+    </div>
+  {% else %}
+    {% set declarado = [
+        ('Tipo de sangre', ficha.grupo_sanguineo), ('Alergias', ficha.alergias),
+        ('Condiciones médicas', ficha.condiciones), ('Medicación', ficha.medicacion),
+        ('Seguro médico', ficha.seguro),
+        ('Contacto de emergencia',
+         (ficha.contacto_nombre or '') ~ (' · ' ~ ficha.contacto_parentesco if ficha.contacto_parentesco else '')
+                                       ~ (' · ' ~ ficha.contacto_tel if ficha.contacto_tel else '')),
+    ] %}
+    {% for etiqueta, valor in declarado if valor and valor|trim %}
+    <div class="md-dato">
+      <div class="md-dato__e">{{ etiqueta }}</div>
+      <div class="md-dato__v">{{ valor }}</div>
+    </div>
+    {% else %}
+    <p style="margin:6px 0 0;font-size:12.5px;color:var(--text-muted);line-height:1.55">
+      Todavía no ha rellenado su ficha médica.
+    </p>
+    {% endfor %}
+  {% endif %}
+</div>
+
+{# ══════════ NOTAS POR AUTOR ══════════ #}
+<div class="pf-card">
+  <div class="md-head">
+    <span class="pf-item__icon"><i data-ico="file-text" class="pf-ico--sm"></i></span>
+    <h2 class="pf-card__title">Notas del cuerpo técnico</h2>
+  </div>
+  <p style="margin:4px 0 12px;font-size:11.5px;color:var(--text-muted);line-height:1.55">
+    Separadas a propósito: así se sabe quién dijo cada cosa y con qué autoridad.
+  </p>
+
+  <div class="pf-field">
+    <label class="pf-label" for="md-notas-medico">🏥 Médico</label>
+    <textarea class="pf-textarea" id="md-notas-medico" rows="2" maxlength="800">{{ ficha.notas_medico or '' }}</textarea>
+  </div>
+  <div class="pf-field">
+    <label class="pf-label" for="md-notas-fisio">⚕️ Fisioterapeuta</label>
+    <textarea class="pf-textarea" id="md-notas-fisio" rows="2" maxlength="800">{{ ficha.notas_fisio or '' }}</textarea>
+  </div>
+  <div class="pf-field" style="margin-bottom:0">
+    <label class="pf-label" for="md-notas-entrenador">📋 Entrenador</label>
+    <textarea class="pf-textarea" id="md-notas-entrenador" rows="2" maxlength="800">{{ ficha.notas_entrenador or '' }}</textarea>
+  </div>
+</div>
+
+<div style="padding:0 16px 24px">
+  <button class="pf-btn pf-btn--primary pf-btn--block" type="button" id="btn-guardar">
+    <i data-ico="save" class="pf-ico--sm"></i> Guardar ficha médica
+  </button>
+</div>
+
+{# ══════════ LESIONES ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Lesiones</h2>
+    <a class="pf-item__right" href="{{ url_for('futbol.c_medico') }}">Registrar</a>
+  </div>
+
+  {% for l in lesiones %}
+  <div class="md-lesion">
+    <div class="md-lesion__t">
+      <span class="md-lesion__n">
+        {{ l.zona }}{% if l.lado %} · {{ l.lado|lower }}{% endif %}
+      </span>
+      <span class="pf-pill" style="background:{{ l._estado.color }}22;color:{{ l._estado.color }}">
+        {{ l._estado.etiqueta }}
+      </span>
+    </div>
+    <div class="md-lesion__s">
+      {{ l._fecha.strftime('%d/%m/%Y') if l._fecha else '' }}
+      · {{ l._gravedad.etiqueta|lower }}
+      {%- if l._dias is not none %} · {{ l._dias }} día{{ '' if l._dias == 1 else 's' }}{% endif %}
+      {%- if l.dias_estimados %} · {{ l.dias_estimados }} d. estimados{% endif %}
+      {%- if l._restantes is not none and l._restantes > 0 %} · faltan {{ l._restantes }}{% endif %}
+    </div>
+    {% if l.descripcion %}
+    <div class="md-lesion__s" style="color:var(--text)">{{ l.descripcion }}</div>
+    {% endif %}
+    {% if l.tratamiento %}
+    <div class="md-lesion__tr"><strong>Tratamiento:</strong> {{ l.tratamiento }}</div>
+    {% endif %}
+  </div>
+  {% else %}
+  <p style="margin:8px 0 0;font-size:12.5px;color:var(--text-muted);line-height:1.55">
+    Sin lesiones en el histórico.
+  </p>
+  {% endfor %}
+</div>
+
+<div style="height:34px"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  // Grupos de botones excluyentes. El de aptitud además se tiñe con su color.
+  function excluyentes(caja, attr, tenir) {
+    if (!caja) return;
+    var btns = caja.querySelectorAll('[' + attr + ']');
+    btns.forEach(function (b) {
+      b.addEventListener('click', function () {
+        btns.forEach(function (o) {
+          o.setAttribute('aria-pressed', 'false');
+          if (tenir) o.style.background = '';
+        });
+        b.setAttribute('aria-pressed', 'true');
+        if (tenir) b.style.background = b.dataset.color;
+      });
+    });
+  }
+  var cajaApto = document.getElementById('md-apto');
+  var cajaRiesgo = document.getElementById('md-riesgo');
+  var cajaFatiga = document.getElementById('md-fatiga');
+  excluyentes(cajaApto, 'data-apto', true);
+  excluyentes(cajaRiesgo, 'data-riesgo', false);
+  excluyentes(cajaFatiga, 'data-fatiga', false);
+
+  var competir = document.getElementById('md-competir');
+  competir.addEventListener('click', function () {
+    var on = competir.getAttribute('aria-pressed') === 'true';
+    competir.setAttribute('aria-pressed', on ? 'false' : 'true');
+  });
+
+  function elegido(caja, attr) {
+    var b = caja ? caja.querySelector('[aria-pressed="true"]') : null;
+    return b ? b.dataset[attr] : null;
+  }
+  function val(id) {
+    var el = document.getElementById(id);
+    return el ? el.value.trim() : undefined;
+  }
+
+  document.getElementById('btn-guardar').addEventListener('click', function () {
+    var btn = this;
+    var datos = {
+      apto: elegido(cajaApto, 'apto') || '',
+      apto_competir: competir.getAttribute('aria-pressed') === 'true',
+      ultimo_chequeo: val('md-chequeo'), certificado_vence: val('md-certificado'),
+      estatura_cm: val('md-estatura'), peso_kg: val('md-peso'),
+      notas_medico: val('md-notas-medico'), notas_fisio: val('md-notas-fisio'),
+      notas_entrenador: val('md-notas-entrenador'),
+      fatiga: elegido(cajaFatiga, 'fatiga'),
+      riesgo_sobrecarga: elegido(cajaRiesgo, 'riesgo'),
+    };
+
+    {% if declaracion_editable %}
+    // Jugador sin cuenta: su declaración también la lleva el entrenador.
+    datos.grupo_sanguineo = val('md-sangre');
+    datos.seguro = val('md-seguro');
+    datos.alergias = val('md-alergias');
+    datos.condiciones = val('md-condiciones');
+    datos.medicacion = val('md-medicacion');
+    {% endif %}
+
+    btn.disabled = true;
+    PF.api('{{ url_for("futbol.api_medico_coach", pid=jugador.id) }}', datos)
+      .then(function (r) { PF.toast(r.mensaje, 'success'); btn.disabled = false; })
+      .catch(function (e) { PF.toast(e.message, 'error'); btn.disabled = false; });
+  });
+})();
+</script>
+{% endblock %}

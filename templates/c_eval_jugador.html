@@ -81,11 +81,10 @@
       ('Peso', (medico.peso_kg ~ ' kg') if medico.peso_kg else ''),
       ('Último chequeo', medico.ultimo_chequeo),
       ('Vence certificado', medico.certificado_vence),
-      ('Vacunas', medico.vacunas),
-      ('Antecedentes personales', medico.antecedentes_personales),
-      ('Antecedentes familiares', medico.antecedentes_familiares),
       ('Cirugías previas', medico.cirugias),
-      ('Observaciones', medico.observaciones),
+      ('Notas del médico', medico.notas_medico),
+      ('Notas del fisio', medico.notas_fisio),
+      ('Notas del entrenador', medico.notas_entrenador),
   ] %}
   {% for etiqueta, valor in datos if valor %}
   <div class="pf-item">

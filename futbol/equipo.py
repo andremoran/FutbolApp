@@ -146,6 +146,7 @@ def c_manuales():
                            archivados=[m for m in lista if not m.get('activo')],
                            posiciones=POSICIONES,
                            aptitudes=db.APTITUDES,
+                           niveles_fatiga=db.NIVELES_FATIGA,
                            n_plantilla=len(db.jugadores_del_entrenador(uid)))
 
 
@@ -154,9 +155,14 @@ def c_manuales():
 _TOPES_MEDICOS = {
     'grupo_sanguineo': 10, 'seguro': 120, 'alergias': 600, 'condiciones': 800,
     'medicacion': 600, 'contacto_nombre': 120, 'contacto_parentesco': 60,
-    'contacto_tel': 30, 'vacunas': 300, 'antecedentes_personales': 800,
-    'antecedentes_familiares': 800, 'cirugias': 600, 'observaciones': 800,
+    'contacto_tel': 30, 'cirugias': 600,
+    'notas_medico': 800, 'notas_fisio': 800, 'notas_entrenador': 800,
 }
+#  `vacunas`, `antecedentes_personales` y `antecedentes_familiares` existen en
+#  la tabla (schema_v4) pero ninguna pantalla los pide: alargaban demasiado el
+#  alta para lo poco que un entrenador de formación puede responder. Las
+#  columnas se dejan por si algún día las llena un club con cuerpo médico —
+#  el antecedente familiar es el cribado cardiovascular de la FIFA.
 
 
 def _limpiar_ficha_medica(medico):
@@ -227,7 +233,10 @@ def api_manual():
     # jugador con cuenta, ver futbol/db.py:guardar_atributos. No son columnas
     # de fut_manual_players, así que se guardan aparte y no entran en `datos`.
     campos_perfil = {}
-    campos_numericos = set(db.ATRIBUTOS_18) | {'potencial', 'fatiga'}
+    # La fatiga llega como bajo|medio|alto y se guarda como número (db.py).
+    if d.get('fatiga') in db.FATIGA_A_NUMERO:
+        campos_perfil['fatiga'] = db.FATIGA_A_NUMERO[d['fatiga']]
+    campos_numericos = set(db.ATRIBUTOS_18) | {'potencial'}
     campos_texto = ('riesgo_sobrecarga', 'fortalezas', 'debilidades', 'evolucion_tecnica',
                     'lesiones_historial', 'posicion_secundaria')
     for k in list(campos_numericos) + list(campos_texto):

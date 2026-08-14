@@ -526,14 +526,41 @@ CAMPOS_MEDICOS_BASICOS = ('grupo_sanguineo', 'alergias', 'medicacion', 'condicio
                           'contacto_nombre', 'contacto_tel', 'contacto_parentesco',
                           'seguro')
 
-CAMPOS_MEDICOS_AVANZADOS = ('estatura_cm', 'peso_kg', 'apto', 'ultimo_chequeo',
-                            'certificado_vence', 'vacunas', 'antecedentes_personales',
-                            'antecedentes_familiares', 'cirugias', 'observaciones')
+CAMPOS_MEDICOS_AVANZADOS = ('estatura_cm', 'peso_kg', 'apto', 'apto_competir',
+                            'ultimo_chequeo', 'certificado_vence', 'cirugias',
+                            'notas_medico', 'notas_fisio', 'notas_entrenador')
 
 APTITUDES = (('apto', 'Apto', '#10b981'),
              ('precaucion', 'Apto con precaución', '#f59e0b'),
              ('no_apto', 'No apto', '#ef4444'))
 APTITUD_META = {c: {'etiqueta': e, 'color': col} for c, e, col in APTITUDES}
+
+#  Quién escribió la parte declarativa de la ficha (alergias, medicación,
+#  condiciones). Un jugador con cuenta la escribe él: el cuerpo técnico la lee
+#  pero no la pisa. Uno sin cuenta no puede, así que la firma el entrenador.
+AUTOR_JUGADOR = 'jugador'
+AUTOR_CUERPO_TECNICO = 'cuerpo_tecnico'
+
+#  La fatiga se pregunta en tres niveles y no en una escala de diez. Un «7 de
+#  10» no le dice nada a nadie, y el selector 1-10 que se usa para los
+#  atributos etiqueta el 10 como «Élite»: para fatiga eso es al revés de lo que
+#  significa. Se sigue guardando como número para no migrar la columna ni su
+#  rango (1-10), pero se pregunta y se muestra en bajo/medio/alto.
+NIVELES_FATIGA = (('bajo', 'Bajo', 3), ('medio', 'Medio', 6), ('alto', 'Alto', 9))
+FATIGA_A_NUMERO = {clave: n for clave, _e, n in NIVELES_FATIGA}
+
+
+def nivel_de_fatiga(valor):
+    """El número guardado (1-10) traducido a bajo | medio | alto."""
+    if valor in (None, ''):
+        return None
+    try:
+        valor = int(valor)
+    except (TypeError, ValueError):
+        return None
+    if valor <= 4:
+        return 'bajo'
+    return 'medio' if valor <= 7 else 'alto'
 
 
 def ficha_medica(player_id=None, manual_player_id=None):
@@ -545,20 +572,33 @@ def ficha_medica(player_id=None, manual_player_id=None):
 
 
 def guardar_ficha_medica(player_id=None, manual_player_id=None,
-                         actualizado_por=None, solo_basicos=False, **campos):
+                         actualizado_por=None, solo_basicos=False,
+                         solo_clinicos=False, autor=None, **campos):
     """Upsert de la ficha médica.
 
-    `solo_basicos` es la frontera del lado del jugador: él escribe lo suyo,
-    pero el veredicto de aptitud y el cribado médico los firma el cuerpo
-    técnico, no el interesado.
+    Dos fronteras, según quién escriba:
+
+    · `solo_basicos` — lo usa el jugador con su propia ficha. Escribe lo suyo
+      (alergias, medicación, condiciones, contacto), pero el veredicto de
+      aptitud y el cribado médico los firma el cuerpo técnico, no el interesado.
+
+    · `solo_clinicos` — lo usa el cuerpo técnico sobre un jugador CON cuenta.
+      Puede leer la ficha entera y escribir la parte clínica, pero no pisa lo
+      que declaró el jugador: ese dato es suyo y él lo mantiene.
+
+    Sin ninguna de las dos (jugador sin cuenta) el entrenador escribe todo,
+    porque no hay nadie más que pueda hacerlo.
     """
     dueno = dueno_filtro(player_id, manual_player_id)
     if not dueno:
         return None
 
-    permitidos = set(CAMPOS_MEDICOS_BASICOS)
-    if not solo_basicos:
-        permitidos |= set(CAMPOS_MEDICOS_AVANZADOS)
+    if solo_basicos:
+        permitidos = set(CAMPOS_MEDICOS_BASICOS)
+    elif solo_clinicos:
+        permitidos = set(CAMPOS_MEDICOS_AVANZADOS)
+    else:
+        permitidos = set(CAMPOS_MEDICOS_BASICOS) | set(CAMPOS_MEDICOS_AVANZADOS)
 
     datos = {k: v for k, v in campos.items() if k in permitidos}
     if not datos:
@@ -566,6 +606,8 @@ def guardar_ficha_medica(player_id=None, manual_player_id=None,
     datos['actualizado'] = _ahora()
     if actualizado_por:
         datos['actualizado_por'] = actualizado_por
+    if autor:
+        datos['autor_declaracion'] = autor
     return _upsert_dueno('fut_medical', dueno, datos, 'guardar ficha medica')
 
 

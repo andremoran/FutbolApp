@@ -760,5 +760,17 @@ img, svg { max-width: 100%; }
 .pf-riesgo__btn[aria-pressed="true"][data-riesgo="medio"] { background: var(--warning); }
 .pf-riesgo__btn[aria-pressed="true"][data-riesgo="alto"]  { background: var(--danger); }
 
+/* Aptitud deportiva: mismos tres botones, otro juego de valores. Sin estas
+   reglas el elegido se queda en blanco sobre blanco (el estado activo pone el
+   texto en blanco y el color de fondo lo trae el valor). */
+.pf-riesgo__btn[aria-pressed="true"][data-apto="apto"]       { background: var(--success); }
+.pf-riesgo__btn[aria-pressed="true"][data-apto="precaucion"] { background: var(--warning); }
+.pf-riesgo__btn[aria-pressed="true"][data-apto="no_apto"]    { background: var(--danger); }
+
+/* Fatiga: aquí «alto» es malo, al revés que en el resto de escalas. */
+.pf-riesgo__btn[aria-pressed="true"][data-fatiga="bajo"]  { background: var(--success); }
+.pf-riesgo__btn[aria-pressed="true"][data-fatiga="medio"] { background: var(--warning); }
+.pf-riesgo__btn[aria-pressed="true"][data-fatiga="alto"]  { background: var(--danger); }
+
 /* ─── Rejilla 2×2 (Datos Competitivos) ─────────────────────────────────── */
 .pf-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }

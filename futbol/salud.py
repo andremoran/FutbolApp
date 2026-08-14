@@ -41,10 +41,25 @@ GRAVEDADES = [('leve', 'Leve', '#f59e0b', '1 a 7 días'),
 GRAVEDAD_META = {c: {'etiqueta': e, 'color': col, 'plazo': p}
                  for c, e, col, p in GRAVEDADES}
 
+#  'cronico' es el estado que faltaba (INJURY_STATUS de PlayerMedicalScreen):
+#  una rodilla que se arrastra desde hace años no está de baja, pero tampoco
+#  curada, y meterla en cualquiera de los otros tres falsea la disponibilidad.
 ESTADOS = [('activa', 'De baja', '#ef4444'),
            ('recuperando', 'Recuperándose', '#f59e0b'),
-           ('alta', 'De alta', '#10b981')]
+           ('alta', 'De alta', '#10b981'),
+           ('cronico', 'Crónica', '#b45309')]
 ESTADO_META = {c: {'etiqueta': e, 'color': col} for c, e, col in ESTADOS}
+
+#  Quién cuenta como disponible para convocar. Una lesión crónica no aparta al
+#  jugador del equipo: juega con ella.
+ESTADOS_DE_BAJA = ('activa', 'recuperando')
+
+#  RISK_LEVELS de PlayerMedicalScreen. El valor vive en fut_attributes, no en
+#  la ficha médica, porque es parte del Perfil Dinámico.
+RIESGOS = [('bajo', 'Bajo', '#10b981'),
+           ('medio', 'Medio', '#f59e0b'),
+           ('alto', 'Alto', '#ef4444')]
+RIESGO_META = {c: {'etiqueta': e, 'color': col} for c, e, col in RIESGOS}
 
 
 def _ahora():
@@ -76,7 +91,44 @@ def decorar_lesiones(filas):
 
 def lesiones_activas(coach_id):
     filas = db.rows('fut_injuries', 'lesiones activas', coach_id=coach_id) or []
-    return decorar_lesiones([f for f in filas if f.get('estado') != 'alta'])
+    return decorar_lesiones([f for f in filas if f.get('estado') in ESTADOS_DE_BAJA])
+
+
+def _dias_o_nada(v):
+    """Los días estimados de recuperación, o nada si no es un número."""
+    if v in (None, ''):
+        return None
+    try:
+        return max(0, min(999, int(v)))
+    except (TypeError, ValueError):
+        return None
+
+
+def _dueno_de_la_plantilla(coach_id, player_id=None, manual_player_id=None):
+    """Comprueba que el jugador (con o sin cuenta) es de este equipo.
+
+    Devuelve el filtro listo para escribir, o None si no lo es.
+    """
+    if player_id:
+        if any(str(j['id']) == str(player_id)
+               for j in db.jugadores_del_entrenador(coach_id)):
+            return db.dueno_filtro(player_id=player_id)
+        return None
+    if manual_player_id:
+        if db.one('fut_manual_players', 'manual mio',
+                  id=manual_player_id, coach_id=coach_id):
+            return db.dueno_filtro(manual_player_id=manual_player_id)
+    return None
+
+
+def _dueno_por_id(coach_id, pid):
+    """Un id suelto que puede ser de cualquiera de los dos tipos de jugador.
+
+    Lo usan las pantallas cuyo `<pid>` viene de la URL y no dicen si es un
+    jugador con cuenta o apuntado a mano.
+    """
+    return (_dueno_de_la_plantilla(coach_id, player_id=pid)
+            or _dueno_de_la_plantilla(coach_id, manual_player_id=pid))
 
 
 # ═══════════════════════ LADO DEL JUGADOR ═══════════════════════
@@ -138,42 +190,162 @@ def c_medico():
         return redirect(url_for('futbol.p_medico'))
 
     uid = db.equipo_id(current_user.id)
-    jugadores = db.jugadores_del_entrenador(uid)
+
+    # La plantilla entera: el que no tiene cuenta se lesiona igual.
+    jugadores = [dict(j, _tipo='registrado') for j in db.jugadores_del_entrenador(uid)]
+    for m in (db.rows('fut_manual_players', 'manuales medico',
+                      coach_id=uid, activo=True) or []):
+        jugadores.append({'id': m['id'], 'name': m.get('nombre'),
+                          'profile_photo': None, '_tipo': 'manual'})
+
     lesiones = decorar_lesiones(
         db.rows('fut_injuries', 'lesiones equipo', coach_id=uid,
                 _order='fecha', _desc=True, _limit=200) or [])
 
     por_jugador = {}
     for l in lesiones:
-        por_jugador.setdefault(str(l.get('player_id')), []).append(l)
+        clave = str(l.get('player_id') or l.get('manual_player_id'))
+        por_jugador.setdefault(clave, []).append(l)
 
-    # Del jugador solo se traen los campos que el entrenador puede ver.
-    # La medicación y las condiciones NO se piden: no basta con no pintarlas,
-    # no tienen que salir de la base.
-    contactos = {}
-    if jugadores:
-        ids = [j['id'] for j in jugadores]
-        filas = db.q(
-            lambda: db.sb().table('fut_medical')
-            .select('player_id, contacto_nombre, contacto_tel, alergias, grupo_sanguineo')
-            .in_('player_id', ids).execute().data or [], [], 'contactos')
-        contactos = {f['player_id']: f for f in filas}
+    fichas = _fichas_del_equipo(jugadores)
 
     for j in jugadores:
         suyas = por_jugador.get(str(j['id']), [])
         j['_lesiones'] = suyas
-        j['_activa'] = next((l for l in suyas if l.get('estado') != 'alta'), None)
-        j['_medico'] = contactos.get(j['id'], {})
+        # Crónica no es baja: el jugador convive con ella y se le convoca.
+        j['_baja'] = next((l for l in suyas if l.get('estado') in ESTADOS_DE_BAJA), None)
+        j['_cronica'] = next((l for l in suyas if l.get('estado') == 'cronico'), None)
+        j['_medico'] = fichas.get(str(j['id']), {})
+        j['_aptitud'] = db.APTITUD_META.get((j['_medico'] or {}).get('apto'))
 
-    activas = [l for l in lesiones if l.get('estado') != 'alta']
+    de_baja = [l for l in lesiones if l.get('estado') in ESTADOS_DE_BAJA]
     return render_template('c_medico.html',
                            tab_activa='equipo', hide_tabbar=True,
                            jugadores=jugadores,
-                           lesiones=lesiones[:40], activas=activas,
-                           n_disponibles=len([j for j in jugadores if not j['_activa']]),
+                           lesiones=lesiones[:40], activas=de_baja,
+                           n_disponibles=len([j for j in jugadores if not j['_baja']]),
                            zonas=ZONAS, tipos=TIPOS_LESION,
                            gravedades=GRAVEDADES, estados=ESTADOS,
                            hoy=date.today().isoformat())
+
+
+def _fichas_del_equipo(jugadores):
+    """Las fichas médicas de toda la plantilla, en dos consultas.
+
+    El entrenador ve la ficha completa —así es la app— pero eso no le hace
+    autor de lo que declaró el jugador: quién puede escribir cada parte lo
+    decide db.guardar_ficha_medica, no esta consulta.
+    """
+    con_cuenta = [j['id'] for j in jugadores if j['_tipo'] == 'registrado']
+    sin_cuenta = [j['id'] for j in jugadores if j['_tipo'] == 'manual']
+
+    fichas = {}
+    if con_cuenta:
+        for f in db.q(lambda: db.sb().table('fut_medical').select('*')
+                      .in_('player_id', con_cuenta).execute().data or [],
+                      [], 'fichas con cuenta'):
+            fichas[str(f['player_id'])] = f
+    if sin_cuenta:
+        for f in db.q(lambda: db.sb().table('fut_medical').select('*')
+                      .in_('manual_player_id', sin_cuenta).execute().data or [],
+                      [], 'fichas sin cuenta'):
+            fichas[str(f['manual_player_id'])] = f
+    return fichas
+
+
+@bp.route('/coach/medico/<pid>')
+@login_required
+@roles.solo_pro('medico')
+def c_medico_jugador(pid):
+    """La ficha médica de UN jugador — screens/PlayerMedicalScreen.tsx.
+
+    Es la pantalla que llevaba el cuerpo técnico en la app y que aquí no
+    existía: la web solo tenía el listado del equipo.
+    """
+    if getattr(current_user, 'role', '') != 'especialista':
+        return redirect(url_for('futbol.p_medico'))
+
+    uid = db.equipo_id(current_user.id)
+    jugador = next((j for j in db.jugadores_del_entrenador(uid)
+                    if str(j['id']) == str(pid)), None)
+    manual = None
+    if not jugador:
+        manual = db.one('fut_manual_players', 'manual medico', id=pid, coach_id=uid)
+        if not manual:
+            abort(404)
+
+    dueno = db.dueno_filtro(player_id=None if manual else pid,
+                            manual_player_id=pid if manual else None)
+    ficha = db.ficha_medica(**dueno)
+    atributos = db.ficha_atributos(**dueno)
+    lesiones = decorar_lesiones(
+        db.rows('fut_injuries', 'lesiones jugador', coach_id=uid,
+                _order='fecha', _desc=True, **dueno) or [])
+
+    return render_template(
+        'c_medico_jugador.html',
+        tab_activa='equipo', hide_tabbar=True,
+        jugador=jugador or {'id': pid, 'name': manual['nombre']},
+        es_manual=bool(manual),
+        ficha=ficha,
+        # La parte declarativa de un jugador CON cuenta la escribe él: el
+        # cuerpo técnico la lee, pero no la pisa (decisión del usuario).
+        declaracion_editable=bool(manual),
+        atributos=atributos,
+        lesiones=lesiones,
+        de_baja=[l for l in lesiones if l.get('estado') in ESTADOS_DE_BAJA],
+        aptitudes=db.APTITUDES,
+        aptitud=db.APTITUD_META.get(ficha.get('apto')),
+        zonas=ZONAS, tipos=TIPOS_LESION,
+        gravedades=GRAVEDADES, estados=ESTADOS,
+        riesgos=RIESGOS,
+        niveles_fatiga=db.NIVELES_FATIGA,
+        fatiga_nivel=db.nivel_de_fatiga(atributos.get('fatiga')),
+        hoy=date.today().isoformat())
+
+
+@bp.route('/api/medico/<pid>', methods=['POST'])
+@login_required
+def api_medico_coach(pid):
+    """El cuerpo técnico guarda la parte clínica de la ficha de un jugador."""
+    error = _guardia()
+    if error:
+        return error
+    if getattr(current_user, 'role', '') != 'especialista':
+        return jsonify({'error': 'Esta ficha la lleva el cuerpo técnico.'}), 403
+
+    uid = db.equipo_id(current_user.id)
+    dueno = _dueno_por_id(uid, pid)
+    if not dueno:
+        return jsonify({'error': 'Ese jugador no es de tu plantilla.'}), 403
+    es_manual = 'manual_player_id' in dueno
+
+    from .equipo import _limpiar_ficha_medica
+    d = request.get_json(silent=True) or {}
+    campos = _limpiar_ficha_medica(d)
+    if 'apto_competir' in d:
+        campos['apto_competir'] = bool(d['apto_competir'])
+
+    # Fatiga y riesgo viven en el Perfil Dinámico, no en la ficha médica: son
+    # los mismos que mueve la evaluación semanal (ver sql/schema_v5).
+    estado = {}
+    if d.get('fatiga') in db.FATIGA_A_NUMERO:
+        estado['fatiga'] = db.FATIGA_A_NUMERO[d['fatiga']]
+    if d.get('riesgo_sobrecarga') in dict((c, e) for c, e, _ in RIESGOS):
+        estado['riesgo_sobrecarga'] = d['riesgo_sobrecarga']
+    if estado:
+        db.guardar_atributos(**dueno, **estado)
+
+    if campos:
+        db.guardar_ficha_medica(
+            **dueno, actualizado_por=current_user.id,
+            # A un jugador sin cuenta le escribe todo el entrenador; a uno con
+            # cuenta, solo lo clínico.
+            solo_clinicos=not es_manual,
+            autor=db.AUTOR_CUERPO_TECNICO if es_manual else None,
+            **campos)
+
+    return jsonify({'ok': True, 'mensaje': 'Ficha médica guardada.'})
 
 
 @bp.route('/api/lesion', methods=['POST'])
@@ -196,16 +368,17 @@ def api_lesion():
         previa = db.one('fut_injuries', 'lesion mia', id=lid, coach_id=uid)
         if not previa:
             return jsonify({'error': 'Ese parte no es tuyo.'}), 403
-        pid = previa.get('player_id')
+        dueno = db.dueno_filtro(previa.get('player_id'), previa.get('manual_player_id'))
     else:
-        pid = d.get('player_id')
-        if not pid or not any(str(j['id']) == str(pid)
-                              for j in db.jugadores_del_entrenador(uid)):
+        # Se lesionan igual los que no tienen cuenta, y hasta ahora no se les
+        # podía abrir parte: el jugador manual solo existía en la plantilla.
+        dueno = _dueno_de_la_plantilla(uid, d.get('player_id'), d.get('manual_player_id'))
+        if not dueno:
             return jsonify({'error': 'Ese jugador no es de tu plantilla.'}), 403
 
     # Al actualizar solo se tocan los campos que vengan: dar el alta manda
     # {id, estado} y no puede borrar la zona ni la fecha de la lesión.
-    datos = {'player_id': pid, 'coach_id': uid}
+    datos = {**dueno, 'coach_id': uid}
     campos = {
         'zona': lambda v: str(v)[:60],
         'lado': lambda v: str(v)[:20],
@@ -216,6 +389,8 @@ def api_lesion():
         'alta_prevista': lambda v: v or None,
         'alta_real': lambda v: v or None,
         'descripcion': lambda v: str(v)[:1000],
+        'tratamiento': lambda v: str(v)[:1000],
+        'dias_estimados': _dias_o_nada,
     }
     for campo, limpiar in campos.items():
         if campo in d:

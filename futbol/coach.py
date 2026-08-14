@@ -305,10 +305,13 @@ def c_evaluar(pid):
     jugador = next((j for j in jugadores if str(j['id']) == str(pid)), None)
     if not jugador:
         abort(404)
+    ficha = db.ficha_atributos(player_id=pid)
     return render_template('c_evaluar.html',
                            hide_tabbar=True,
                            jugador=jugador,
-                           ficha=db.ficha_atributos(player_id=pid))
+                           ficha=ficha,
+                           niveles_fatiga=db.NIVELES_FATIGA,
+                           fatiga_nivel=db.nivel_de_fatiga(ficha.get('fatiga')))
 
 
 # ═══════════════════════ 3. AGENDA ═══════════════════════

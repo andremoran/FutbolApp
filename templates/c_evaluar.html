@@ -45,9 +45,17 @@
   {{ rating('fuerza', 'Fuerza', ficha.fuerza) }}
   {{ rating('agilidad', 'Agilidad', ficha.agilidad) }}
   {{ rating('aceleracion', 'Aceleración', ficha.aceleracion) }}
-  {{ rating('fatiga', 'Nivel de Fatiga Actual', ficha.fatiga or 3) }}
+  <div class="pf-field pf-mt-16">
+    <label class="pf-label">Nivel de Fatiga Actual</label>
+    <div class="pf-riesgo" role="group" aria-label="Nivel de fatiga" id="ev-fatiga">
+      {% for clave, etiqueta, _n in niveles_fatiga %}
+      <button type="button" class="pf-riesgo__btn" data-fatiga="{{ clave }}"
+              aria-pressed="{{ 'true' if clave == (fatiga_nivel or 'bajo') else 'false' }}">{{ etiqueta }}</button>
+      {% endfor %}
+    </div>
+  </div>
 
-  <div class="pf-field pf-mt-12">
+  <div class="pf-field">
     <label class="pf-label">Riesgo de Sobrecarga</label>
     <div class="pf-riesgo" role="group" aria-label="Riesgo de sobrecarga" id="ev-riesgo">
       {% for r in ['bajo', 'medio', 'alto'] %}
@@ -110,19 +118,28 @@
 {% block scripts %}
 <script>
 (function () {
-  var riesgoBox = document.getElementById('ev-riesgo');
-  riesgoBox.querySelectorAll('[data-riesgo]').forEach(function (b) {
-    b.addEventListener('click', function () {
-      riesgoBox.querySelectorAll('[data-riesgo]').forEach(function (o) {
-        o.setAttribute('aria-pressed', o === b ? 'true' : 'false');
+  function excluyentes(caja, attr) {
+    if (!caja) return;
+    var btns = caja.querySelectorAll('[' + attr + ']');
+    btns.forEach(function (b) {
+      b.addEventListener('click', function () {
+        btns.forEach(function (o) {
+          o.setAttribute('aria-pressed', o === b ? 'true' : 'false');
+        });
       });
     });
-  });
+  }
+  var riesgoBox = document.getElementById('ev-riesgo');
+  var fatigaBox = document.getElementById('ev-fatiga');
+  excluyentes(riesgoBox, 'data-riesgo');
+  excluyentes(fatigaBox, 'data-fatiga');
 
   document.getElementById('btn-guardar').addEventListener('click', function () {
     var btn = this;
     var riesgo = riesgoBox.querySelector('[aria-pressed="true"]');
+    var fatiga = fatigaBox.querySelector('[aria-pressed="true"]');
     var datos = Object.assign({
+      fatiga: fatiga ? fatiga.dataset.fatiga : 'bajo',
       player_id: {{ jugador.id|tojson }},
       notas: document.getElementById('ev-notas').value.trim(),
       fortalezas: document.getElementById('ev-fortalezas').value.trim(),

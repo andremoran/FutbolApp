@@ -157,9 +157,18 @@
   {{ rating('fuerza', 'Fuerza') }}
   {{ rating('agilidad', 'Agilidad') }}
   {{ rating('aceleracion', 'Aceleración') }}
-  {{ rating('fatiga', 'Nivel de Fatiga Actual', 3) }}
 
-  <div class="pf-field pf-mt-12">
+  <div class="pf-field pf-mt-16">
+    <label class="pf-label">Nivel de Fatiga Actual</label>
+    <div class="pf-riesgo" role="group" aria-label="Nivel de fatiga" id="m-fatiga">
+      {% for clave, etiqueta, _n in niveles_fatiga %}
+      <button type="button" class="pf-riesgo__btn" data-fatiga="{{ clave }}"
+              aria-pressed="{{ 'true' if clave == 'bajo' else 'false' }}">{{ etiqueta }}</button>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="pf-field">
     <label class="pf-label" for="m-lesiones">Historial de lesiones</label>
     <textarea class="pf-textarea" id="m-lesiones" rows="2" maxlength="600"
               placeholder="Ej: esguince de tobillo leve en marzo, ya recuperado"></textarea>
@@ -326,36 +335,14 @@
     </div>
 
     <div class="pf-field pf-mt-12">
-      <label class="pf-label" for="m-vacunas">Vacunas</label>
-      <input class="pf-input" id="m-vacunas" maxlength="300"
-             placeholder="Ej: tétanos al día (2025)">
-    </div>
-
-    <div class="pf-field">
-      <label class="pf-label" for="m-ant-personales">Antecedentes personales</label>
-      <textarea class="pf-textarea" id="m-ant-personales" rows="2" maxlength="800"
-                placeholder="Desmayos o dolor en el pecho al esforzarse, soplo, asma…"></textarea>
-    </div>
-
-    <div class="pf-field">
-      <label class="pf-label" for="m-ant-familiares">Antecedentes familiares</label>
-      <textarea class="pf-textarea" id="m-ant-familiares" rows="2" maxlength="800"
-                placeholder="Muerte súbita o cardiopatía en un familiar antes de los 50 años"></textarea>
-      <p style="margin:6px 0 0;font-size:11.5px;color:var(--text-muted);line-height:1.55">
-        Es la pregunta que más vidas salva en un campo: obliga a revisar el
-        corazón antes de dejar competir.
-      </p>
-    </div>
-
-    <div class="pf-field">
       <label class="pf-label" for="m-cirugias">Cirugías previas</label>
       <textarea class="pf-textarea" id="m-cirugias" rows="2" maxlength="600"
                 placeholder="Qué y cuándo"></textarea>
     </div>
 
     <div class="pf-field" style="margin-bottom:0">
-      <label class="pf-label" for="m-observaciones">Observaciones del médico</label>
-      <textarea class="pf-textarea" id="m-observaciones" rows="2" maxlength="800"></textarea>
+      <label class="pf-label" for="m-notas-medico">Notas del médico</label>
+      <textarea class="pf-textarea" id="m-notas-medico" rows="2" maxlength="800"></textarea>
     </div>
   </details>
 </div>
@@ -450,8 +437,10 @@
   }
   var riesgoBox = document.getElementById('m-riesgo');
   var aptoBox = document.getElementById('m-apto');
+  var fatigaBox = document.getElementById('m-fatiga');
   excluyentes(riesgoBox, 'data-riesgo');
   excluyentes(aptoBox, 'data-apto');
+  excluyentes(fatigaBox, 'data-fatiga');
 
   document.getElementById('btn-crear').onclick = function () {
     var boton = this;
@@ -461,6 +450,7 @@
 
     var riesgo = riesgoBox.querySelector('[aria-pressed="true"]');
     var apto = aptoBox.querySelector('[aria-pressed="true"]');
+    var fatiga = fatigaBox.querySelector('[aria-pressed="true"]');
     // PF.leerRatings() trae los 18 atributos + "valoracion" (que no es un
     // atributo del Perfil Dinámico: va aparte, a fut_manual_players).
     var ratings = PF.leerRatings();
@@ -475,6 +465,7 @@
       fortalezas: v('m-fortalezas'), debilidades: v('m-debilidades'),
       evolucion_tecnica: v('m-evoltec'), lesiones_historial: v('m-lesiones'),
       riesgo_sobrecarga: riesgo ? riesgo.dataset.riesgo : 'bajo',
+      fatiga: fatiga ? fatiga.dataset.fatiga : 'bajo',
       goles: v('m-goles'), asistencias: v('m-asistencias'),
       minutos_jugados: v('m-minutos'), jugadas_clave: v('m-jugadas'),
       valoracion_promedio: valoracion,
@@ -490,10 +481,7 @@
         estatura_cm: v('m-estatura'), peso_kg: v('m-peso'),
         apto: apto ? apto.dataset.apto : '',
         ultimo_chequeo: v('m-chequeo'), certificado_vence: v('m-certificado'),
-        vacunas: v('m-vacunas'),
-        antecedentes_personales: v('m-ant-personales'),
-        antecedentes_familiares: v('m-ant-familiares'),
-        cirugias: v('m-cirugias'), observaciones: v('m-observaciones'),
+        cirugias: v('m-cirugias'), notas_medico: v('m-notas-medico'),
       },
     }, ratings);
 
