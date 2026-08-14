@@ -1,8 +1,10 @@
 {% extends '_shell.html' %}
+{% from '_rating.html' import rating %}
 {% block title %}Evaluar a {{ jugador.name }} · ProFoot{% endblock %}
 
-{# screens/PlayerEvaluationScreen.tsx: el entrenador mueve los 4 atributos y deja
-   sus notas. Lo que guarda aquí es lo que el jugador ve en "Mi Ficha". #}
+{# screens/PlayerEvaluationScreen.tsx: los 18 atributos del Perfil Dinámico,
+   por familia, más el estado del jugador. Lo que guarda aquí es lo que
+   alimenta el overall/potencial que se ve en Equipo y en su ficha. #}
 
 {% block hero_back %}
 <a class="pf-hero__btn" href="{{ url_for('futbol.c_jugador', pid=jugador.id) }}" aria-label="Volver">
@@ -11,50 +13,85 @@
 {% endblock %}
 {% block hero_label %}<div class="pf-hero__label">Evaluación</div>{% endblock %}
 {% block hero_title %}{{ jugador.name }}{% endblock %}
-
-{% block head %}
-<style>
-  .ev-attr { padding: 16px 0; border-top: 1px solid var(--border-soft); }
-  .ev-attr:first-of-type { border-top: none; }
-  .ev-attr__row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
-  .ev-attr__n { font-size: 15px; font-weight: 700; }
-  .ev-attr__v { font-size: 22px; font-weight: 800; }
-  .ev-attr__h { font-size: 12px; color: var(--text-sec); margin-bottom: 10px; }
-  .ev-range { width: 100%; accent-color: var(--primary); }
-</style>
+{% block hero_subtitle %}
+{% if ficha._tiene_perfil %}
+<div class="pf-hero__subtitle">{{ ficha.overall }} OVR actual · POT {{ ficha.potencial }}</div>
+{% endif %}
 {% endblock %}
 
 {% block content %}
 
 <div class="pf-card">
-  <div class="pf-card__head"><h2 class="pf-card__title">Atributos</h2></div>
-
-  {% set descripciones = {
-    'tecnica': 'Control, pase, regate y definición',
-    'fisico':  'Velocidad, resistencia y fuerza',
-    'tactico': 'Lectura del juego y posicionamiento',
-    'mental':  'Actitud, concentración y carácter'
-  } %}
-
-  {% for clave, nombre in [('tecnica','Técnica'), ('fisico','Físico'),
-                           ('tactico','Táctico'), ('mental','Mental')] %}
-  <div class="ev-attr">
-    <div class="ev-attr__row">
-      <span class="ev-attr__n">{{ nombre }}</span>
-      <span class="ev-attr__v" id="v-{{ clave }}">{{ atributos[clave] }}</span>
-    </div>
-    <div class="ev-attr__h">{{ descripciones[clave] }}</div>
-    <input class="ev-range" type="range" min="0" max="100" step="1"
-           id="r-{{ clave }}" value="{{ atributos[clave] }}"
-           aria-label="{{ nombre }}">
+  <div class="cm-head" style="display:flex;align-items:center;gap:10px;margin-bottom:2px">
+    <span class="pf-item__icon"><i data-ico="target" class="pf-ico--sm"></i></span>
+    <h2 class="pf-card__title">Técnico</h2>
   </div>
-  {% endfor %}
+  {{ rating('pase', 'Pase', ficha.pase) }}
+  {{ rating('control', 'Control', ficha.control) }}
+  {{ rating('regate', 'Regate', ficha.regate) }}
+  {{ rating('tiro', 'Tiro', ficha.tiro) }}
+  {{ rating('definicion', 'Definición', ficha.definicion) }}
+  {{ rating('centros', 'Centros', ficha.centros) }}
+  {{ rating('vision_juego', 'Visión de juego', ficha.vision_juego) }}
 </div>
 
 <div class="pf-card">
-  <div class="pf-card__head"><h2 class="pf-card__title">Notas</h2></div>
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:2px">
+    <span class="pf-item__icon"><i data-ico="activity" class="pf-ico--sm"></i></span>
+    <h2 class="pf-card__title">Físico</h2>
+  </div>
+  {{ rating('velocidad', 'Velocidad', ficha.velocidad) }}
+  {{ rating('resistencia', 'Resistencia', ficha.resistencia) }}
+  {{ rating('fuerza', 'Fuerza', ficha.fuerza) }}
+  {{ rating('agilidad', 'Agilidad', ficha.agilidad) }}
+  {{ rating('aceleracion', 'Aceleración', ficha.aceleracion) }}
+  {{ rating('fatiga', 'Nivel de Fatiga Actual', ficha.fatiga or 3) }}
+
   <div class="pf-field pf-mt-12">
-    <textarea class="pf-textarea" id="ev-notas" rows="5" maxlength="2000"
+    <label class="pf-label">Riesgo de Sobrecarga</label>
+    <div class="pf-riesgo" role="group" aria-label="Riesgo de sobrecarga" id="ev-riesgo">
+      {% for r in ['bajo', 'medio', 'alto'] %}
+      <button type="button" class="pf-riesgo__btn" data-riesgo="{{ r }}"
+              aria-pressed="{{ 'true' if r == (ficha.riesgo_sobrecarga or 'bajo') else 'false' }}">{{ r|capitalize }}</button>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="pf-card">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:2px">
+    <span class="pf-item__icon"><i data-ico="heart" class="pf-ico--sm"></i></span>
+    <h2 class="pf-card__title">Mental</h2>
+  </div>
+  {{ rating('confianza', 'Confianza', ficha.confianza) }}
+  {{ rating('mentalidad', 'Mentalidad / Motivación', ficha.mentalidad) }}
+  {{ rating('concentracion', 'Concentración', ficha.concentracion) }}
+  {{ rating('liderazgo', 'Liderazgo', ficha.liderazgo) }}
+  {{ rating('disciplina', 'Disciplina', ficha.disciplina) }}
+  {{ rating('trabajo_equipo', 'Trabajo en equipo', ficha.trabajo_equipo) }}
+</div>
+
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Notas y evolución</h2></div>
+  <div class="pf-field">
+    <label class="pf-label" for="ev-fortalezas">Fortalezas específicas</label>
+    <textarea class="pf-textarea" id="ev-fortalezas" rows="2" maxlength="600">{{ ficha.fortalezas }}</textarea>
+  </div>
+  <div class="pf-field">
+    <label class="pf-label" for="ev-debilidades">Debilidades detectadas</label>
+    <textarea class="pf-textarea" id="ev-debilidades" rows="2" maxlength="600">{{ ficha.debilidades }}</textarea>
+  </div>
+  <div class="pf-field">
+    <label class="pf-label" for="ev-evoltec">Evolución técnica mensual</label>
+    <textarea class="pf-textarea" id="ev-evoltec" rows="2" maxlength="600">{{ ficha.evolucion_tecnica }}</textarea>
+  </div>
+  <div class="pf-field">
+    <label class="pf-label" for="ev-lesiones">Historial de lesiones</label>
+    <textarea class="pf-textarea" id="ev-lesiones" rows="2" maxlength="600">{{ ficha.lesiones_historial }}</textarea>
+  </div>
+  <div class="pf-field" style="margin-bottom:0">
+    <label class="pf-label" for="ev-notas">Notas para el jugador</label>
+    <textarea class="pf-textarea" id="ev-notas" rows="4" maxlength="2000"
               placeholder="Qué hizo bien, en qué debe insistir, qué le pides para las próximas semanas…"></textarea>
     <p style="font-size:12px;color:var(--text-sec);margin:8px 0 0;line-height:1.5">
       El jugador lee estas notas en su pestaña «Mi Ficha».
@@ -73,25 +110,27 @@
 {% block scripts %}
 <script>
 (function () {
-  var claves = ['tecnica', 'fisico', 'tactico', 'mental'];
-
-  function color(v) {
-    return v >= 70 ? 'var(--primary)' : (v >= 50 ? 'var(--warning)' : 'var(--danger)');
-  }
-
-  claves.forEach(function (k) {
-    var r = document.getElementById('r-' + k);
-    var v = document.getElementById('v-' + k);
-    function pintar() { v.textContent = r.value; v.style.color = color(parseInt(r.value, 10)); }
-    r.addEventListener('input', pintar);
-    pintar();
+  var riesgoBox = document.getElementById('ev-riesgo');
+  riesgoBox.querySelectorAll('[data-riesgo]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      riesgoBox.querySelectorAll('[data-riesgo]').forEach(function (o) {
+        o.setAttribute('aria-pressed', o === b ? 'true' : 'false');
+      });
+    });
   });
 
   document.getElementById('btn-guardar').addEventListener('click', function () {
     var btn = this;
-    var datos = { player_id: {{ jugador.id|tojson }},
-                  notas: document.getElementById('ev-notas').value.trim() };
-    claves.forEach(function (k) { datos[k] = parseInt(document.getElementById('r-' + k).value, 10); });
+    var riesgo = riesgoBox.querySelector('[aria-pressed="true"]');
+    var datos = Object.assign({
+      player_id: {{ jugador.id|tojson }},
+      notas: document.getElementById('ev-notas').value.trim(),
+      fortalezas: document.getElementById('ev-fortalezas').value.trim(),
+      debilidades: document.getElementById('ev-debilidades').value.trim(),
+      evolucion_tecnica: document.getElementById('ev-evoltec').value.trim(),
+      lesiones_historial: document.getElementById('ev-lesiones').value.trim(),
+      riesgo_sobrecarga: riesgo ? riesgo.dataset.riesgo : 'bajo',
+    }, PF.leerRatings());
 
     btn.disabled = true;
     PF.api('{{ url_for("futbol.api_evaluacion") }}', datos)

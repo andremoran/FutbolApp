@@ -11,7 +11,7 @@ no se corra sql/schema.sql, cada consulta devuelve vacío y la pantalla se ve
 como "sin datos" en vez de dar error 500.
 """
 import logging
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -256,6 +256,32 @@ def perfil_jugador(player_id):
     return one('fut_player_profile', 'perfil jugador', user_id=player_id) or {}
 
 
+# ─── Posiciones ──────────────────────────────────────────────────────────────
+#  En la app conviven DOS vocabularios de posición: el detallado del alta a
+#  mano (equipo.py › POSICIONES: «Lateral derecho», «Mediapunta») y el corto de
+#  la ficha del jugador con cuenta («lateral», «medio»). La pantalla de Equipo
+#  filtra por las cuatro familias de TeamPlayersScreen.tsx, así que hay que
+#  traducir: sin esto, filtrar por «Defensa» no encontraría a un «Central».
+_FAMILIAS_POSICION = (
+    ('Portero',       ('portero', 'arquero', 'guardameta')),
+    ('Defensa',       ('central', 'defensa', 'lateral', 'libero', 'zaguero')),
+    ('Mediocampista', ('pivote', 'interior', 'mediapunta', 'mediocentro',
+                       'medio', 'volante', 'centrocampista')),
+    ('Delantero',     ('delantero', 'extremo', 'punta', 'ariete', 'atacante')),
+)
+
+
+def familia_posicion(posicion):
+    """La familia con la que se filtra en Equipo, venga como venga escrita."""
+    texto = (posicion or '').strip().lower()
+    if not texto:
+        return 'Sin posición'
+    for familia, palabras in _FAMILIAS_POSICION:
+        if any(p in texto for p in palabras):
+            return familia
+    return 'Sin posición'
+
+
 # ─── Hábitos ─────────────────────────────────────────────────────────────────
 def habitos(player_id):
     return rows('fut_habits', 'habitos', player_id=player_id, activo=True, _order='creado')
@@ -336,6 +362,294 @@ def atributos(player_id):
 def media_atributos(player_id):
     a = atributos(player_id)
     return round(sum(a.values()) / len(a))
+
+
+# ─── Perfil Dinámico: los 18 atributos ───────────────────────────────────────
+#  Los 4 de arriba (ATRIBUTOS) no se borran — cada uno sigue vivo como la
+#  media de su familia — pero la app real evalúa con dieciocho, repartidos en
+#  tres familias, y de su media (1-10 cada uno) sale el `overall` 0-100 que se
+#  ve en el círculo de cada tarjeta. Ver sql/schema_v3_perfil_dinamico.sql.
+#
+#  Sirve tanto para un jugador con cuenta (`player_id`) como sin cuenta
+#  (`manual_player_id`) — nunca los dos a la vez; ese es el cambio que hizo
+#  falta en el esquema para que el Perfil Dinámico también viva en un jugador
+#  apuntado a mano, que es justo el caso de la pantalla «Nuevo Jugador».
+ATRIBUTOS_TECNICOS = ['pase', 'control', 'regate', 'tiro', 'definicion', 'centros', 'vision_juego']
+ATRIBUTOS_FISICOS = ['velocidad', 'resistencia', 'fuerza', 'agilidad', 'aceleracion']
+ATRIBUTOS_MENTALES = ['liderazgo', 'disciplina', 'concentracion', 'confianza', 'trabajo_equipo', 'mentalidad']
+ATRIBUTOS_18 = ATRIBUTOS_TECNICOS + ATRIBUTOS_FISICOS + ATRIBUTOS_MENTALES
+
+_CAMPOS_ESTADO = ('fatiga', 'riesgo_sobrecarga', 'fortalezas', 'debilidades',
+                  'evolucion_tecnica', 'lesiones_historial', 'posicion_secundaria')
+
+
+def _ahora():
+    return datetime.now(timezone.utc).isoformat()
+
+
+def dueno_filtro(player_id=None, manual_player_id=None):
+    """Normaliza el par (con cuenta / sin cuenta): exactamente uno de los dos."""
+    if player_id:
+        return {'player_id': player_id}
+    if manual_player_id:
+        return {'manual_player_id': manual_player_id}
+    return {}
+
+
+def _upsert_dueno(table, dueno, datos, ctx=''):
+    """Upsert manual sobre una tabla con «dueño» opcional (jugador con o sin
+    cuenta). No se usa el `on_conflict` de Supabase porque la unicidad de
+    estas tablas es con índices PARCIALES (uno para player_id, otro para
+    manual_player_id) y PostgREST no sabe apuntar un ON CONFLICT a un índice
+    parcial solo con nombres de columna — se resuelve leyendo primero.
+    """
+    existente = one(table, ctx, **dueno)
+    if existente:
+        return update(table, datos, ctx, **dueno) and {**existente, **datos}
+    return insert(table, {**dueno, **datos}, ctx)
+
+
+def fila_atributos(player_id=None, manual_player_id=None):
+    """La fila cruda de fut_attributes, o None si el jugador nunca fue evaluado."""
+    dueno = dueno_filtro(player_id, manual_player_id)
+    if not dueno:
+        return None
+    return one('fut_attributes', 'fila atributos', **dueno)
+
+
+def calcular_overall(valores):
+    """Media de los 18 (escala 1-10) llevada a 0-100. `None` si no hay ninguno."""
+    vals = [valores.get(k) for k in ATRIBUTOS_18 if valores.get(k) is not None]
+    if not vals:
+        return None
+    return max(1, min(100, round(sum(vals) / len(vals) * 10)))
+
+
+def _media_familia(valores, claves):
+    """Igual que calcular_overall pero para una sola familia (TÉC/FÍS/MEN)."""
+    vals = [valores.get(k) for k in claves if valores.get(k) is not None]
+    if not vals:
+        return None
+    return max(1, min(100, round(sum(vals) / len(vals) * 10)))
+
+
+def ficha_atributos(player_id=None, manual_player_id=None):
+    """Los 18 atributos + overall/potencial/estado, listos para pintar.
+
+    Los huecos se muestran como 5/10 (punto de partida neutro), pero eso es
+    solo para no dejar la pantalla en blanco — nunca se guarda un valor que
+    nadie evaluó. `_tiene_perfil` distingue "aún sin evaluar" de verdad.
+    """
+    fila = fila_atributos(player_id, manual_player_id) or {}
+    tiene_perfil = fila.get('overall') is not None
+
+    ficha = {k: (fila.get(k) if fila.get(k) is not None else 5) for k in ATRIBUTOS_18}
+    ficha['overall'] = fila.get('overall') if fila.get('overall') is not None else 50
+    ficha['potencial'] = fila.get('potencial') if fila.get('potencial') is not None else ficha['overall']
+    ficha['media_tecnica'] = _media_familia(fila, ATRIBUTOS_TECNICOS) or 50
+    ficha['media_fisica'] = _media_familia(fila, ATRIBUTOS_FISICOS) or 50
+    ficha['media_mental'] = _media_familia(fila, ATRIBUTOS_MENTALES) or 50
+    ficha['fatiga'] = fila.get('fatiga')
+    ficha['riesgo_sobrecarga'] = fila.get('riesgo_sobrecarga') or 'bajo'
+    ficha['fortalezas'] = fila.get('fortalezas') or ''
+    ficha['debilidades'] = fila.get('debilidades') or ''
+    ficha['evolucion_tecnica'] = fila.get('evolucion_tecnica') or ''
+    ficha['lesiones_historial'] = fila.get('lesiones_historial') or ''
+    ficha['posicion_secundaria'] = fila.get('posicion_secundaria') or ''
+    ficha['_tiene_perfil'] = tiene_perfil
+    return ficha
+
+
+def guardar_atributos(player_id=None, manual_player_id=None, **campos):
+    """Upsert de la ficha de un jugador (con o sin cuenta).
+
+    `campos` puede traer cualquiera de los 18 (escala 1-10), `potencial`
+    (0-100) y los campos de `_CAMPOS_ESTADO`. El overall y las tres medias por
+    familia (que alimentan tecnica/fisico/mental, los 4 de siempre) se
+    recalculan siempre a partir de lo que quede guardado. Si es la primera
+    vez que se evalúa y no llega `potencial`, se deja igual al overall recién
+    calculado — es un techo estimado del entrenador, no algo que la fórmula
+    deba inventar (eso lo hará la IA más adelante).
+    """
+    dueno = dueno_filtro(player_id, manual_player_id)
+    if not dueno:
+        return None
+
+    actual = fila_atributos(player_id, manual_player_id) or {}
+    fusion = dict(actual)
+    fusion.update({k: v for k, v in campos.items()
+                   if k in ATRIBUTOS_18 or k in _CAMPOS_ESTADO or k == 'potencial'})
+
+    datos = {k: fusion[k] for k in ATRIBUTOS_18 if fusion.get(k) is not None}
+    overall = calcular_overall(fusion)
+    if overall is not None:
+        datos['overall'] = overall
+        datos['potencial'] = fusion.get('potencial') if fusion.get('potencial') is not None else overall
+        for clave, familia in (('tecnica', ATRIBUTOS_TECNICOS),
+                               ('fisico', ATRIBUTOS_FISICOS),
+                               ('mental', ATRIBUTOS_MENTALES)):
+            media = _media_familia(fusion, familia)
+            if media is not None:
+                datos[clave] = media
+    for campo in _CAMPOS_ESTADO:
+        if campo in fusion:
+            datos[campo] = fusion[campo]
+    datos['actualizado'] = _ahora()
+
+    return _upsert_dueno('fut_attributes', dueno, datos, 'guardar atributos')
+
+
+def guardar_familias(player_id, valores):
+    """Escribe solo las 4 familias clásicas (0-100), sin tocar los 18.
+
+    Lo usa evaluaciones.py cuando la marca de una prueba mueve la ficha del
+    jugador. No puede ser un `upsert(on_conflict='player_id')`: desde
+    schema_v3 la unicidad de fut_attributes es un índice PARCIAL, y Postgres
+    no admite ON CONFLICT contra un índice parcial.
+    """
+    dueno = dueno_filtro(player_id=player_id)
+    if not dueno:
+        return None
+    datos = {k: v for k, v in valores.items() if k in ATRIBUTOS}
+    if not datos:
+        return None
+    datos['actualizado'] = _ahora()
+    return _upsert_dueno('fut_attributes', dueno, datos, 'ficha por prueba')
+
+
+# ─── Ficha médica ────────────────────────────────────────────────────────────
+#  Los básicos son los que hacen falta a pie de campo el día del partido; los
+#  avanzados, los del reconocimiento médico (ver sql/schema_v4_ficha_medica.sql).
+#  Se separan porque el formulario esconde los segundos: a un entrenador de
+#  formación no se le puede pedir el cribado cardiovascular de la FIFA.
+CAMPOS_MEDICOS_BASICOS = ('grupo_sanguineo', 'alergias', 'medicacion', 'condiciones',
+                          'contacto_nombre', 'contacto_tel', 'contacto_parentesco',
+                          'seguro')
+
+CAMPOS_MEDICOS_AVANZADOS = ('estatura_cm', 'peso_kg', 'apto', 'ultimo_chequeo',
+                            'certificado_vence', 'vacunas', 'antecedentes_personales',
+                            'antecedentes_familiares', 'cirugias', 'observaciones')
+
+APTITUDES = (('apto', 'Apto', '#10b981'),
+             ('precaucion', 'Apto con precaución', '#f59e0b'),
+             ('no_apto', 'No apto', '#ef4444'))
+APTITUD_META = {c: {'etiqueta': e, 'color': col} for c, e, col in APTITUDES}
+
+
+def ficha_medica(player_id=None, manual_player_id=None):
+    """La ficha médica de un jugador, con o sin cuenta. {} si no tiene."""
+    dueno = dueno_filtro(player_id, manual_player_id)
+    if not dueno:
+        return {}
+    return one('fut_medical', 'ficha medica', **dueno) or {}
+
+
+def guardar_ficha_medica(player_id=None, manual_player_id=None,
+                         actualizado_por=None, solo_basicos=False, **campos):
+    """Upsert de la ficha médica.
+
+    `solo_basicos` es la frontera del lado del jugador: él escribe lo suyo,
+    pero el veredicto de aptitud y el cribado médico los firma el cuerpo
+    técnico, no el interesado.
+    """
+    dueno = dueno_filtro(player_id, manual_player_id)
+    if not dueno:
+        return None
+
+    permitidos = set(CAMPOS_MEDICOS_BASICOS)
+    if not solo_basicos:
+        permitidos |= set(CAMPOS_MEDICOS_AVANZADOS)
+
+    datos = {k: v for k, v in campos.items() if k in permitidos}
+    if not datos:
+        return None
+    datos['actualizado'] = _ahora()
+    if actualizado_por:
+        datos['actualizado_por'] = actualizado_por
+    return _upsert_dueno('fut_medical', dueno, datos, 'guardar ficha medica')
+
+
+def _lunes_de_esta_semana():
+    hoy = date.today()
+    return (hoy - timedelta(days=hoy.weekday())).isoformat()
+
+
+def recalcular_evolucion_equipo(coach_id):
+    """Botón «⟳ Recalcular evolución del equipo»: guarda la foto de esta
+    semana de cada jugador (con o sin cuenta) y actualiza sus alertas.
+
+    Devuelve cuántos jugadores tenían perfil y se pudieron recalcular.
+    """
+    uid = equipo_id(coach_id)
+    semana = _lunes_de_esta_semana()
+    tocados = 0
+    for j in jugadores_del_entrenador(uid):
+        tocados += _recalcular_uno(uid, semana, player_id=j['id'])
+    for m in rows('fut_manual_players', 'manuales recalc', coach_id=uid, activo=True):
+        tocados += _recalcular_uno(uid, semana, manual_player_id=m['id'])
+    return tocados
+
+
+def _recalcular_uno(coach_id, semana, player_id=None, manual_player_id=None):
+    fila = fila_atributos(player_id, manual_player_id)
+    if not fila or fila.get('overall') is None:
+        return 0  # sin perfil todavía: nada que fotografiar
+
+    dueno = dueno_filtro(player_id, manual_player_id)
+    overall = fila['overall']
+
+    historial = rows('fut_attribute_history', 'historial', _order='semana', _desc=True, **dueno)
+    previa = next((h for h in historial if h.get('semana') != semana), None)
+    delta = (overall - previa['overall']) if previa and previa.get('overall') is not None else 0
+
+    snapshot = {k: fila.get(k) for k in ATRIBUTOS_18}
+    _upsert_dueno('fut_attribute_history', {**dueno, 'semana': semana},
+                  {'atributos': snapshot, 'overall': overall, 'origen': 'manual'},
+                  'snapshot semana')
+
+    _actualizar_alertas(coach_id, dueno, delta, fila)
+    return 1
+
+
+#  Las alertas que se recalculan cada semana. Las de otro tipo (si algún día
+#  las hay) no se tocan: se resuelven solo estas antes de volver a crearlas.
+_TIPOS_RECALCULADOS = ('caida', 'fisico', 'mental')
+
+
+def _actualizar_alertas(coach_id, dueno, delta, fila):
+    """Resuelve las alertas de la semana pasada y crea las que sigan aplicando.
+
+    Mismas reglas, en el mismo orden, que TeamPlayersScreen.tsx:buildAlerts().
+    """
+    activas = rows('fut_player_alerts', 'alertas previas', activa=True, **dueno)
+    for a in activas:
+        if a.get('tipo') in _TIPOS_RECALCULADOS:
+            update('fut_player_alerts', {'activa': False, 'resuelto': _ahora()},
+                   'resolver alerta', id=a['id'])
+
+    nuevas = []
+    # Retroceso semanal
+    if delta <= -2:
+        nuevas.append(('caida', 'grave', f'Retroceso de {abs(delta)} pts esta semana'))
+    elif delta == -1:
+        nuevas.append(('caida', 'aviso', 'Leve retroceso esta semana'))
+    # Condición física baja
+    fisico = _media_familia(fila, ATRIBUTOS_FISICOS)
+    if fisico is not None and fisico < 45:
+        nuevas.append(('fisico', 'aviso', 'Condición física baja'))
+    # Estado mental
+    mental = _media_familia(fila, ATRIBUTOS_MENTALES)
+    if mental is not None:
+        if mental < 40:
+            nuevas.append(('mental', 'grave', 'Estado mental crítico'))
+        elif mental < 55:
+            nuevas.append(('mental', 'aviso', 'Motivación reducida'))
+
+    for tipo, severidad, mensaje in nuevas:
+        insert('fut_player_alerts', {
+            **dueno, 'coach_id': coach_id, 'tipo': tipo, 'severidad': severidad,
+            'mensaje': mensaje, 'activa': True,
+        }, 'crear alerta')
 
 
 # ─── Utilidades de fecha ─────────────────────────────────────────────────────

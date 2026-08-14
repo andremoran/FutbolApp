@@ -145,7 +145,49 @@ def c_manuales():
                            manuales=activos,
                            archivados=[m for m in lista if not m.get('activo')],
                            posiciones=POSICIONES,
+                           aptitudes=db.APTITUDES,
                            n_plantilla=len(db.jugadores_del_entrenador(uid)))
+
+
+#  Topes de cada campo médico. Las fechas y los números se validan aparte:
+#  una fecha mal escrita tiene que quedar vacía, no reventar el alta entera.
+_TOPES_MEDICOS = {
+    'grupo_sanguineo': 10, 'seguro': 120, 'alergias': 600, 'condiciones': 800,
+    'medicacion': 600, 'contacto_nombre': 120, 'contacto_parentesco': 60,
+    'contacto_tel': 30, 'vacunas': 300, 'antecedentes_personales': 800,
+    'antecedentes_familiares': 800, 'cirugias': 600, 'observaciones': 800,
+}
+
+
+def _limpiar_ficha_medica(medico):
+    """Deja solo lo que se puede guardar, con su tipo y su tope."""
+    if not isinstance(medico, dict):
+        return {}
+
+    limpio = {}
+    for campo, tope in _TOPES_MEDICOS.items():
+        valor = (medico.get(campo) or '').strip() if isinstance(medico.get(campo), str) else medico.get(campo)
+        if valor:
+            limpio[campo] = str(valor)[:tope]
+
+    for campo in ('estatura_cm', 'peso_kg'):
+        valor = medico.get(campo)
+        if valor not in (None, ''):
+            try:
+                limpio[campo] = float(valor)
+            except (TypeError, ValueError):
+                pass
+
+    for campo in ('ultimo_chequeo', 'certificado_vence'):
+        valor = (medico.get(campo) or '').strip()
+        if valor and db.parse_fecha(valor):
+            limpio[campo] = valor[:10]
+
+    apto = (medico.get('apto') or '').strip()
+    if apto in db.APTITUD_META:
+        limpio['apto'] = apto
+
+    return limpio
 
 
 @bp.route('/api/manual', methods=['POST'])
@@ -170,7 +212,10 @@ def api_manual():
         'notas': (d.get('notas') or '')[:600],
     }
     for campo, tipo in (('dorsal', int), ('anio_nacimiento', int),
-                        ('estatura', float), ('peso', float)):
+                        ('estatura', float), ('peso', float),
+                        ('goles', int), ('asistencias', int),
+                        ('minutos_jugados', int), ('jugadas_clave', int),
+                        ('valoracion_promedio', int)):
         v = d.get(campo)
         if v not in (None, ''):
             try:
@@ -178,11 +223,40 @@ def api_manual():
             except (TypeError, ValueError):
                 pass
 
+    # Perfil Dinámico (18 atributos + estado): mismos campos que evaluar a un
+    # jugador con cuenta, ver futbol/db.py:guardar_atributos. No son columnas
+    # de fut_manual_players, así que se guardan aparte y no entran en `datos`.
+    campos_perfil = {}
+    campos_numericos = set(db.ATRIBUTOS_18) | {'potencial', 'fatiga'}
+    campos_texto = ('riesgo_sobrecarga', 'fortalezas', 'debilidades', 'evolucion_tecnica',
+                    'lesiones_historial', 'posicion_secundaria')
+    for k in list(campos_numericos) + list(campos_texto):
+        v = d.get(k)
+        if v in (None, ''):
+            continue
+        if k in campos_numericos:
+            try:
+                campos_perfil[k] = int(v)
+            except (TypeError, ValueError):
+                pass
+        else:
+            campos_perfil[k] = str(v)[:600]
+
+    # Ficha médica. Va aparte, en fut_medical: es el mismo sitio donde vive la
+    # del jugador con cuenta, así no hay dos fichas médicas distintas según
+    # cómo se dio de alta a la persona.
+    campos_medicos = _limpiar_ficha_medica(d.get('medico') or {})
+
     mid = d.get('id')
     if mid:
         if not db.one('fut_manual_players', 'mio', id=mid, coach_id=uid):
             return jsonify({'error': 'Ese jugador no es de tu equipo.'}), 403
         db.update('fut_manual_players', datos, 'manual up', id=mid, coach_id=uid)
+        if campos_perfil:
+            db.guardar_atributos(manual_player_id=mid, **campos_perfil)
+        if campos_medicos:
+            db.guardar_ficha_medica(manual_player_id=mid,
+                                    actualizado_por=current_user.id, **campos_medicos)
         return jsonify({'ok': True, 'id': mid, 'mensaje': 'Ficha actualizada.'})
 
     # Los apuntados a mano cuentan para el tope del plan gratuito: si no,
@@ -201,6 +275,11 @@ def api_manual():
     fila = db.insert('fut_manual_players', datos, 'manual nuevo')
     if not fila:
         return jsonify({'error': 'No se pudo guardar.'}), 500
+    if campos_perfil:
+        db.guardar_atributos(manual_player_id=fila['id'], **campos_perfil)
+    if campos_medicos:
+        db.guardar_ficha_medica(manual_player_id=fila['id'],
+                                actualizado_por=current_user.id, **campos_medicos)
     return jsonify({'ok': True, 'id': fila['id'],
                     'mensaje': f'{nombre} está en la plantilla.'})
 

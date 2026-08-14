@@ -126,36 +126,117 @@ def c_inicio():
 @bp.route('/coach/equipo/editar')
 @solo_entrenador
 def c_equipo_editar():
+    """Datos del equipo + nivel competitivo (TeamLevelConfigModal.tsx).
+
+    El nivel y la categoría de edad no son decoración: son los que deciden
+    contra qué baremo se puntúan las pruebas físicas (ver tests_catalogo.py).
+    """
+    from . import tests_catalogo as cat
+    from .evaluaciones import contexto_equipo
+
+    uid = db.equipo_id(current_user.id)
+    edad, nivel = contexto_equipo(uid)
     return render_template('c_equipo_editar.html',
                            hide_tabbar=True,
-                           equipo=db.equipo_del_entrenador(current_user.id))
+                           equipo=db.equipo_del_entrenador(uid),
+                           categorias=cat.CATEGORIAS_EDAD,
+                           niveles=cat.NIVELES_COMPETITIVOS,
+                           ctx_edad=edad, ctx_nivel=nivel)
 
 
 # ═══════════════════════ 2. EQUIPO ═══════════════════════
+def _edad_de(anio_nacimiento):
+    if not anio_nacimiento:
+        return None
+    return max(0, date.today().year - int(anio_nacimiento))
+
+
+def _ficha_equipo(coach_id, semana_actual, alertas_por_dueno, *, player_id=None,
+                  manual_player_id=None, nombre, posicion, dorsal, anio_nacimiento,
+                  foto=None, activo=True):
+    """Arma la tarjeta de un jugador (con o sin cuenta) para la pantalla
+    Equipo: overall/potencial, cambio semanal y alerta principal — mismos
+    datos que TeamPlayersScreen.tsx, calculados en futbol/db.py.
+    """
+    ficha = db.ficha_atributos(player_id, manual_player_id)
+    historial = db.rows('fut_attribute_history', 'historial equipo',
+                        _order='semana', _desc=True,
+                        **db.dueno_filtro(player_id, manual_player_id))
+    anterior = next((h for h in historial if h.get('semana') != semana_actual), None)
+    delta = 0
+    if ficha['_tiene_perfil'] and anterior and anterior.get('overall') is not None:
+        delta = ficha['overall'] - anterior['overall']
+
+    clave = str(player_id or manual_player_id)
+    alertas = alertas_por_dueno.get(clave, [])
+    # Las graves primero, como en la app: si solo caben dos, que se vean esas.
+    alertas.sort(key=lambda a: 0 if a.get('severidad') == 'grave' else 1)
+
+    return {
+        'id': player_id or manual_player_id,
+        'tipo': 'registrado' if player_id else 'manual',
+        'name': nombre, 'posicion': posicion or 'Sin posición',
+        # Se muestra la posición tal cual, pero se filtra por su familia.
+        'familia': db.familia_posicion(posicion),
+        'dorsal': dorsal, 'edad': _edad_de(anio_nacimiento),
+        'profile_photo': foto, 'activo': activo,
+        'overall': ficha['overall'], 'potencial': ficha['potencial'],
+        'media_tecnica': ficha['media_tecnica'], 'media_fisica': ficha['media_fisica'],
+        'media_mental': ficha['media_mental'],
+        '_tiene_perfil': ficha['_tiene_perfil'], '_delta': delta,
+        '_alertas': alertas,
+        # Resumen semanal escrito por la IA. Vacío hasta la Fase 6 (espera al
+        # proxy de IA); la tarjeta simplemente no pinta ese párrafo.
+        '_resumen_ia': None,
+    }
+
+
 @bp.route('/coach/plantilla')
 @solo_entrenador
 def c_equipo():
     uid = db.equipo_id(current_user.id)
     jugadores = db.jugadores_del_entrenador(uid)
+    manuales = db.rows('fut_manual_players', 'manuales equipo', coach_id=uid, activo=True) or []
 
-    # Media de atributos por jugador, para el badge de nivel
-    if jugadores:
-        ids = [j['id'] for j in jugadores]
-        attrs = db.q(
-            lambda: db.sb().table('fut_attributes').select('*').in_('player_id', ids).execute().data or [],
-            [], 'atributos equipo')
-        by_id = {a['player_id']: a for a in attrs}
-        for j in jugadores:
-            a = by_id.get(j['id'])
-            vals = [a.get(k) for k in db.ATRIBUTOS if a and a.get(k) is not None] if a else []
-            j['_media'] = round(sum(vals) / len(vals)) if vals else 50
-        # De mejor a peor, como TeamPlayersScreen: la plantilla se lee de un
-        # vistazo y arriba está quien está rindiendo.
-        jugadores.sort(key=lambda j: -j['_media'])
+    hoy = date.today()
+    semana_actual = (hoy - timedelta(days=hoy.weekday())).isoformat()
+
+    alertas_por_dueno = {}
+    for a in (db.rows('fut_player_alerts', 'alertas equipo', coach_id=uid, activa=True) or []):
+        clave = str(a.get('player_id') or a.get('manual_player_id'))
+        alertas_por_dueno.setdefault(clave, []).append(a)
+
+    plantilla = []
+    for j in jugadores:
+        plantilla.append(_ficha_equipo(
+            uid, semana_actual, alertas_por_dueno, player_id=j['id'],
+            nombre=j.get('name'), posicion=(j.get('fut') or {}).get('posicion'),
+            dorsal=(j.get('fut') or {}).get('dorsal'), anio_nacimiento=j.get('anio_nacimiento'),
+            foto=j.get('profile_photo'), activo=j.get('activo', True)))
+    for m in manuales:
+        plantilla.append(_ficha_equipo(
+            uid, semana_actual, alertas_por_dueno, manual_player_id=m['id'],
+            nombre=m.get('nombre'), posicion=m.get('posicion'),
+            dorsal=m.get('dorsal'), anio_nacimiento=m.get('anio_nacimiento')))
+
+    # Con perfil primero (de mejor a peor overall); sin evaluar, al final.
+    plantilla.sort(key=lambda p: (0 if p['_tiene_perfil'] else 1, -(p['overall'] or 0)))
+
+    con_perfil = [p for p in plantilla if p['_tiene_perfil']]
+    resumen = {
+        'con_perfil': len(con_perfil),
+        'total': len(plantilla),
+        'overall_prom': round(sum(p['overall'] for p in con_perfil) / len(con_perfil)) if con_perfil else 0,
+        'cambio_semanal': sum(p['_delta'] for p in con_perfil),
+        'subiendo': len([p for p in con_perfil if p['_delta'] > 0]),
+        'bajando': len([p for p in con_perfil if p['_delta'] < 0]),
+        'con_alertas': len([p for p in plantilla if p['_alertas']]),
+    }
 
     return render_template('c_equipo.html',
                            tab_activa='equipo',
-                           jugadores=jugadores,
+                           jugadores=plantilla,
+                           resumen=resumen,
                            equipo=db.equipo_del_entrenador(uid),
                            codigo=db.codigo_equipo(uid))
 
@@ -181,6 +262,7 @@ def c_jugador(pid):
                            _order='fecha', _desc=True, _limit=20)
     for e in evaluaciones:
         e['_fecha'] = db.parse_fecha(e.get('fecha'))
+        e.update(e.get('puntuaciones') or {})  # tecnica/fisico/mental sueltos, para el resumen de abajo
     apuntes = [e for e in evaluaciones if (e.get('notas') or '').strip()]
 
     # Las cuatro cifras de PlayerDetailScreen.
@@ -208,6 +290,7 @@ def c_jugador(pid):
                            perfil=db.perfil_jugador(pid),
                            atributos=db.atributos(pid),
                            media=db.media_atributos(pid),
+                           ficha=db.ficha_atributos(player_id=pid),
                            entrenos=entrenos,
                            evaluaciones=evaluaciones,
                            apuntes=apuntes,
@@ -225,7 +308,7 @@ def c_evaluar(pid):
     return render_template('c_evaluar.html',
                            hide_tabbar=True,
                            jugador=jugador,
-                           atributos=db.atributos(pid))
+                           ficha=db.ficha_atributos(player_id=pid))
 
 
 # ═══════════════════════ 3. AGENDA ═══════════════════════

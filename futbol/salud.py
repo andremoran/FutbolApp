@@ -112,15 +112,19 @@ def api_medico():
         return jsonify({'error': 'La ficha médica la escribe el jugador.'}), 403
 
     d = request.get_json(silent=True) or {}
-    datos = {'player_id': current_user.id, 'actualizado': _ahora()}
+    datos = {}
     for campo, tope in (('grupo_sanguineo', 10), ('alergias', 600),
                         ('medicacion', 600), ('condiciones', 800),
                         ('contacto_nombre', 120), ('contacto_tel', 30),
-                        ('seguro', 120)):
+                        ('contacto_parentesco', 60), ('seguro', 120)):
         if campo in d:
             datos[campo] = (str(d[campo]) or '')[:tope]
 
-    if not db.upsert('fut_medical', datos, 'ficha medica', on_conflict='player_id'):
+    # `solo_basicos`: el jugador escribe lo suyo, pero el veredicto de aptitud
+    # y el cribado médico los firma el cuerpo técnico, no el interesado.
+    if not db.guardar_ficha_medica(player_id=current_user.id,
+                                   actualizado_por=current_user.id,
+                                   solo_basicos=True, **datos):
         return jsonify({'error': 'No se pudo guardar la ficha.'}), 500
     return jsonify({'ok': True, 'mensaje': 'Ficha médica guardada.'})
 

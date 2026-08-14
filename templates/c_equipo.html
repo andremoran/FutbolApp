@@ -1,15 +1,21 @@
 {% extends '_shell.html' %}
 {% block title %}Equipo · ProFoot{% endblock %}
 
-{# screens/TeamPlayersScreen.tsx: la plantilla con buscador y badge de nivel.
-   Los jugadores salen de especialista_paciente, la relación que ya existe. #}
+{# screens/TeamPlayersScreen.tsx: plantilla + Perfil Dinámico Inteligente
+   fusionados en una sola pantalla. Los jugadores salen de fut_plantilla
+   (con cuenta) y fut_manual_players (sin cuenta); el Perfil Dinámico —
+   overall, potencial, cambio semanal, alertas — de fut_attributes +
+   fut_attribute_history + fut_player_alerts (ver futbol/db.py).
+
+   Las medidas de abajo son las de cardStyles/pulseStyles de la app nativa,
+   no aproximaciones. #}
 
 {% block hero_label %}<div class="pf-hero__label">Gestión · Plantilla</div>{% endblock %}
 {% block hero_title %}Mi equipo{% endblock %}
 {% block hero_subtitle %}
 <div class="pf-hero__subtitle">
   {% if jugadores %}
-    {{ jugadores|length }} jugador{{ '' if jugadores|length == 1 else 'es' }} · ordenado por nivel
+    {{ jugadores|length }} jugador{{ '' if jugadores|length == 1 else 'es' }} · ordenado por overall
   {% else %}
     Aún no hay jugadores
   {% endif %}
@@ -21,7 +27,7 @@
 {% block hero_actions %}
 <a class="pf-hero__btn" href="{{ url_for('futbol.c_equipo_editar') }}"
    aria-label="Ajustes del equipo">
-  <i data-ico="settings" class="pf-ico--sm"></i>
+  <i data-ico="sliders" class="pf-ico--sm"></i>
 </a>
 <a class="pf-hero__btn" href="{{ url_for('futbol.c_manuales') }}"
    aria-label="Agregar jugador">
@@ -31,45 +37,207 @@
 
 {% block head %}
 <style>
-  .tp-nivel {
-    width: 36px; height: 36px; border-radius: 10px; flex: none;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 14px; font-weight: 800; color: #fff;
-  }
   .tp-buscar { padding: 16px 16px 0; position: relative; }
   .tp-buscar input { padding-left: 40px; }
   .tp-buscar .pf-ico { position: absolute; left: 30px; top: 29px; color: var(--text-muted); }
 
-  /* Filtros por posición, en fila que se desplaza (filterChip de la app). */
+  /* Filtros por posición y por vista (styles.filterRow / filterChip) */
   .tp-chips {
-    display: flex; gap: 8px; overflow-x: auto; padding: 14px 16px 0;
+    display: flex; gap: 8px; overflow-x: auto; padding: 10px 16px;
     scrollbar-width: none;
   }
+  .tp-chips + .tp-chips { padding-top: 0; }
   .tp-chips::-webkit-scrollbar { display: none; }
   .tp-chip {
-    flex: none; padding: 7px 14px; border-radius: 100px; cursor: pointer;
+    flex: none; padding: 7px 12px; border-radius: 16px; cursor: pointer;
     background: #fff; border: 1px solid var(--border);
-    font: inherit; font-size: 13px; font-weight: 600; color: var(--text-sec);
+    font: inherit; font-size: 12px; font-weight: 600; color: var(--text-sec);
     white-space: nowrap;
   }
   .tp-chip[aria-pressed="true"] {
-    background: var(--primary); border-color: var(--primary); color: #fff;
+    background: var(--primary); border-color: var(--primary);
+    color: #fff; font-weight: 700;
   }
+
+  /* ─── Panel «Perfil Dinámico del Equipo» (pulseStyles) ─────────────── */
+  .eq-dyn {
+    margin: 12px 16px 0; padding: 14px; border-radius: 16px;
+    background: var(--primary-dark); color: #fff;
+    box-shadow: 0 4px 10px rgba(4,120,87,.18);
+  }
+  .eq-dyn__head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .eq-dyn__icon {
+    width: 36px; height: 36px; border-radius: 18px; flex: none;
+    background: rgba(255,255,255,.22);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .eq-dyn__title { font-size: 15px; font-weight: 800; margin: 0; }
+  .eq-dyn__sub { font-size: 11px; color: rgba(255,255,255,.85); margin: 2px 0 0; }
+  .eq-dyn__box {
+    display: flex; align-items: center; background: rgba(255,255,255,.12);
+    padding: 10px; border-radius: 12px;
+  }
+  .eq-dyn__stat { flex: 1; text-align: center; }
+  .eq-dyn__sep { width: 1px; height: 28px; background: rgba(255,255,255,.18); flex: none; }
+  .eq-dyn__num {
+    display: flex; align-items: center; justify-content: center; gap: 3px;
+    font-size: 18px; font-weight: 900; line-height: 1.15;
+  }
+  .eq-dyn__label {
+    font-size: 9px; font-weight: 600; color: rgba(255,255,255,.78); margin-top: 2px;
+  }
+  .eq-dyn__alert {
+    display: flex; align-items: center; gap: 6px; background: rgba(0,0,0,.18);
+    padding: 7px 10px; border-radius: 10px; margin-top: 10px;
+    font-size: 11px; font-weight: 700;
+  }
+  .eq-dyn__btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; padding: 11px; border-radius: 10px; margin-top: 10px;
+    background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.25);
+    color: #fff; font-size: 13px; font-weight: 800;
+  }
+  .eq-dyn__btn:active { background: rgba(255,255,255,.28); }
+  .eq-dyn__btn[disabled] { opacity: .6; pointer-events: none; }
+
+  /* ─── Cabecera de la lista (styles.listHeader) ─────────────────────── */
+  .eq-listhead { padding: 6px 16px; }
+  .eq-listhead h2 { font-size: 13.5px; font-weight: 800; margin: 0; }
+
+  /* ─── Tarjeta de jugador (cardStyles) ──────────────────────────────── */
+  .eq-card {
+    position: relative;
+    background: #fff; border-radius: 14px; padding: 12px;
+    margin: 0 16px 10px; border: 1px solid var(--border-soft);
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  }
+  .eq-card__top { display: flex; align-items: center; gap: 10px; }
+  .eq-ovr {
+    width: 48px; height: 48px; border-radius: 24px; flex: none;
+    border: 2.5px solid var(--border); background: var(--primary-faint);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .eq-ovr__n { font-size: 16px; font-weight: 900; line-height: 18px; }
+  .eq-ovr__l { font-size: 7px; font-weight: 700; color: var(--text-muted); margin-top: 1px; }
+  .eq-card__body { flex: 1; min-width: 0; }
+  .eq-card__namerow { display: flex; align-items: center; gap: 6px; }
+  /* El enlace del nombre cubre toda la tarjeta (patrón "stretched link"): así
+     se puede tocar en cualquier parte sin anidar <a> dentro de <a>. */
+  .eq-card__name {
+    font-size: 14px; font-weight: 800; color: var(--text);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+  }
+  .eq-card__name::after { content: ''; position: absolute; inset: 0; }
+  .eq-manual {
+    width: 14px; height: 14px; border-radius: 7px; flex: none;
+    background: #b45309; color: #fff;
+    font-size: 9px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .eq-card__pos { font-size: 11px; color: var(--text-sec); margin-top: 2px; }
+  .eq-delta {
+    display: flex; align-items: center; gap: 2px; flex: none;
+    padding: 3px 7px; border-radius: 8px;
+    font-size: 11px; font-weight: 800;
+    background: var(--border-soft); color: var(--text-sec);
+  }
+  .eq-delta--up { background: #d1fae5; color: var(--primary); }
+  .eq-delta--down { background: var(--danger-bg); color: #dc2626; }
+
+  .eq-bars { display: flex; gap: 10px; margin-top: 10px; }
+  .eq-bar { flex: 1; }
+  .eq-bar__head { display: flex; align-items: center; gap: 4px; margin-bottom: 3px; }
+  .eq-bar__label {
+    flex: 1; font-size: 9px; font-weight: 800; color: var(--text-sec); letter-spacing: .5px;
+  }
+  .eq-bar__value { font-size: 10px; font-weight: 800; color: var(--text); }
+  .eq-bar__track { height: 5px; border-radius: 3px; background: #e5e7eb; overflow: hidden; }
+  .eq-bar__fill { height: 5px; border-radius: 3px; }
+
+  .eq-alerts { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+  .eq-alert {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 7px; border-radius: 6px;
+    font-size: 10px; font-weight: 700;
+  }
+  .eq-alert--aviso { background: #fef3c7; color: #d97706; }
+  .eq-alert--grave { background: var(--danger-bg); color: #dc2626; }
+
+  .eq-report {
+    display: flex; align-items: flex-start; gap: 5px;
+    margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-soft);
+  }
+  .eq-report p {
+    flex: 1; margin: 0; font-size: 11px; line-height: 14px; color: var(--text);
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+
+  .eq-foot {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-soft);
+  }
+  /* Encima del enlace estirado del nombre, para que sea pulsable por su cuenta. */
+  .eq-foot__btn {
+    position: relative; z-index: 1;
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 8px; border-radius: 8px;
+    background: #ede9fe; color: #7e6acb;
+    font-size: 11px; font-weight: 700;
+  }
+  .eq-foot__btn--vacio { background: var(--border-soft); color: var(--text-sec); }
 </style>
 {% endblock %}
 
 {% block content %}
 
-{# Atajos a lo que se hace desde la plantilla. Van aquí y no en la barra
-   inferior, que es réplica exacta de la app nativa y no se toca. #}
-<div class="pf-segs pf-mt-16">
-  <a class="pf-seg" href="{{ url_for('futbol.c_evaluaciones') }}">📊 Evaluaciones</a>
-  <a class="pf-seg" href="{{ url_for('futbol.c_solicitudes') }}">📬 Solicitudes</a>
-  <a class="pf-seg" href="{{ url_for('futbol.c_manuales') }}">✍️ Sin cuenta</a>
-  <a class="pf-seg" href="{{ url_for('futbol.c_medico') }}">
-    🏥 Lesiones{% if not fut_es_pro %} 🔒{% endif %}
-  </a>
+{% if resumen.total %}
+<div class="eq-dyn">
+  <div class="eq-dyn__head">
+    <span class="eq-dyn__icon"><i data-ico="trending-up" class="pf-ico--sm"></i></span>
+    <div class="pf-grow">
+      <h2 class="eq-dyn__title">Perfil Dinámico del Equipo</h2>
+      <p class="eq-dyn__sub">{{ resumen.con_perfil }}/{{ resumen.total }} jugadores con perfil activo</p>
+    </div>
+  </div>
+
+  <div class="eq-dyn__box">
+    <div class="eq-dyn__stat">
+      <div class="eq-dyn__num">{{ resumen.overall_prom or '—' }}</div>
+      <div class="eq-dyn__label">Overall promedio</div>
+    </div>
+    <div class="eq-dyn__sep"></div>
+    <div class="eq-dyn__stat">
+      <div class="eq-dyn__num">
+        {% if resumen.cambio_semanal > 0 %}
+          <i data-ico="trending-up" class="pf-ico--xs"></i>+{{ resumen.cambio_semanal }}
+        {% elif resumen.cambio_semanal < 0 %}
+          <i data-ico="trending-down" class="pf-ico--xs" style="color:#fecaca"></i>{{ resumen.cambio_semanal }}
+        {% else %}
+          <i data-ico="minus" class="pf-ico--xs"></i>0
+        {% endif %}
+      </div>
+      <div class="eq-dyn__label">Cambio semanal</div>
+    </div>
+    <div class="eq-dyn__sep"></div>
+    <div class="eq-dyn__stat">
+      <div class="eq-dyn__num">{{ resumen.subiendo }}↑ {{ resumen.bajando }}↓</div>
+      <div class="eq-dyn__label">Subiendo / bajando</div>
+    </div>
+  </div>
+
+  {% if resumen.con_alertas %}
+  <div class="eq-dyn__alert">
+    <i data-ico="alert-triangle" class="pf-ico--xs"></i>
+    {{ resumen.con_alertas }} jugador{{ '' if resumen.con_alertas == 1 else 'es' }} con alertas
+  </div>
+  {% endif %}
+
+  <button class="eq-dyn__btn" type="button" id="btn-recalcular">
+    <i data-ico="refresh-cw" class="pf-ico--sm"></i>
+    <span>Recalcular evolución del equipo</span>
+  </button>
 </div>
+{% endif %}
 
 {% if jugadores %}
 <div class="tp-buscar">
@@ -85,48 +253,128 @@
           aria-pressed="{{ 'true' if loop.first else 'false' }}">{{ pos }}</button>
   {% endfor %}
 </div>
+
+{# VIEW_FILTERS de TeamPlayersScreen.tsx. #}
+<div class="tp-chips" role="group" aria-label="Filtrar por vista">
+  {% for vista in ['Todos', '↑ Subiendo', '↓ Bajando', 'Alertas', 'Sin perfil'] %}
+  <button class="tp-chip" type="button" data-vista="{{ vista }}"
+          aria-pressed="{{ 'true' if loop.first else 'false' }}">{{ vista }}</button>
+  {% endfor %}
+</div>
+
+<div class="eq-listhead"><h2 id="tp-cab">Plantilla ({{ jugadores|length }})</h2></div>
+
+<div id="tp-lista">
+  {% for j in jugadores %}
+  {% set ficha = url_for('futbol.c_jugador', pid=j.id) if j.tipo == 'registrado'
+                  else url_for('futbol.c_eval_jugador', pid=j.id) %}
+  {% set evaluar = url_for('futbol.c_evaluar', pid=j.id) if j.tipo == 'registrado'
+                    else url_for('futbol.c_eval_jugador', pid=j.id) %}
+  {% set color = '#10b981' if j.overall >= 80 else
+                 ('#047857' if j.overall >= 65 else
+                  ('#d97706' if j.overall >= 50 else
+                   ('#fb923c' if j.overall >= 35 else '#dc2626'))) %}
+  <article class="eq-card"
+           data-nombre="{{ (j.name or '')|lower }}" data-pos="{{ j.familia }}"
+           data-delta="{{ j._delta }}" data-alertas="{{ j._alertas|length }}"
+           data-perfil="{{ 1 if j._tiene_perfil else 0 }}">
+    <div class="eq-card__top">
+      <div class="eq-ovr" style="border-color:{{ color if j._tiene_perfil else 'var(--border)' }}">
+        {% if j._tiene_perfil %}
+        <span class="eq-ovr__n" style="color:{{ color }}">{{ j.overall }}</span>
+        <span class="eq-ovr__l">OVR</span>
+        {% else %}
+        <i data-ico="user" class="pf-ico--sm" style="color:var(--text-muted)"></i>
+        {% endif %}
+      </div>
+
+      <div class="eq-card__body">
+        <div class="eq-card__namerow">
+          <a class="eq-card__name" href="{{ ficha }}">{{ j.name }}</a>
+          {% if j.tipo == 'manual' %}<span class="eq-manual" title="Jugador sin cuenta">M</span>{% endif %}
+        </div>
+        <div class="eq-card__pos">
+          {{ j.posicion or 'Sin posición' }}
+          {%- if j.edad %} · {{ j.edad }} años{% endif %}
+          {%- if j._tiene_perfil %} · POT {{ j.potencial }}{% endif %}
+        </div>
+      </div>
+
+      {% if j._tiene_perfil %}
+      <span class="eq-delta {{ 'eq-delta--up' if j._delta > 0 else ('eq-delta--down' if j._delta < 0 else '') }}">
+        {%- if j._delta > 0 %}<i data-ico="arrow-up-right" class="pf-ico--xs"></i>+{{ j._delta }}
+        {%- elif j._delta < 0 %}<i data-ico="arrow-down-right" class="pf-ico--xs"></i>{{ j._delta }}
+        {%- else %}<i data-ico="minus" class="pf-ico--xs"></i>0{% endif -%}
+      </span>
+      {% endif %}
+    </div>
+
+    {% if j._tiene_perfil %}
+    <div class="eq-bars">
+      {% for ico, etiqueta, valor, tono in [
+          ('target', 'TÉC', j.media_tecnica, 'var(--primary)'),
+          ('zap', 'FIS', j.media_fisica, '#475569'),
+          ('cpu', 'MEN', j.media_mental, '#7e6acb')] %}
+      <div class="eq-bar">
+        <div class="eq-bar__head">
+          <i data-ico="{{ ico }}" class="pf-ico--xs" style="color:{{ tono }}"></i>
+          <span class="eq-bar__label">{{ etiqueta }}</span>
+          <span class="eq-bar__value">{{ valor }}</span>
+        </div>
+        <div class="eq-bar__track">
+          <div class="eq-bar__fill" style="width:{{ valor }}%;background:{{ tono }}"></div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if j._alertas %}
+    <div class="eq-alerts">
+      {% for a in j._alertas[:2] %}
+      <span class="eq-alert eq-alert--{{ a.severidad or 'aviso' }}">
+        <i data-ico="{{ 'alert-triangle' if a.severidad == 'grave' else 'alert-circle' }}" class="pf-ico--xs"></i>
+        {{ a.mensaje }}
+      </span>
+      {% endfor %}
+      {% if j._alertas|length > 2 %}
+      <span style="font-size:10px;font-weight:700;color:var(--text-sec);align-self:center">
+        +{{ j._alertas|length - 2 }}
+      </span>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {# El párrafo de la IA solo aparece cuando hay un informe generado. Todavía
+       no lo hay: lo escribe la Fase 6, cuando el proxy de IA esté desplegado. #}
+    {% if j._resumen_ia %}
+    <div class="eq-report">
+      <i data-ico="cpu" class="pf-ico--xs" style="color:#7e6acb"></i>
+      <p>{{ j._resumen_ia }}</p>
+    </div>
+    {% endif %}
+
+    <div class="eq-foot">
+      <a class="eq-foot__btn {{ '' if j._tiene_perfil else 'eq-foot__btn--vacio' }}" href="{{ evaluar }}">
+        <i data-ico="{{ 'trending-up' if j._tiene_perfil else 'edit-2' }}" class="pf-ico--xs"></i>
+        {{ 'Ver evaluación' if j._tiene_perfil else 'Crear evaluación' }}
+      </a>
+      <i data-ico="chevron-right" class="pf-ico--sm" style="color:var(--text-muted)"></i>
+    </div>
+  </article>
+  {% endfor %}
+</div>
+
+<div id="tp-vacio" class="pf-hide" style="text-align:center;padding:30px">
+  <i data-ico="filter" class="pf-ico--xxl" style="color:var(--text-muted)"></i>
+  <p style="font-size:13px;color:var(--text-sec);margin:8px 0 0">
+    Ningún jugador coincide con los filtros
+  </p>
+</div>
 {% endif %}
 
+{% if not jugadores %}
 <div class="pf-card">
-  <div class="pf-card__head">
-    <h2 class="pf-card__title" id="tp-cab">Plantilla ({{ jugadores|length }})</h2>
-    <a href="{{ url_for('futbol.c_evaluaciones') }}" class="pf-item__right">Evaluaciones</a>
-  </div>
-
-  <div id="tp-lista">
-    {% for j in jugadores %}
-    <a class="pf-item" href="{{ url_for('futbol.c_jugador', pid=j.id) }}"
-       data-nombre="{{ (j.name or '')|lower }}"
-       data-pos="{{ (j.fut or {}).get('posicion') or 'Sin posición' }}">
-      <span class="pf-avatar">
-        {%- if j.profile_photo %}<img src="{{ j.profile_photo }}" alt="">
-        {%- else %}{{ (j.name or '?')[:1]|upper }}{% endif -%}
-      </span>
-      <span class="pf-item__body">
-        <span class="pf-item__title">
-          {%- if (j.fut or {}).get('dorsal') %}
-            <span style="color:var(--text-muted);font-weight:800">{{ j.fut.dorsal }}</span>
-          {% endif %}
-          {{ j.name }}
-        </span>
-        <span class="pf-item__sub">
-          {{ (j.fut or {}).get('posicion') or 'Sin posición' }}
-          {%- if not j.activo %} · Cuenta inactiva{% endif %}
-        </span>
-      </span>
-      <span class="tp-nivel" style="background:
-        {%- if j._media >= 70 %}var(--primary)
-        {%- elif j._media >= 50 %}var(--warning)
-        {%- else %}var(--danger){% endif %}">{{ j._media }}</span>
-    </a>
-    {% endfor %}
-  </div>
-
-  <p id="tp-vacio" class="pf-center pf-hide" style="padding:20px;color:var(--text-sec);font-size:13px">
-    Ningún jugador coincide con la búsqueda.
-  </p>
-
-  {% if not jugadores %}
   <div class="pf-empty" style="padding:22px 8px">
     <div class="pf-empty__icon"><i data-ico="users" class="pf-ico--xxl"></i></div>
     <h3 class="pf-empty__title">Sin jugadores todavía</h3>
@@ -139,8 +387,8 @@
       {% endif %}
     </p>
   </div>
-  {% endif %}
 </div>
+{% endif %}
 
 {% if codigo %}
 <div class="pf-card">
@@ -154,26 +402,36 @@
 </div>
 {% endif %}
 
+<div style="height:24px"></div>
 {% endblock %}
 
 {% block scripts %}
 <script>
 (function () {
   var q = document.getElementById('tp-q');
-  var chips = document.querySelectorAll('.tp-chip');
+  var posChips = document.querySelectorAll('.tp-chip[data-pos]');
+  var vistaChips = document.querySelectorAll('.tp-chip[data-vista]');
   var cab = document.getElementById('tp-cab');
   var filas = document.querySelectorAll('#tp-lista [data-nombre]');
-  var posicion = 'Todos';
+  var posicion = 'Todos', vista = 'Todos';
 
-  // Buscador y filtro de posición actúan a la vez: una fila se ve si pasa los
-  // dos. Y la cabecera dice cuántas quedan, como el listHeader de la app.
+  // Buscador + filtro de posición + filtro de vista actúan a la vez: una
+  // tarjeta se ve si pasa los tres. La cabecera dice cuántas quedan.
   function filtrar() {
     var t = q ? q.value.trim().toLowerCase() : '';
     var visibles = 0;
     filas.forEach(function (fila) {
       var porNombre = !t || fila.dataset.nombre.indexOf(t) !== -1;
       var porPos = posicion === 'Todos' || fila.dataset.pos === posicion;
-      var ok = porNombre && porPos;
+      var delta = parseInt(fila.dataset.delta, 10) || 0;
+      var alertas = parseInt(fila.dataset.alertas, 10) || 0;
+      var tienePerfil = fila.dataset.perfil === '1';
+      var porVista = true;
+      if (vista === '↑ Subiendo') porVista = delta > 0;
+      else if (vista === '↓ Bajando') porVista = delta < 0;
+      else if (vista === 'Alertas') porVista = alertas > 0;
+      else if (vista === 'Sin perfil') porVista = !tienePerfil;
+      var ok = porNombre && porPos && porVista;
       fila.classList.toggle('pf-hide', !ok);
       if (ok) visibles++;
     });
@@ -187,12 +445,17 @@
 
   if (q) { q.addEventListener('input', filtrar); }
 
-  chips.forEach(function (chip) {
+  posChips.forEach(function (chip) {
     chip.addEventListener('click', function () {
       posicion = chip.dataset.pos;
-      chips.forEach(function (c) {
-        c.setAttribute('aria-pressed', c === chip ? 'true' : 'false');
-      });
+      posChips.forEach(function (c) { c.setAttribute('aria-pressed', c === chip ? 'true' : 'false'); });
+      filtrar();
+    });
+  });
+  vistaChips.forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      vista = chip.dataset.vista;
+      vistaChips.forEach(function (c) { c.setAttribute('aria-pressed', c === chip ? 'true' : 'false'); });
       filtrar();
     });
   });
@@ -208,6 +471,23 @@
       } else {
         PF.copy(mensaje, 'Invitación copiada');
       }
+    });
+  }
+
+  var btnRecalcular = document.getElementById('btn-recalcular');
+  if (btnRecalcular) {
+    var etiqueta = btnRecalcular.querySelector('span');
+    btnRecalcular.addEventListener('click', function () {
+      btnRecalcular.disabled = true;
+      etiqueta.textContent = 'Analizando…';
+      PF.api('{{ url_for("futbol.api_equipo_recalcular") }}', {}).then(function (r) {
+        PF.toast(r.mensaje, 'success');
+        setTimeout(function () { location.reload(); }, 700);
+      }).catch(function (e) {
+        PF.toast(e.message, 'error');
+        btnRecalcular.disabled = false;
+        etiqueta.textContent = 'Recalcular evolución del equipo';
+      });
     });
   }
 })();

@@ -299,9 +299,13 @@ def api_equipo_guardar():
     datos = {
         'coach_id': current_user.id,
         'nombre': (d.get('nombre') or 'Mi equipo')[:80],
-        'categoria': (d.get('categoria') or '')[:60],
         'codigo': db.codigo_equipo(current_user.id),
     }
+    # `categoria` es texto libre y ya no se edita desde la pantalla (la
+    # categoría de verdad es `categoria_edad`, que se elige en «Nivel del
+    # equipo»). Solo se toca si llega: si no, se conserva lo que hubiera.
+    if 'categoria' in d:
+        datos['categoria'] = (d.get('categoria') or '')[:60]
     existente = db.one('fut_teams', 'equipo', coach_id=db.equipo_id(current_user.id))
     if existente:
         db.update('fut_teams', datos, 'equipo up', id=existente['id'])
@@ -352,6 +356,9 @@ def api_perfil_jugador():
 @bp.route('/api/evaluacion', methods=['POST'])
 @api
 def api_evaluacion():
+    """Guarda el Perfil Dinámico (18 atributos) de un jugador con cuenta —
+    templates/c_evaluar.html. Ver futbol/db.py:guardar_atributos.
+    """
     if not es_coach():
         return jsonify({'error': 'Solo el entrenador evalúa.'}), 403
     d = body()
@@ -359,13 +366,30 @@ def api_evaluacion():
     if not pid or not de_mi_plantilla(pid):
         return jsonify({'error': 'Ese jugador no es de tu plantilla.'}), 403
 
-    puntuaciones = {}
-    for k in db.ATRIBUTOS:
-        if k in d:
+    campos_numericos = set(db.ATRIBUTOS_18) | {'potencial', 'fatiga'}
+    campos_texto = ('riesgo_sobrecarga', 'fortalezas', 'debilidades', 'evolucion_tecnica',
+                    'lesiones_historial', 'posicion_secundaria')
+    campos_perfil = {}
+    for k in list(campos_numericos) + list(campos_texto):
+        v = d.get(k)
+        if v in (None, ''):
+            continue
+        if k in campos_numericos:
             try:
-                puntuaciones[k] = max(0, min(100, int(d[k])))
+                campos_perfil[k] = int(v)
             except (TypeError, ValueError):
                 pass
+        else:
+            campos_perfil[k] = str(v)[:600]
+
+    fila = db.guardar_atributos(player_id=pid, **campos_perfil) if campos_perfil else None
+
+    # Nota histórica: lo que el jugador lee en "Mi Ficha" y lo que ve el coach
+    # en "Observaciones". La puntuación que se guarda aquí son los 3 de
+    # siempre (recién recalculados) para no romper las pantallas que todavía
+    # muestran ese resumen (no hay familia táctica en el modelo nuevo).
+    puntuaciones = {k: fila[k] for k in ('tecnica', 'fisico', 'mental')
+                    if fila and fila.get(k) is not None}
 
     db.insert('fut_evaluations', {
         'player_id': pid,
@@ -376,12 +400,21 @@ def api_evaluacion():
         'creado': ahora(),
     })
 
-    if puntuaciones:
-        puntuaciones['player_id'] = pid
-        puntuaciones['actualizado'] = ahora()
-        db.upsert('fut_attributes', puntuaciones, 'atributos', on_conflict='player_id')
-
     return jsonify({'ok': True, 'redirect': url_for('futbol.c_jugador', pid=pid)})
+
+
+@bp.route('/api/equipo/recalcular', methods=['POST'])
+@api
+def api_equipo_recalcular():
+    """Botón «⟳ Recalcular evolución del equipo» de la pantalla Equipo."""
+    if not es_coach():
+        return jsonify({'error': 'Solo el entrenador puede recalcular la evolución.'}), 403
+    tocados = db.recalcular_evolucion_equipo(current_user.id)
+    if tocados == 0:
+        return jsonify({'ok': True, 'tocados': 0,
+                        'mensaje': 'Nadie tiene Perfil Dinámico todavía: evalúa a un jugador primero.'})
+    return jsonify({'ok': True, 'tocados': tocados,
+                    'mensaje': f'Evolución recalculada: {tocados} jugador{"" if tocados == 1 else "es"}.'})
 
 
 # ═══════════════════════ PARTIDOS ═══════════════════════

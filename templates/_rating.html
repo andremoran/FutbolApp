@@ -1,0 +1,28 @@
+{# _rating.html — selector 1-10 (AddManualPlayerScreen.tsx › RatingStat).
+
+   Uso: {% from '_rating.html' import rating %}
+        {{ rating('velocidad', 'Velocidad', jugador.velocidad) }}
+
+   El valor elegido queda en un <input type="hidden" data-campo="…">; para
+   leer todos los de un formulario, en JS: PF.leerRatings(formEl). El pintado
+   de colores (5 tramos, igual que ratingColor() nativo) lo hace PF.ratings()
+   en profoot.js — no hay nada que enganchar a mano. #}
+{% macro rating(campo, etiqueta, valor=5) %}
+<div class="pf-rating" data-rating data-value="{{ valor }}">
+  <div class="pf-rating__row">
+    <span class="pf-rating__label">{{ etiqueta }}</span>
+    <span class="pf-rating__badge" data-rating-badge>
+      <span data-rating-n>{{ valor }}</span><small>/10</small>
+    </span>
+  </div>
+  <div class="pf-rating__btns" role="group" aria-label="{{ etiqueta }}">
+    {% for n in range(1, 11) %}
+    <button type="button" class="pf-rating__btn" data-rating-btn="{{ n }}"
+            aria-label="{{ etiqueta }} {{ n }} de 10"
+            aria-pressed="{{ 'true' if n == valor else 'false' }}">{{ n }}</button>
+    {% endfor %}
+  </div>
+  <div class="pf-rating__hint" data-rating-hint></div>
+  <input type="hidden" data-rating-input data-campo="{{ campo }}" value="{{ valor }}">
+</div>
+{% endmacro %}

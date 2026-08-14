@@ -714,3 +714,51 @@ img, svg { max-width: 100%; }
   white-space: nowrap; text-decoration: none;
 }
 .pf-seg.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+/* ─── SELECTOR 1-10 (AddManualPlayerScreen.tsx › RatingStat) ───────────── */
+/* Usado en "Nuevo Jugador" y "Evaluar": una fila de 10 botones cuadrados,
+   el elegido en color, con una insignia N/10 a la derecha del título. Los
+   colores de los 5 tramos (ratingColor nativo) se pintan por JS inline —
+   igual que ya hace c_evaluar.html con sus sliders — para no tener que
+   duplicar 10 reglas de color por umbral aquí. */
+.pf-rating { padding: 14px 0; border-top: 1px solid var(--border-soft); }
+.pf-rating:first-of-type { padding-top: 2px; border-top: none; }
+.pf-rating__row {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 9px; gap: 8px;
+}
+.pf-rating__label { font-size: 13.5px; font-weight: 700; color: var(--text); }
+.pf-rating__badge {
+  display: inline-flex; align-items: baseline; gap: 2px; flex: none;
+  padding: 3px 10px; border-radius: 100px; color: #fff;
+  font-size: 13px; font-weight: 800; transition: background .12s;
+}
+.pf-rating__badge small { font-size: 10px; font-weight: 700; opacity: 0.85; }
+.pf-rating__btns { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; }
+.pf-rating__btn {
+  aspect-ratio: 1; min-height: 26px; border-radius: 8px;
+  border: 1.5px solid var(--border); background: #fff;
+  font-family: inherit; font-size: 12px; font-weight: 700; color: var(--text-sec);
+  display: flex; align-items: center; justify-content: center;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.pf-rating__btn[aria-pressed="true"] { color: #fff; border-color: transparent; }
+.pf-rating__hint {
+  font-size: 11.5px; font-weight: 700; margin-top: 7px; text-align: right;
+  transition: color .12s;
+}
+
+/* ─── SELECTOR Bajo/Medio/Alto (riesgo de sobrecarga) ─────────────────── */
+.pf-riesgo { display: flex; gap: 8px; }
+.pf-riesgo__btn {
+  flex: 1; padding: 10px; border-radius: var(--r-lg);
+  border: 1.5px solid var(--border); background: #fff;
+  font-size: 13px; font-weight: 700; color: var(--text-sec); text-align: center;
+}
+.pf-riesgo__btn[aria-pressed="true"] { color: #fff; border-color: transparent; }
+.pf-riesgo__btn[aria-pressed="true"][data-riesgo="bajo"]  { background: var(--success); }
+.pf-riesgo__btn[aria-pressed="true"][data-riesgo="medio"] { background: var(--warning); }
+.pf-riesgo__btn[aria-pressed="true"][data-riesgo="alto"]  { background: var(--danger); }
+
+/* ─── Rejilla 2×2 (Datos Competitivos) ─────────────────────────────────── */
+.pf-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }

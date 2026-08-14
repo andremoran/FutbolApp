@@ -20,7 +20,51 @@
 --  Las columnas nuevas nacen en NULL a propósito: NULL significa «no evaluado
 --  todavía», que no es lo mismo que 50. La app ya trata el hueco como 50 al
 --  mostrarlo, pero guardar 50 aquí sería inventarse una evaluación.
+--
+--  También un jugador SIN CUENTA (fut_manual_players) tiene Perfil Dinámico:
+--  la pantalla de Equipo y el alta de «Nuevo Jugador» son justo sobre ellos.
+--  `fut_attributes` nació con `player_id` como clave primaria — eso solo
+--  admite jugadores con cuenta. La sección 0 lo arregla, con el mismo patrón
+--  que ya usan `fut_eval_results` y `fut_attendance` (columna
+--  `manual_player_id` en paralelo, sin exigir que `player_id` esté relleno).
 -- ============================================================================
+
+-- ─── 0. `fut_attributes` también para jugadores sin cuenta ───────────────────
+--  `player_id` deja de ser la clave primaria (un jugador manual no tiene) y
+--  pasa a ser una columna más, nullable, con `id` propio como clave. Se
+--  mantiene como mucho una ficha por jugador con un índice único parcial en
+--  vez de la vieja restricción PRIMARY KEY.
+alter table public.fut_attributes add column if not exists id uuid default gen_random_uuid();
+update public.fut_attributes set id = gen_random_uuid() where id is null;
+alter table public.fut_attributes alter column id set not null;
+
+do $$
+begin
+  if exists (select 1 from pg_constraint where conname = 'fut_attributes_pkey') then
+    alter table public.fut_attributes drop constraint fut_attributes_pkey;
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'fut_attributes_pkey_id') then
+    alter table public.fut_attributes add constraint fut_attributes_pkey_id primary key (id);
+  end if;
+end $$;
+
+alter table public.fut_attributes alter column player_id drop not null;
+alter table public.fut_attributes add column if not exists manual_player_id uuid;  -- jugador sin cuenta
+
+create unique index if not exists fut_attributes_player_uidx
+  on public.fut_attributes (player_id) where player_id is not null;
+create unique index if not exists fut_attributes_manual_uidx
+  on public.fut_attributes (manual_player_id) where manual_player_id is not null;
+
+-- ─── 0b. Estadísticas competitivas de jugadores sin cuenta ───────────────────
+--  Para un jugador con cuenta, goles/asistencias salen de fut_match_stats (ver
+--  futbol/coach.py:c_jugador). Uno sin cuenta puede no tener partidos cargados
+--  todavía, así que el alta permite sembrar sus cifras de la temporada a mano.
+alter table public.fut_manual_players add column if not exists goles              int;
+alter table public.fut_manual_players add column if not exists asistencias        int;
+alter table public.fut_manual_players add column if not exists minutos_jugados    int;
+alter table public.fut_manual_players add column if not exists jugadas_clave      int;
+alter table public.fut_manual_players add column if not exists valoracion_promedio smallint;
 
 -- ─── 1. Los 18 atributos ─────────────────────────────────────────────────────
 -- Técnicos (7)
@@ -49,7 +93,8 @@ alter table public.fut_attributes add column if not exists mentalidad     smalli
 
 -- ─── 2. Overall y potencial ──────────────────────────────────────────────────
 --  `overall` es la media de los dieciocho: lo que se ve en el círculo naranja
---  de cada tarjeta. `potencial` es el techo estimado del jugador (el POT).
+--  de cada tarjeta. `potencial` es el techo estimado del jugador (el POT),
+--  que pone el entrenador — no se calcula solo.
 alter table public.fut_attributes add column if not exists overall    smallint;
 alter table public.fut_attributes add column if not exists potencial  smallint;
 
@@ -60,6 +105,7 @@ alter table public.fut_attributes add column if not exists fatiga             sm
 alter table public.fut_attributes add column if not exists riesgo_sobrecarga  text;
 alter table public.fut_attributes add column if not exists fortalezas         text;
 alter table public.fut_attributes add column if not exists debilidades        text;
+alter table public.fut_attributes add column if not exists evolucion_tecnica  text;
 alter table public.fut_attributes add column if not exists lesiones_historial text;
 alter table public.fut_attributes add column if not exists posicion_secundaria text;
 
@@ -79,39 +125,51 @@ end $$;
 -- ─── 4. Histórico semanal ────────────────────────────────────────────────────
 --  Sin esto no hay «cambio semanal» ni flechas de subiendo/bajando: harían
 --  falta dos fotos del mismo jugador en momentos distintos y solo hay una.
---  Una fila por jugador y semana.
+--  Una fila por jugador y semana — con o sin cuenta, igual que fut_attributes.
 create table if not exists public.fut_attribute_history (
-  id          uuid primary key default gen_random_uuid(),
-  player_id   uuid not null references public.usuarios(id) on delete cascade,
-  semana      date not null,               -- lunes de la semana medida
-  atributos   jsonb not null default '{}', -- foto de los 18 en ese momento
-  overall     smallint,
-  origen      text default 'manual',       -- 'manual' | 'prueba' | 'ia'
-  creado      timestamptz not null default now(),
-  unique (player_id, semana)
+  id                uuid primary key default gen_random_uuid(),
+  player_id         uuid references public.usuarios(id) on delete cascade,
+  manual_player_id  uuid,                      -- jugador sin cuenta
+  semana            date not null,             -- lunes de la semana medida
+  atributos         jsonb not null default '{}', -- foto de los 18 en ese momento
+  overall           smallint,
+  origen            text default 'manual',     -- 'manual' | 'prueba' | 'ia'
+  creado            timestamptz not null default now()
 );
+
+create unique index if not exists fut_attribute_history_player_uidx
+  on public.fut_attribute_history (player_id, semana) where player_id is not null;
+create unique index if not exists fut_attribute_history_manual_uidx
+  on public.fut_attribute_history (manual_player_id, semana) where manual_player_id is not null;
 
 create index if not exists fut_attribute_history_jugador
   on public.fut_attribute_history (player_id, semana desc);
+create index if not exists fut_attribute_history_manual
+  on public.fut_attribute_history (manual_player_id, semana desc);
 
 -- ─── 5. Alertas del jugador ──────────────────────────────────────────────────
 --  «Motivación reducida», «2 jugadores con alertas». Se guardan en vez de
 --  recalcularse al vuelo para poder decir desde cuándo pasa y no repetir el
 --  mismo aviso cada vez que se abre la pantalla.
 create table if not exists public.fut_player_alerts (
-  id          uuid primary key default gen_random_uuid(),
-  player_id   uuid not null references public.usuarios(id) on delete cascade,
-  coach_id    uuid not null references public.usuarios(id) on delete cascade,
-  tipo        text not null,               -- 'motivacion' | 'fatiga' | 'caida' | ...
-  severidad   text not null default 'aviso', -- 'aviso' | 'grave'
-  mensaje     text not null,
-  activa      boolean not null default true,
-  creado      timestamptz not null default now(),
-  resuelto    timestamptz
+  id                uuid primary key default gen_random_uuid(),
+  player_id         uuid references public.usuarios(id) on delete cascade,
+  manual_player_id  uuid,                      -- jugador sin cuenta
+  coach_id          uuid not null references public.usuarios(id) on delete cascade,
+  tipo              text not null,             -- 'motivacion' | 'fatiga' | 'caida' | ...
+  severidad         text not null default 'aviso', -- 'aviso' | 'grave'
+  mensaje           text not null,
+  activa            boolean not null default true,
+  creado            timestamptz not null default now(),
+  resuelto          timestamptz
 );
 
 create index if not exists fut_player_alerts_activas
   on public.fut_player_alerts (coach_id, activa);
+create index if not exists fut_player_alerts_jugador
+  on public.fut_player_alerts (player_id, activa);
+create index if not exists fut_player_alerts_manual
+  on public.fut_player_alerts (manual_player_id, activa);
 
 -- ─── 6. Seguridad ────────────────────────────────────────────────────────────
 --  RLS activado sin políticas públicas, igual que el resto del esquema: solo

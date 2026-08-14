@@ -1,13 +1,57 @@
 {% extends '_shell.html' %}
 {% block title %}Editar equipo · ProFoot{% endblock %}
 
+{# Lo que en la app abre el botón de los deslizadores de «Mi equipo»:
+   components/TeamLevelConfigModal.tsx (nivel competitivo + categoría de edad)
+   junto a los datos del equipo. Aquí van en una pantalla en vez de un modal
+   porque en la web se llega por enlace, no por hoja emergente. #}
+
 {% block hero_back %}
-<a class="pf-hero__btn" href="{{ url_for('futbol.c_inicio') }}" aria-label="Volver">
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_equipo') }}" aria-label="Volver">
   <i data-ico="arrow-left" class="pf-ico--sm"></i>
 </a>
 {% endblock %}
 {% block hero_label %}<div class="pf-hero__label">Configuración</div>{% endblock %}
 {% block hero_title %}Mi equipo{% endblock %}
+
+{% block head %}
+<style>
+  .nv-intro { font-size: 12px; color: var(--text-sec); line-height: 17px; margin: 4px 0 16px; }
+  .nv-sec {
+    font-size: 10px; font-weight: 800; color: var(--text-sec);
+    letter-spacing: 1px; margin: 0 0 8px;
+  }
+  .nv-opt {
+    display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+    padding: 11px 12px; margin-bottom: 6px;
+    border: 1px solid var(--border); border-radius: 10px; background: #fff;
+  }
+  .nv-opt[aria-pressed="true"] { background: var(--primary-faint); border-color: var(--primary); }
+  .nv-opt__l { font-size: 13px; font-weight: 700; color: var(--text); }
+  .nv-opt[aria-pressed="true"] .nv-opt__l { color: var(--primary); }
+  .nv-opt__d { font-size: 11px; color: var(--text-sec); margin-top: 2px; }
+  .nv-opt__check { color: var(--primary); display: none; flex: none; }
+  .nv-opt[aria-pressed="true"] .nv-opt__check { display: flex; }
+
+  .nv-edades { display: flex; flex-wrap: wrap; gap: 6px; }
+  .nv-edad {
+    padding: 7px 11px; border-radius: 16px;
+    border: 1px solid var(--border); background: #fff;
+    font: inherit; font-size: 12px; font-weight: 600; color: #475569;
+  }
+  .nv-edad[aria-pressed="true"] {
+    background: var(--primary-soft); border-color: var(--primary);
+    color: var(--primary); font-weight: 800;
+  }
+
+  .nv-preview {
+    display: flex; align-items: center; gap: 6px;
+    background: #ccfbf1; padding: 9px 10px; border-radius: 8px; margin-top: 14px;
+  }
+  .nv-preview i { color: #0f766e; }
+  .nv-preview p { flex: 1; margin: 0; font-size: 12px; color: #134e4a; line-height: 17px; }
+</style>
+{% endblock %}
 
 {% block content %}
 
@@ -21,14 +65,49 @@
            placeholder="Ej. Deportivo Los Andes">
   </div>
 
-  <div class="pf-field">
-    <label class="pf-label" for="eq-cat">Categoría</label>
-    <input class="pf-input" id="eq-cat" type="text" maxlength="60"
-           value="{{ equipo.categoria or '' }}" placeholder="Ej. Sub-17 masculino">
-  </div>
-
   <button class="pf-btn pf-btn--primary pf-btn--block" type="button" id="btn-equipo">
     <i data-ico="save" class="pf-ico--sm"></i> Guardar
+  </button>
+</div>
+
+{# ══════════ NIVEL DEL EQUIPO (TeamLevelConfigModal.tsx) ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Nivel del equipo</h2></div>
+  <p class="nv-intro">
+    Esto ajusta los <strong>baremos</strong> con los que se evalúan los tests.
+    No es lo mismo un Yo-Yo de un sub-15 amateur que el de un jugador del
+    Liverpool — y el sistema lo respeta.
+  </p>
+
+  <p class="nv-sec">NIVEL COMPETITIVO</p>
+  <div id="nv-niveles">
+    {% for clave, etiqueta, descripcion in niveles %}
+    <button class="nv-opt" type="button" data-nivel="{{ clave }}"
+            aria-pressed="{{ 'true' if clave == ctx_nivel else 'false' }}">
+      <span class="pf-grow">
+        <span class="nv-opt__l" style="display:block">{{ etiqueta }}</span>
+        <span class="nv-opt__d" style="display:block">{{ descripcion }}</span>
+      </span>
+      <i data-ico="check" class="pf-ico--sm nv-opt__check"></i>
+    </button>
+    {% endfor %}
+  </div>
+
+  <p class="nv-sec" style="margin-top:16px">CATEGORÍA DE EDAD</p>
+  <div class="nv-edades" id="nv-edades">
+    {% for clave, etiqueta in categorias %}
+    <button class="nv-edad" type="button" data-edad="{{ clave }}"
+            aria-pressed="{{ 'true' if clave == ctx_edad else 'false' }}">{{ etiqueta }}</button>
+    {% endfor %}
+  </div>
+
+  <div class="nv-preview">
+    <i data-ico="info" class="pf-ico--xs"></i>
+    <p>Los tests se compararán contra el baremo de <strong id="nv-resumen">—</strong>.</p>
+  </div>
+
+  <button class="pf-btn pf-btn--primary pf-btn--block pf-mt-16" type="button" id="btn-nivel">
+    <i data-ico="check" class="pf-ico--sm"></i> Guardar nivel
   </button>
 </div>
 
@@ -42,6 +121,7 @@
   </p>
 </div>
 
+<div style="height:24px"></div>
 {% endblock %}
 
 {% block scripts %}
@@ -50,17 +130,58 @@ document.getElementById('btn-equipo').addEventListener('click', function () {
   var nombre = document.getElementById('eq-nombre').value.trim();
   if (!nombre) { document.getElementById('eq-nombre').focus(); return; }
 
-  PF.api('{{ url_for("futbol.api_equipo_guardar") }}', {
-    nombre: nombre,
-    categoria: document.getElementById('eq-cat').value.trim()
-  })
-    .then(function () {
-      PF.toast('Equipo guardado');
-      setTimeout(function () {
-        window.location.href = '{{ url_for("futbol.c_inicio") }}';
-      }, 700);
-    })
+  PF.api('{{ url_for("futbol.api_equipo_guardar") }}', { nombre: nombre })
+    .then(function () { PF.toast('Equipo guardado'); })
     .catch(function (e) { PF.toast(e.message, 'error'); });
 });
+
+/* ─── Nivel del equipo ─────────────────────────────────────────────────── */
+(function () {
+  var niveles = document.querySelectorAll('[data-nivel]');
+  var edades = document.querySelectorAll('[data-edad]');
+  var resumen = document.getElementById('nv-resumen');
+
+  function elegido(lista) {
+    var sel = null;
+    lista.forEach(function (b) {
+      if (b.getAttribute('aria-pressed') === 'true') sel = b;
+    });
+    return sel;
+  }
+
+  // El recuadro de abajo dice, en cristiano, contra qué se va a comparar.
+  function pintarResumen() {
+    var n = elegido(niveles), e = elegido(edades);
+    var etiquetaNivel = n ? n.querySelector('.nv-opt__l').textContent.trim() : '—';
+    var etiquetaEdad = e ? e.textContent.trim() : '—';
+    resumen.textContent = etiquetaEdad + ' · ' + etiquetaNivel;
+  }
+
+  function conectar(lista) {
+    lista.forEach(function (b) {
+      b.addEventListener('click', function () {
+        lista.forEach(function (o) {
+          o.setAttribute('aria-pressed', o === b ? 'true' : 'false');
+        });
+        pintarResumen();
+      });
+    });
+  }
+  conectar(niveles);
+  conectar(edades);
+  pintarResumen();
+
+  document.getElementById('btn-nivel').addEventListener('click', function () {
+    var btn = this;
+    var n = elegido(niveles), e = elegido(edades);
+    btn.disabled = true;
+    PF.api('{{ url_for("futbol.api_eval_contexto") }}', {
+      nivel: n ? n.dataset.nivel : 'general',
+      categoria_edad: e ? e.dataset.edad : 'general'
+    })
+      .then(function (r) { PF.toast(r.mensaje, 'success'); btn.disabled = false; })
+      .catch(function (err) { PF.toast(err.message, 'error'); btn.disabled = false; });
+  });
+})();
 </script>
 {% endblock %}

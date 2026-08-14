@@ -1,9 +1,11 @@
 {% extends '_shell.html' %}
+{% from '_rating.html' import rating %}
 {% block title %}Jugadores sin cuenta · ProFoot{% endblock %}
 
-{# Un chico de once años no tiene correo. Se apunta a mano, se le evalúa y se
-   le pasa lista igual; si algún día se registra, se le enchufa la ficha con
-   todo el histórico. #}
+{# Un chico de once años no tiene correo. Se apunta a mano, con su Perfil
+   Dinámico completo (AddManualPlayerScreen.tsx), se le evalúa y se le pasa
+   lista igual; si algún día se registra, se le enchufa la ficha con todo el
+   histórico. #}
 
 {% block hero_back %}
 <a class="pf-hero__btn" href="{{ url_for('futbol.c_equipo') }}" aria-label="Volver">
@@ -11,7 +13,7 @@
 </a>
 {% endblock %}
 {% block hero_label %}<div class="pf-hero__label">Plantilla</div>{% endblock %}
-{% block hero_title %}Sin cuenta{% endblock %}
+{% block hero_title %}Nuevo Jugador{% endblock %}
 {% block hero_subtitle %}
 <div class="pf-hero__subtitle">
   {{ manuales|length }} apuntado{{ '' if manuales|length == 1 else 's' }} a mano
@@ -19,42 +21,79 @@
 </div>
 {% endblock %}
 
+{% block head %}
+<style>
+  .cm-head { display: flex; align-items: center; gap: 10px; margin-bottom: 2px; }
+  .cm-head i { color: var(--primary); }
+  .cm-hint { margin: 0 0 14px; font-size: 12px; color: var(--text-sec); line-height: 1.55; }
+
+  /* Bloque plegable de datos médicos avanzados */
+  .cm-avanzado { margin-top: 16px; border-top: 1px solid var(--border-soft); padding-top: 14px; }
+  .cm-avanzado > summary {
+    display: flex; align-items: center; gap: 9px; cursor: pointer; list-style: none;
+    font-size: 13.5px; font-weight: 700;
+  }
+  .cm-avanzado > summary::-webkit-details-marker { display: none; }
+  .cm-avanzado[open] > summary .pf-item__chev { transform: rotate(180deg); }
+  .cm-opcional {
+    display: inline-block; margin-left: 6px; padding: 2px 7px; border-radius: 100px;
+    background: var(--border-soft); color: var(--text-sec);
+    font-size: 10.5px; font-weight: 700; vertical-align: middle;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 
+{# ══════════ 1. DATOS BÁSICOS ══════════ #}
 <div class="pf-card">
   <div class="pf-card__head">
-    <h2 class="pf-card__title">Apuntar un jugador</h2>
+    <span class="pf-item__icon"><i data-ico="user" class="pf-ico--sm"></i></span>
+    <h2 class="pf-card__title">Datos Básicos</h2>
   </div>
-  <p style="margin:0 0 12px;font-size:12.5px;color:var(--text-sec);line-height:1.6">
-    Para los que no tienen correo o todavía no se han registrado. Cuentan en la
-    plantilla, se les evalúa y entran en la lista de asistencia.
+  <p class="cm-hint">
+    Para los que no tienen correo o todavía no se han registrado. Cuentan en
+    la plantilla, se les evalúa y entran en la lista de asistencia.
   </p>
 
   <div class="pf-field">
-    <label class="pf-label" for="m-nombre">Nombre</label>
+    <label class="pf-label" for="m-nombre">Nombre completo *</label>
     <input class="pf-input" id="m-nombre" maxlength="100" placeholder="Nombre y apellido">
   </div>
 
   <div class="pf-row pf-mt-12" style="gap:10px">
+    <div class="pf-grow">
+      <label class="pf-label" for="m-anio">Año de nacimiento *</label>
+      <input class="pf-input" id="m-anio" type="number" min="1950" max="2025" placeholder="2011">
+    </div>
     <div style="width:88px;flex:none">
       <label class="pf-label" for="m-dorsal">Dorsal</label>
       <input class="pf-input" id="m-dorsal" type="number" min="1" max="99">
     </div>
+  </div>
+  <p class="pf-mt-8" style="margin:0 0 12px;font-size:11.5px;color:var(--text-muted);line-height:1.55">
+    El año de nacimiento importa: es lo que decide con qué baremo se comparan
+    sus evaluaciones.
+  </p>
+
+  <div class="pf-row" style="gap:10px">
     <div class="pf-grow">
-      <label class="pf-label" for="m-posicion">Posición</label>
+      <label class="pf-label" for="m-posicion">Posición Principal *</label>
       <select class="pf-select" id="m-posicion">
         <option value="">—</option>
+        {% for p in posiciones %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="pf-grow">
+      <label class="pf-label" for="m-posicion2">Posición Secundaria</label>
+      <select class="pf-select" id="m-posicion2">
+        <option value="">— (opcional)</option>
         {% for p in posiciones %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
       </select>
     </div>
   </div>
 
   <div class="pf-row pf-mt-12" style="gap:10px">
-    <div class="pf-grow">
-      <label class="pf-label" for="m-anio">Año de nacimiento</label>
-      <input class="pf-input" id="m-anio" type="number" min="1950" max="2025"
-             placeholder="2011">
-    </div>
     <div class="pf-grow">
       <label class="pf-label" for="m-pie">Pie hábil</label>
       <select class="pf-select" id="m-pie">
@@ -64,25 +103,267 @@
         <option value="Ambidiestro">Ambidiestro</option>
       </select>
     </div>
-  </div>
-  <p class="pf-mt-8" style="margin:0;font-size:11.5px;color:var(--text-muted);line-height:1.55">
-    El año de nacimiento importa: es lo que decide con qué baremo se comparan
-    sus evaluaciones.
-  </p>
-
-  <div class="pf-row pf-mt-12" style="gap:10px">
-    <div class="pf-grow">
-      <label class="pf-label" for="m-tutor">Representante</label>
-      <input class="pf-input" id="m-tutor" maxlength="120" placeholder="Nombre del padre o madre">
-    </div>
     <div class="pf-grow">
       <label class="pf-label" for="m-telefono">Teléfono</label>
       <input class="pf-input" id="m-telefono" maxlength="30" inputmode="tel">
     </div>
   </div>
 
-  <button class="pf-btn pf-btn--primary pf-btn--block pf-mt-16" type="button" id="btn-crear">
-    <i data-ico="user-plus" class="pf-ico--sm"></i> Apuntar
+  <div class="pf-field pf-mt-12">
+    <label class="pf-label" for="m-tutor">Representante</label>
+    <input class="pf-input" id="m-tutor" maxlength="120" placeholder="Nombre del padre o madre">
+  </div>
+</div>
+
+{# ══════════ 2. DATOS TÉCNICOS ══════════ #}
+<div class="pf-card">
+  <div class="cm-head">
+    <span class="pf-item__icon"><i data-ico="target" class="pf-ico--sm"></i></span>
+    <h2 class="pf-card__title">Datos Técnicos</h2>
+  </div>
+  {{ rating('pase', 'Pase') }}
+  {{ rating('control', 'Control') }}
+  {{ rating('regate', 'Regate') }}
+  {{ rating('tiro', 'Tiro') }}
+  {{ rating('definicion', 'Definición') }}
+  {{ rating('centros', 'Centros') }}
+  {{ rating('vision_juego', 'Visión de juego') }}
+
+  <div class="pf-field pf-mt-12">
+    <label class="pf-label" for="m-fortalezas">Fortalezas específicas</label>
+    <textarea class="pf-textarea" id="m-fortalezas" rows="2" maxlength="600"
+              placeholder="Ej: buen golpeo de balón con ambas piernas"></textarea>
+  </div>
+  <div class="pf-field">
+    <label class="pf-label" for="m-debilidades">Debilidades detectadas</label>
+    <textarea class="pf-textarea" id="m-debilidades" rows="2" maxlength="600"
+              placeholder="Ej: le cuesta el juego aéreo"></textarea>
+  </div>
+  <div class="pf-field">
+    <label class="pf-label" for="m-evoltec">Evolución técnica mensual</label>
+    <textarea class="pf-textarea" id="m-evoltec" rows="2" maxlength="600"
+              placeholder="Ej: mejoró notablemente el pase largo este mes"></textarea>
+  </div>
+</div>
+
+{# ══════════ 3. DATOS FÍSICOS ══════════ #}
+<div class="pf-card">
+  <div class="cm-head">
+    <span class="pf-item__icon"><i data-ico="activity" class="pf-ico--sm"></i></span>
+    <h2 class="pf-card__title">Datos Físicos</h2>
+  </div>
+  {{ rating('velocidad', 'Velocidad') }}
+  {{ rating('resistencia', 'Resistencia') }}
+  {{ rating('fuerza', 'Fuerza') }}
+  {{ rating('agilidad', 'Agilidad') }}
+  {{ rating('aceleracion', 'Aceleración') }}
+  {{ rating('fatiga', 'Nivel de Fatiga Actual', 3) }}
+
+  <div class="pf-field pf-mt-12">
+    <label class="pf-label" for="m-lesiones">Historial de lesiones</label>
+    <textarea class="pf-textarea" id="m-lesiones" rows="2" maxlength="600"
+              placeholder="Ej: esguince de tobillo leve en marzo, ya recuperado"></textarea>
+  </div>
+
+  <div class="pf-field">
+    <label class="pf-label">Riesgo de Sobrecarga</label>
+    <div class="pf-riesgo" role="group" aria-label="Riesgo de sobrecarga" id="m-riesgo">
+      {% for r in ['bajo', 'medio', 'alto'] %}
+      <button type="button" class="pf-riesgo__btn" data-riesgo="{{ r }}"
+              aria-pressed="{{ 'true' if r == 'bajo' else 'false' }}">{{ r|capitalize }}</button>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+{# ══════════ 4. DATOS MENTALES ══════════ #}
+<div class="pf-card">
+  <div class="cm-head">
+    <span class="pf-item__icon"><i data-ico="heart" class="pf-ico--sm"></i></span>
+    <h2 class="pf-card__title">Datos Mentales</h2>
+  </div>
+  {{ rating('confianza', 'Confianza') }}
+  {{ rating('mentalidad', 'Mentalidad / Motivación') }}
+  {{ rating('concentracion', 'Concentración') }}
+  {{ rating('liderazgo', 'Liderazgo') }}
+  {{ rating('disciplina', 'Disciplina') }}
+  {{ rating('trabajo_equipo', 'Trabajo en equipo') }}
+</div>
+
+{# ══════════ 5. DATOS COMPETITIVOS ══════════ #}
+<div class="pf-card">
+  <div class="cm-head">
+    <span class="pf-item__icon"><i data-ico="bar-chart-2" class="pf-ico--sm"></i></span>
+    <h2 class="pf-card__title">Datos Competitivos</h2>
+  </div>
+  <div class="pf-grid2">
+    <div class="pf-field">
+      <label class="pf-label" for="m-goles">Goles</label>
+      <input class="pf-input" id="m-goles" type="number" min="0" value="0">
+    </div>
+    <div class="pf-field">
+      <label class="pf-label" for="m-asistencias">Asistencias</label>
+      <input class="pf-input" id="m-asistencias" type="number" min="0" value="0">
+    </div>
+    <div class="pf-field">
+      <label class="pf-label" for="m-minutos">Minutos</label>
+      <input class="pf-input" id="m-minutos" type="number" min="0" value="0">
+    </div>
+    <div class="pf-field">
+      <label class="pf-label" for="m-jugadas">Jugadas clave</label>
+      <input class="pf-input" id="m-jugadas" type="number" min="0" value="0">
+    </div>
+  </div>
+  {{ rating('valoracion', 'Valoración promedio') }}
+</div>
+
+{# ══════════ 6. FICHA MÉDICA ══════════ #}
+{# Los básicos son los que un club pide siempre y los que hacen falta a pie de
+   campo. Los avanzados (aptitud, certificado, cribado cardiovascular del PCMA
+   de la FIFA) van plegados: a un entrenador de formación no se le puede pedir
+   que los rellene, pero un club con médico los quiere. #}
+<div class="pf-card">
+  <div class="cm-head">
+    <span class="pf-item__icon"><i data-ico="heart" class="pf-ico--sm"></i></span>
+    <h2 class="pf-card__title">Ficha Médica</h2>
+  </div>
+  <p class="cm-hint">
+    Lo mínimo para que, si pasa algo en un entrenamiento, se sepa a quién
+    llamar y qué no darle.
+  </p>
+
+  <div class="pf-row" style="gap:10px">
+    <div style="width:130px;flex:none">
+      <label class="pf-label" for="m-sangre">Tipo de sangre</label>
+      <select class="pf-select" id="m-sangre">
+        <option value="">—</option>
+        {% for g in ['A+','A-','B+','B-','AB+','AB-','O+','O-'] %}
+        <option value="{{ g }}">{{ g }}</option>
+        {% endfor %}
+        <option value="No lo sé">No lo sé</option>
+      </select>
+    </div>
+    <div class="pf-grow">
+      <label class="pf-label" for="m-seguro">Seguro médico</label>
+      <input class="pf-input" id="m-seguro" maxlength="120" placeholder="Prestadora o número de póliza">
+    </div>
+  </div>
+
+  <div class="pf-field pf-mt-12">
+    <label class="pf-label" for="m-alergias">Alergias</label>
+    <textarea class="pf-textarea" id="m-alergias" rows="2" maxlength="600"
+              placeholder="Medicamentos, alimentos, picaduras… Escribe «ninguna» si no tiene."></textarea>
+  </div>
+
+  <div class="pf-field">
+    <label class="pf-label" for="m-condiciones">Condiciones médicas</label>
+    <textarea class="pf-textarea" id="m-condiciones" rows="2" maxlength="800"
+              placeholder="Asma, diabetes, epilepsia, cardiopatía…"></textarea>
+  </div>
+
+  <div class="pf-field">
+    <label class="pf-label" for="m-medicacion">Medicación habitual</label>
+    <textarea class="pf-textarea" id="m-medicacion" rows="2" maxlength="600"
+              placeholder="Qué toma, cuánto y cada cuánto"></textarea>
+  </div>
+
+  <label class="pf-label" style="margin-top:4px">Contacto de emergencia</label>
+  <div class="pf-row" style="gap:10px">
+    <div class="pf-grow">
+      <input class="pf-input" id="m-emerg-nombre" maxlength="120" placeholder="Nombre">
+    </div>
+    <div style="width:118px;flex:none">
+      <input class="pf-input" id="m-emerg-parentesco" maxlength="60" placeholder="Parentesco">
+    </div>
+  </div>
+  <div class="pf-field pf-mt-8">
+    <input class="pf-input" id="m-emerg-tel" maxlength="30" inputmode="tel"
+           placeholder="Teléfono de emergencia">
+  </div>
+
+  {# ── Avanzados, plegados ── #}
+  <details class="cm-avanzado">
+    <summary>
+      <span class="pf-grow">Datos médicos avanzados <span class="cm-opcional">opcional</span></span>
+      <i data-ico="chevron-down" class="pf-ico--sm pf-item__chev"></i>
+    </summary>
+
+    <p class="cm-hint" style="margin-top:12px">
+      Lo que rellena un club con cuerpo médico: el reconocimiento y el cribado
+      cardiovascular del PCMA de la FIFA.
+    </p>
+
+    <div class="pf-row" style="gap:10px">
+      <div class="pf-grow">
+        <label class="pf-label" for="m-estatura">Estatura (cm)</label>
+        <input class="pf-input" id="m-estatura" type="number" min="80" max="230" step="0.5">
+      </div>
+      <div class="pf-grow">
+        <label class="pf-label" for="m-peso">Peso (kg)</label>
+        <input class="pf-input" id="m-peso" type="number" min="20" max="150" step="0.1">
+      </div>
+    </div>
+
+    <div class="pf-field pf-mt-12">
+      <label class="pf-label">Apto para competir</label>
+      <div class="pf-riesgo" role="group" aria-label="Aptitud deportiva" id="m-apto">
+        {% for clave, etiqueta, _color in aptitudes %}
+        <button type="button" class="pf-riesgo__btn" data-apto="{{ clave }}"
+                aria-pressed="false">{{ etiqueta }}</button>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="pf-row" style="gap:10px">
+      <div class="pf-grow">
+        <label class="pf-label" for="m-chequeo">Último chequeo</label>
+        <input class="pf-input" id="m-chequeo" type="date">
+      </div>
+      <div class="pf-grow">
+        <label class="pf-label" for="m-certificado">Vence certificado</label>
+        <input class="pf-input" id="m-certificado" type="date">
+      </div>
+    </div>
+
+    <div class="pf-field pf-mt-12">
+      <label class="pf-label" for="m-vacunas">Vacunas</label>
+      <input class="pf-input" id="m-vacunas" maxlength="300"
+             placeholder="Ej: tétanos al día (2025)">
+    </div>
+
+    <div class="pf-field">
+      <label class="pf-label" for="m-ant-personales">Antecedentes personales</label>
+      <textarea class="pf-textarea" id="m-ant-personales" rows="2" maxlength="800"
+                placeholder="Desmayos o dolor en el pecho al esforzarse, soplo, asma…"></textarea>
+    </div>
+
+    <div class="pf-field">
+      <label class="pf-label" for="m-ant-familiares">Antecedentes familiares</label>
+      <textarea class="pf-textarea" id="m-ant-familiares" rows="2" maxlength="800"
+                placeholder="Muerte súbita o cardiopatía en un familiar antes de los 50 años"></textarea>
+      <p style="margin:6px 0 0;font-size:11.5px;color:var(--text-muted);line-height:1.55">
+        Es la pregunta que más vidas salva en un campo: obliga a revisar el
+        corazón antes de dejar competir.
+      </p>
+    </div>
+
+    <div class="pf-field">
+      <label class="pf-label" for="m-cirugias">Cirugías previas</label>
+      <textarea class="pf-textarea" id="m-cirugias" rows="2" maxlength="600"
+                placeholder="Qué y cuándo"></textarea>
+    </div>
+
+    <div class="pf-field" style="margin-bottom:0">
+      <label class="pf-label" for="m-observaciones">Observaciones del médico</label>
+      <textarea class="pf-textarea" id="m-observaciones" rows="2" maxlength="800"></textarea>
+    </div>
+  </details>
+</div>
+
+<div style="padding:0 16px 30px;display:flex;gap:10px">
+  <a class="pf-btn pf-btn--secondary" style="flex:1" href="{{ url_for('futbol.c_equipo') }}">Cancelar</a>
+  <button class="pf-btn pf-btn--primary" style="flex:2" type="button" id="btn-crear">
+    <i data-ico="user-plus" class="pf-ico--sm"></i> Guardar Jugador
   </button>
 </div>
 
@@ -147,39 +428,85 @@
 </details>
 {% endif %}
 
-{% if not manuales and not archivados %}
-<div class="pf-card">
-  <div class="pf-empty">
-    <div class="pf-empty__icon">✍️</div>
-    <div class="pf-empty__title">Nadie apuntado a mano</div>
-    <div class="pf-empty__text">
-      Úsalo con las categorías de formación, donde casi nadie tiene correo.
-    </div>
-  </div>
-</div>
-{% endif %}
-
 <div style="height:34px"></div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-document.getElementById('btn-crear').onclick = function () {
-  const boton = this;
-  const v = id => document.getElementById(id).value;
-  boton.disabled = true;
-  PF.api('/api/manual', {
-    nombre: v('m-nombre'), dorsal: v('m-dorsal'), posicion: v('m-posicion'),
-    anio_nacimiento: v('m-anio'), pie_habil: v('m-pie'),
-    tutor: v('m-tutor'), telefono: v('m-telefono'),
-  }).then(j => {
-    PF.toast(j.mensaje, 'success');
-    setTimeout(() => location.reload(), 700);
-  }).catch(e => {
-    PF.toast(e.message, 'error');
-    boton.disabled = false;
-  });
-};
+(function () {
+  // Los dos grupos de botones excluyentes: riesgo de sobrecarga y aptitud.
+  function excluyentes(caja, attr) {
+    if (!caja) return;
+    caja.querySelectorAll('[' + attr + ']').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var yaEstaba = b.getAttribute('aria-pressed') === 'true';
+        caja.querySelectorAll('[' + attr + ']').forEach(function (o) {
+          o.setAttribute('aria-pressed', 'false');
+        });
+        // La aptitud se puede dejar sin responder: volver a tocarla la borra.
+        if (!(yaEstaba && attr === 'data-apto')) b.setAttribute('aria-pressed', 'true');
+      });
+    });
+  }
+  var riesgoBox = document.getElementById('m-riesgo');
+  var aptoBox = document.getElementById('m-apto');
+  excluyentes(riesgoBox, 'data-riesgo');
+  excluyentes(aptoBox, 'data-apto');
+
+  document.getElementById('btn-crear').onclick = function () {
+    var boton = this;
+    var v = id => document.getElementById(id).value;
+    var nombre = v('m-nombre').trim();
+    if (nombre.length < 2) { PF.toast('Escribe el nombre del jugador.', 'error'); return; }
+
+    var riesgo = riesgoBox.querySelector('[aria-pressed="true"]');
+    var apto = aptoBox.querySelector('[aria-pressed="true"]');
+    // PF.leerRatings() trae los 18 atributos + "valoracion" (que no es un
+    // atributo del Perfil Dinámico: va aparte, a fut_manual_players).
+    var ratings = PF.leerRatings();
+    var valoracion = ratings.valoracion;
+    delete ratings.valoracion;
+
+    var datos = Object.assign({
+      nombre: nombre, dorsal: v('m-dorsal'), posicion: v('m-posicion'),
+      posicion_secundaria: v('m-posicion2'),
+      anio_nacimiento: v('m-anio'), pie_habil: v('m-pie'),
+      tutor: v('m-tutor'), telefono: v('m-telefono'),
+      fortalezas: v('m-fortalezas'), debilidades: v('m-debilidades'),
+      evolucion_tecnica: v('m-evoltec'), lesiones_historial: v('m-lesiones'),
+      riesgo_sobrecarga: riesgo ? riesgo.dataset.riesgo : 'bajo',
+      goles: v('m-goles'), asistencias: v('m-asistencias'),
+      minutos_jugados: v('m-minutos'), jugadas_clave: v('m-jugadas'),
+      valoracion_promedio: valoracion,
+
+      // Ficha médica: viaja en el mismo alta y se guarda en fut_medical.
+      medico: {
+        grupo_sanguineo: v('m-sangre'), seguro: v('m-seguro'),
+        alergias: v('m-alergias'), condiciones: v('m-condiciones'),
+        medicacion: v('m-medicacion'),
+        contacto_nombre: v('m-emerg-nombre'),
+        contacto_parentesco: v('m-emerg-parentesco'),
+        contacto_tel: v('m-emerg-tel'),
+        estatura_cm: v('m-estatura'), peso_kg: v('m-peso'),
+        apto: apto ? apto.dataset.apto : '',
+        ultimo_chequeo: v('m-chequeo'), certificado_vence: v('m-certificado'),
+        vacunas: v('m-vacunas'),
+        antecedentes_personales: v('m-ant-personales'),
+        antecedentes_familiares: v('m-ant-familiares'),
+        cirugias: v('m-cirugias'), observaciones: v('m-observaciones'),
+      },
+    }, ratings);
+
+    boton.disabled = true;
+    PF.api('/api/manual', datos).then(function (j) {
+      PF.toast(j.mensaje, 'success');
+      setTimeout(function () { location.reload(); }, 700);
+    }).catch(function (e) {
+      PF.toast(e.message, 'error');
+      boton.disabled = false;
+    });
+  };
+})();
 
 function archivar(mid, nombre) {
   if (!confirm('¿Sacar a ' + nombre + ' de la plantilla?\n\n' +

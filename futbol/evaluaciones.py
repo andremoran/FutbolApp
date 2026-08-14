@@ -401,10 +401,7 @@ def aplicar_a_ficha(coach_id, player_id, t, nivel_absoluto):
                         'antes': antes, 'despues': despues})
 
     if cambios:
-        nuevos['player_id'] = player_id
-        nuevos['actualizado'] = _ahora()
-        db.upsert('fut_attributes', nuevos, 'ficha por prueba',
-                  on_conflict='player_id')
+        db.guardar_familias(player_id, nuevos)
     return cambios
 
 
@@ -715,6 +712,13 @@ def c_eval_jugador(pid):
     for f in filas:
         ultimos.setdefault(f['test_clave'], f)
 
+    ficha = db.ficha_atributos(player_id=None if manual else pid,
+                               manual_player_id=pid if manual else None)
+    # La ficha médica solo la ve el entrenador cuando es un jugador SIN cuenta:
+    # ahí la escribió él con lo que le dio el representante. La del jugador con
+    # cuenta la escribe él y sigue siendo suya (ver futbol/salud.py).
+    medico = db.ficha_medica(manual_player_id=pid) if manual else {}
+
     return render_template('c_eval_jugador.html',
                            tab_activa='equipo', hide_tabbar=True,
                            jugador=jugador or {'id': pid, 'name': manual['nombre'],
@@ -723,6 +727,9 @@ def c_eval_jugador(pid):
                            historial=filas[:40],
                            perfil=list(ultimos.values()),
                            radar=medias_por_categoria(list(ultimos.values())),
+                           ficha=ficha,
+                           medico=medico,
+                           aptitud=db.APTITUD_META.get(medico.get('apto')),
                            es_pro=es_pro)
 
 
@@ -1014,7 +1021,9 @@ def api_eval_contexto():
         return jsonify({'error': 'Categoría de edad no válida.'}), 400
     if nivel not in dict((c, e) for c, e, _ in cat.NIVELES_COMPETITIVOS):
         return jsonify({'error': 'Nivel no válido.'}), 400
-    guardar_contexto(current_user.id, edad, nivel)
+    # Sobre el EQUIPO, no sobre quien guarda: si lo cambia un asistente tiene
+    # que caer en la ficha del principal, que es la que leen los baremos.
+    guardar_contexto(db.equipo_id(current_user.id), edad, nivel)
     return jsonify({'ok': True,
                     'mensaje': 'Listo. Las próximas evaluaciones se comparan con '
                                'ese baremo.'})

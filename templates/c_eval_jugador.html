@@ -20,6 +20,99 @@
 
 {% block content %}
 
+{# ══════════ PERFIL DINÁMICO (overall/potencial + 3 familias) ══════════ #}
+{# TeamPlayersScreen.tsx: lo mismo que se ve en la tarjeta de Equipo, aquí
+   con el detalle. Funciona igual con o sin cuenta (ficha_atributos). #}
+{% if ficha._tiene_perfil %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Perfil Dinámico</h2>
+    <span class="pf-card__badge">{{ ficha.overall }} OVR · POT {{ ficha.potencial }}</span>
+  </div>
+  <div style="display:flex;gap:10px;margin-top:4px">
+    {% for etiqueta, valor, color in [('TÉC', ficha.media_tecnica, 'var(--primary)'),
+                                       ('FÍS', ficha.media_fisica, '#475569'),
+                                       ('MEN', ficha.media_mental, 'var(--purple)')] %}
+    <div style="flex:1">
+      <div class="pf-row pf-row--between" style="margin-bottom:5px">
+        <span style="font-size:10px;font-weight:800;color:var(--text-muted)">{{ etiqueta }}</span>
+        <span style="font-size:11px;font-weight:800">{{ valor }}</span>
+      </div>
+      <div class="pf-bar"><div class="pf-bar__fill" style="width:{{ valor }}%;background:{{ color }}"></div></div>
+    </div>
+    {% endfor %}
+  </div>
+  {% if not es_manual %}
+  <a class="pf-btn pf-btn--ghost pf-btn--block pf-mt-16"
+     href="{{ url_for('futbol.c_jugador', pid=jugador.id) }}">
+    <i data-ico="user" class="pf-ico--sm"></i> Ver el detalle de los 18 atributos
+  </a>
+  {% endif %}
+</div>
+{% endif %}
+
+{# ══════════ FICHA MÉDICA ══════════ #}
+{# Solo para jugadores sin cuenta: la escribió el entrenador con lo que le dio
+   el representante. La del jugador con cuenta es suya y no se enseña aquí. #}
+{% if medico %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Ficha médica</h2>
+    {% if aptitud %}
+    <span class="pf-pill" style="background:{{ aptitud.color }}1a;color:{{ aptitud.color }}">
+      {{ aptitud.etiqueta }}
+    </span>
+    {% endif %}
+  </div>
+
+  {% set alertas = [('Alergias', medico.alergias), ('Condiciones', medico.condiciones)] %}
+  {% for etiqueta, valor in alertas if valor %}
+  <div class="pf-alerta pf-alerta--warn" style="margin-top:10px">
+    <i data-ico="alert-circle" class="pf-ico--xs"></i>
+    <span><strong>{{ etiqueta }}:</strong> {{ valor }}</span>
+  </div>
+  {% endfor %}
+
+  {% set datos = [
+      ('Tipo de sangre', medico.grupo_sanguineo),
+      ('Medicación', medico.medicacion),
+      ('Seguro médico', medico.seguro),
+      ('Estatura', (medico.estatura_cm ~ ' cm') if medico.estatura_cm else ''),
+      ('Peso', (medico.peso_kg ~ ' kg') if medico.peso_kg else ''),
+      ('Último chequeo', medico.ultimo_chequeo),
+      ('Vence certificado', medico.certificado_vence),
+      ('Vacunas', medico.vacunas),
+      ('Antecedentes personales', medico.antecedentes_personales),
+      ('Antecedentes familiares', medico.antecedentes_familiares),
+      ('Cirugías previas', medico.cirugias),
+      ('Observaciones', medico.observaciones),
+  ] %}
+  {% for etiqueta, valor in datos if valor %}
+  <div class="pf-item">
+    <span class="pf-item__body">
+      <span class="pf-item__sub">{{ etiqueta }}</span>
+      <span class="pf-item__title" style="white-space:normal">{{ valor }}</span>
+    </span>
+  </div>
+  {% endfor %}
+
+  {% if medico.contacto_tel or medico.contacto_nombre %}
+  <a class="pf-item" href="tel:{{ medico.contacto_tel }}">
+    <span class="pf-item__icon" style="background:var(--danger-bg);color:#dc2626">
+      <i data-ico="send" class="pf-ico--sm"></i>
+    </span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">
+        {{ medico.contacto_nombre or 'Contacto de emergencia' }}
+        {%- if medico.contacto_parentesco %} · {{ medico.contacto_parentesco }}{% endif %}
+      </span>
+      <span class="pf-item__sub">{{ medico.contacto_tel or 'Sin teléfono' }}</span>
+    </span>
+  </a>
+  {% endif %}
+</div>
+{% endif %}
+
 {# ══════════ PERFIL POR FAMILIAS ══════════ #}
 {% if radar and es_pro %}
 <div class="pf-card">

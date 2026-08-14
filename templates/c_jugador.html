@@ -107,24 +107,57 @@
   </div>
 </div>
 
-{# ── Atributos ── #}
+{# ── Perfil Dinámico: 18 atributos por familia ── #}
+{# TeamPlayersScreen.tsx: overall/potencial + TÉC/FÍS/MEN, aquí con el detalle
+   de cada uno de los 18 (ficha_atributos, futbol/db.py). #}
 <div class="pf-card">
   <div class="pf-card__head">
-    <h2 class="pf-card__title">Atributos</h2>
-    <span class="pf-card__badge">{{ media }}/100</span>
+    <h2 class="pf-card__title">Perfil Dinámico</h2>
+    {% if ficha._tiene_perfil %}
+    <span class="pf-card__badge">{{ ficha.overall }} OVR · POT {{ ficha.potencial }}</span>
+    {% endif %}
   </div>
-  {% for clave, nombre in [('tecnica','Técnica'), ('fisico','Físico'),
-                           ('tactico','Táctico'), ('mental','Mental')] %}
-    {% set v = atributos[clave] %}
-    <div style="padding:11px 0">
-      <div class="pf-row pf-row--between" style="margin-bottom:7px">
-        <span style="font-size:14px;font-weight:700">{{ nombre }}</span>
-        <span style="font-size:14px;font-weight:800;color:
-          {%- if v >= 70 %}var(--primary){% elif v >= 50 %}var(--warning){% else %}var(--danger){% endif %}">{{ v }}</span>
-      </div>
-      <div class="pf-bar"><div class="pf-bar__fill" style="width:{{ v }}%"></div></div>
+  {% if not ficha._tiene_perfil %}
+  <p style="margin:4px 0 2px;font-size:12.5px;color:var(--text-sec);line-height:1.55">
+    Todavía sin evaluar. Los valores de abajo son el punto de partida neutro
+    (5/10 en todo) — se guardan de verdad recién cuando lo evalúes.
+  </p>
+  {% endif %}
+  {% for familia, media, claves in [
+      ('Técnico', ficha.media_tecnica, [('pase','Pase'), ('control','Control'),
+        ('regate','Regate'), ('tiro','Tiro'), ('definicion','Definición'),
+        ('centros','Centros'), ('vision_juego','Visión de juego')]),
+      ('Físico', ficha.media_fisica, [('velocidad','Velocidad'), ('resistencia','Resistencia'),
+        ('fuerza','Fuerza'), ('agilidad','Agilidad'), ('aceleracion','Aceleración')]),
+      ('Mental', ficha.media_mental, [('liderazgo','Liderazgo'), ('disciplina','Disciplina'),
+        ('concentracion','Concentración'), ('confianza','Confianza'),
+        ('trabajo_equipo','Trabajo en equipo'), ('mentalidad','Mentalidad')]),
+  ] %}
+  <div style="padding:12px 0;border-top:1px solid var(--border-soft)">
+    <div class="pf-row pf-row--between" style="margin-bottom:8px">
+      <span style="font-size:13.5px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--text-sec)">{{ familia }}</span>
+      <span style="font-size:13px;font-weight:800;color:
+        {%- if media >= 70 %}var(--primary){% elif media >= 50 %}var(--warning){% else %}var(--danger){% endif %}">{{ media }}</span>
     </div>
+    <div class="pf-bar" style="margin-bottom:10px"><div class="pf-bar__fill" style="width:{{ media }}%"></div></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px">
+      {% for clave, nombre in claves %}
+      <div class="pf-row pf-row--between">
+        <span style="font-size:12.5px;color:var(--text-sec)">{{ nombre }}</span>
+        <span style="font-size:12.5px;font-weight:700">{{ ficha[clave] }}/10</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
   {% endfor %}
+
+  {% if ficha.fortalezas or ficha.debilidades or ficha.evolucion_tecnica %}
+  <div style="padding-top:12px;border-top:1px solid var(--border-soft)">
+    {% if ficha.fortalezas %}<p style="margin:0 0 8px;font-size:12.5px;line-height:1.55"><b>Fortalezas:</b> {{ ficha.fortalezas }}</p>{% endif %}
+    {% if ficha.debilidades %}<p style="margin:0 0 8px;font-size:12.5px;line-height:1.55"><b>Debilidades:</b> {{ ficha.debilidades }}</p>{% endif %}
+    {% if ficha.evolucion_tecnica %}<p style="margin:0;font-size:12.5px;line-height:1.55"><b>Evolución técnica:</b> {{ ficha.evolucion_tecnica }}</p>{% endif %}
+  </div>
+  {% endif %}
 </div>
 
 {# ── Ficha editable ── #}
@@ -274,7 +307,7 @@
         {{ e._fecha.strftime('%d/%m/%Y') if e._fecha else e.fecha }}
       </span>
       <span class="pf-item__sub">
-        {%- set vals = [e.tecnica, e.fisico, e.tactico, e.mental] | select('number') | list -%}
+        {%- set vals = [e.tecnica, e.fisico, e.mental] | select('number') | list -%}
         {% if vals %}Media {{ (vals | sum / vals | length) | round | int }}/100{% else %}Sin puntuar{% endif %}
       </span>
     </span>
