@@ -73,6 +73,8 @@ ASISTENCIA_META = {c: {'etiqueta': e, 'emoji': m, 'color': col}
 MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio',
          'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
 DIAS_CORTOS = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
+DIAS_LARGOS = ['Lunes', 'Martes', 'Miércoles', 'Jueves',
+               'Viernes', 'Sábado', 'Domingo']
 DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 
 
@@ -376,6 +378,35 @@ def c_calendario():
     sig = date(anio, mes, monthrange(anio, mes)[1]) + timedelta(days=1)
     proximos = [e for e in amplio if not e['_pasado']][:6]
 
+    # ── Vista de semana ──
+    #  La app abre en semana, no en mes: es la unidad con la que se planifica.
+    #  El dia de referencia viaja en `d`; sin el, la semana de hoy.
+    vista = 'mes' if request.args.get('v') == 'mes' else 'semana'
+    ref = db.parse_fecha(request.args.get('d')) or date.today()
+    lunes = ref - timedelta(days=ref.weekday())
+    dias_semana = [lunes + timedelta(days=i) for i in range(7)]
+
+    #  Los eventos de la semana pueden caer fuera del mes que se esta viendo.
+    de_la_semana = decorar(db.eventos_equipo(
+        uid, lunes.isoformat(), (lunes + timedelta(days=6)).isoformat()))
+    por_dia = {}
+    for e in de_la_semana:
+        por_dia.setdefault(str(e.get('fecha'))[:10], []).append(e)
+
+    hoy = date.today()
+    semana = [{
+        'iso': d.isoformat(),
+        'dia': d.day,
+        'inicial': DIAS_CORTOS[i][:1],
+        'nombre': DIAS_LARGOS[i],
+        'hoy': d == hoy,
+        'eventos': sorted(por_dia.get(d.isoformat(), []),
+                          key=lambda e: str(e.get('hora') or '99')),
+    } for i, d in enumerate(dias_semana)]
+
+    etiqueta_semana = (
+        f'{lunes.day} – {dias_semana[6].day} {MESES[dias_semana[6].month - 1]}')
+
     return render_template(
         'c_calendario.html',
         tab_activa='agenda',
@@ -387,6 +418,11 @@ def c_calendario():
         mes_ant={'a': ant.year, 'm': ant.month},
         mes_sig={'a': sig.year, 'm': sig.month},
         es_mes_actual=(anio == date.today().year and mes == date.today().month),
+        vista=vista,
+        semana=semana,
+        etiqueta_semana=etiqueta_semana,
+        semana_ant=(lunes - timedelta(days=7)).isoformat(),
+        semana_sig=(lunes + timedelta(days=7)).isoformat(),
         analisis=analisis_semana(amplio),
         proximos=proximos,
         tipos=TIPOS_EVENTO, tipos_entreno=TIPOS_ENTRENO, intensidades=INTENSIDADES,

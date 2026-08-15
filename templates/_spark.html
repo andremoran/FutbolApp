@@ -1,0 +1,39 @@
+{# ============================================================================
+   _spark.html — La minilínea de tendencia que va dentro de una stat card.
+
+   Port de ui.tsx › <Sparkline>. Mismo cálculo: se normaliza la serie entre su
+   propio mínimo y su máximo, así que la silueta se ve aunque los valores
+   varíen poco. No lleva ejes, ni fechas, ni puntos: eso es _grafica.html, que
+   es la gráfica grande de una pantalla de evolución.
+
+   Se usa así:
+     {% with datos = [3,5,4,8], color = 'var(--primary)' %}
+       {% include '_spark.html' %}
+     {% endwith %}
+
+   `datos`  — lista de números (hacen falta 2 o más; con menos no dibuja nada)
+   `color`  — cualquier color CSS. Se aplica con `currentColor`, de modo que
+              la línea y el área tiñen juntas.
+   `ancho` / `alto` — opcionales (56 × 22 por defecto, como en la app).
+   ============================================================================ #}
+
+{% set _d = datos|default([], true)|list %}
+{% if _d|length >= 2 %}
+  {% set _w = ancho|default(56) %}
+  {% set _h = alto|default(22) %}
+  {% set _min = _d|min %}
+  {% set _max = _d|max %}
+  {# Serie plana: rango 0 partiría la división. Se fuerza a 1 y la línea sale recta. #}
+  {% set _rango = (_max - _min) if (_max - _min) > 0 else 1 %}
+  {% set _paso = _w / (_d|length - 1) %}
+
+  <svg class="pf-spark" width="{{ _w }}" height="{{ _h }}"
+       viewBox="0 0 {{ _w }} {{ _h }}" aria-hidden="true"
+       style="color:{{ color|default('var(--primary)', true) }}">
+    <path class="pf-spark__area" d="M0,{{ _h }}
+      {%- for v in _d %} L{{ (loop.index0 * _paso)|round(1) }},{{ (_h - ((v - _min) / _rango) * _h)|round(1) }}{% endfor %}
+      L{{ _w }},{{ _h }} Z"></path>
+    <polyline class="pf-spark__linea" points="
+      {%- for v in _d %}{{ (loop.index0 * _paso)|round(1) }},{{ (_h - ((v - _min) / _rango) * _h)|round(1) }} {% endfor %}"></polyline>
+  </svg>
+{% endif %}

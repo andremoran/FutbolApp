@@ -266,10 +266,10 @@
 
 <div id="tp-lista">
   {% for j in jugadores %}
-  {% set ficha = url_for('futbol.c_jugador', pid=j.id) if j.tipo == 'registrado'
-                  else url_for('futbol.c_eval_jugador', pid=j.id) %}
-  {% set evaluar = url_for('futbol.c_evaluar', pid=j.id) if j.tipo == 'registrado'
-                    else url_for('futbol.c_eval_jugador', pid=j.id) %}
+  {# «Ver evaluación» abre el Perfil Dinámico (c_evaluar), como en la app.
+     Vale igual para el jugador sin cuenta: esa pantalla ya los admite. #}
+  {% set evaluar = url_for('futbol.c_evaluar', pid=j.id) %}
+  {% set ficha = url_for('futbol.c_jugador', pid=j.id) if j.tipo == 'registrado' else evaluar %}
   {% set color = '#10b981' if j.overall >= 80 else
                  ('#047857' if j.overall >= 65 else
                   ('#d97706' if j.overall >= 50 else

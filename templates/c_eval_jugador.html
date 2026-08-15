@@ -4,8 +4,10 @@
 {# La foto actual del jugador: el ÚLTIMO resultado de cada prueba (no todos,
    que serían cien filas), el perfil por familias y el histórico debajo. #}
 
+{# A Equipo, no history.back(): volver al historial encadenaba un bucle entre
+   esta pantalla y la del Perfil Dinámico. #}
 {% block hero_back %}
-<a class="pf-hero__btn" href="javascript:history.back()" aria-label="Volver">
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_equipo') }}" aria-label="Volver al equipo">
   <i data-ico="arrow-left" class="pf-ico--sm"></i>
 </a>
 {% endblock %}
@@ -42,12 +44,10 @@
     </div>
     {% endfor %}
   </div>
-  {% if not es_manual %}
   <a class="pf-btn pf-btn--ghost pf-btn--block pf-mt-16"
-     href="{{ url_for('futbol.c_jugador', pid=jugador.id) }}">
-    <i data-ico="user" class="pf-ico--sm"></i> Ver el detalle de los 18 atributos
+     href="{{ url_for('futbol.c_evaluar', pid=jugador.id) }}">
+    <i data-ico="trending-up" class="pf-ico--sm"></i> Abrir el Perfil Dinámico
   </a>
-  {% endif %}
 </div>
 {% endif %}
 
@@ -213,6 +213,10 @@
   <a class="pf-btn pf-btn--primary pf-btn--block"
      href="{{ url_for('futbol.c_eval_catalogo') }}">
     <i data-ico="plus" class="pf-ico--sm"></i> Tomarle una prueba
+  </a>
+  <a class="pf-btn pf-btn--secondary pf-btn--block pf-mt-8"
+     href="{{ url_for('futbol.c_evaluar', pid=jugador.id) }}">
+    <i data-ico="trending-up" class="pf-ico--sm"></i> Evaluar (Perfil Dinámico)
   </a>
   {% if not es_manual %}
   <a class="pf-btn pf-btn--ghost pf-btn--block pf-mt-8"

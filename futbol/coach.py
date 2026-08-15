@@ -30,6 +30,24 @@ def solo_entrenador(f):
     return wrapper
 
 
+def _hay_perfil_dinamico(player_ids, manual_ids):
+    """¿Hay alguien del equipo con el Perfil Dinámico ya cargado?
+
+    Vale para marcar «evaluá a un jugador»: un jugador dado de alta con sus
+    18 atributos está evaluado, aunque nunca se le haya tomado una prueba.
+    """
+    for columna, ids in (('player_id', player_ids), ('manual_player_id', manual_ids)):
+        if not ids:
+            continue
+        filas = db.q(
+            lambda c=columna, i=ids: db.sb().table('fut_attributes').select('id')
+            .in_(c, i).not_.is_('overall', 'null').limit(1).execute().data or [],
+            [], 'perfil dinamico')
+        if filas:
+            return True
+    return False
+
+
 # ═══════════════════════ 1. INICIO (dashboard) ═══════════════════════
 @bp.route('/coach')
 @solo_entrenador
@@ -63,8 +81,22 @@ def c_inicio():
     #  Se marcan con datos reales, nunca a mano: igual que SetupChecklist.tsx
     #  de la app original. Basta con saber si existe al menos uno, de ahi el
     #  _limit=1 en vez de traerse la tabla entera para contarla.
-    hay_evaluacion = bool(db.rows('fut_eval_results', 'primeros pasos',
-                                  coach_id=uid, _limit=1))
+    #
+    #  Cuentan los jugadores SIN CUENTA: son jugadores del equipo igual, y con
+    #  la plantilla llena de ellos el paso seguia sin marcarse.
+    manuales = db.rows('fut_manual_players', 'manuales inicio',
+                       coach_id=uid, activo=True) or []
+    n_plantilla = len(jugadores) + len(manuales)
+
+    #  «Evaluado» es cualquiera de las tres formas de evaluar que tiene la app,
+    #  no solo las pruebas fisicas con baremo: tambien la evaluacion de los 18
+    #  atributos (que es la que se hace desde la ficha del jugador) y el alta
+    #  con Perfil Dinamico de un jugador sin cuenta.
+    hay_evaluacion = bool(
+        db.rows('fut_eval_results', 'primeros pasos', coach_id=uid, _limit=1)
+        or db.rows('fut_evaluations', 'primeros pasos', coach_id=uid, _limit=1)
+        or _hay_perfil_dinamico(ids, [m['id'] for m in manuales]))
+
     hay_evento = bool(db.rows('fut_events', 'primeros pasos',
                               coach_id=uid, _limit=1))
 
@@ -109,7 +141,9 @@ def c_inicio():
                            equipo=equipo,
                            codigo=db.codigo_equipo(uid),
                            jugadores=jugadores,
-                           n_jugadores=len(jugadores),
+                           # La cifra «Plantel» y el primer paso cuentan a todos,
+                           # tengan cuenta o no: son la plantilla del equipo.
+                           n_jugadores=n_plantilla,
                            activos=activos,
                            n_partidos=n_partidos,
                            estado=estado,
@@ -301,15 +335,91 @@ def c_jugador(pid):
 @bp.route('/coach/jugador/<pid>/evaluar')
 @solo_entrenador
 def c_evaluar(pid):
-    jugadores = db.jugadores_del_entrenador(db.equipo_id(current_user.id))
-    jugador = next((j for j in jugadores if str(j['id']) == str(pid)), None)
+    uid = db.equipo_id(current_user.id)
+
+    #  Vale para los dos tipos de jugador. Antes solo abría con los que tienen
+    #  cuenta, así que en un equipo de formación —donde casi nadie la tiene—
+    #  esta pantalla era inalcanzable.
+    jugador = next((j for j in db.jugadores_del_entrenador(uid)
+                    if str(j['id']) == str(pid)), None)
+    manual = None
     if not jugador:
-        abort(404)
-    ficha = db.ficha_atributos(player_id=pid)
+        manual = db.one('fut_manual_players', 'manual eval', id=pid, coach_id=uid)
+        if not manual:
+            abort(404)
+        jugador = {'id': pid, 'name': manual.get('nombre')}
+
+    dueno = db.dueno_filtro(player_id=None if manual else pid,
+                            manual_player_id=pid if manual else None)
+    ficha = db.ficha_atributos(**dueno)
+
+    # ── Evolución: la línea del overall y el delta de cada atributo ──
+    #  Las dos salen del histórico semanal. Sin dos fotos no hay comparación,
+    #  así que con una sola semana no se pinta ni gráfica ni deltas.
+    historial_filas = db.rows('fut_attribute_history', 'historial eval',
+                              _order='semana', **dueno) or []
+    historial = [h['overall'] for h in historial_filas
+                 if h.get('overall') is not None][-8:]
+
+    deltas = {}
+    if len(historial_filas) >= 2:
+        previa = historial_filas[-2].get('atributos') or {}
+        for clave in db.ATRIBUTOS_18:
+            antes, ahora = previa.get(clave), ficha.get(clave)
+            if antes is not None and ahora is not None and ahora != antes:
+                deltas[clave] = ahora - antes
+
+    delta_overall = 0
+    if len(historial) >= 2:
+        delta_overall = historial[-1] - historial[-2]
+
+    # ── Stats competitivas ──
+    #  Del que tiene cuenta salen solas de los partidos. El que no la tiene no
+    #  aparece en fut_match_stats, así que se usan las cifras que el entrenador
+    #  cargó al darlo de alta.
+    if manual:
+        stats = {'partidos': '—',
+                 'minutos': manual.get('minutos_jugados') or 0,
+                 'goles': manual.get('goles') or 0,
+                 'asistencias': manual.get('asistencias') or 0,
+                 'rating': manual.get('valoracion_promedio') or '—'}
+        auto = False
+    else:
+        partidos = db.rows('fut_matches', 'partidos eval', coach_id=uid, _limit=100) or []
+        marcas = []
+        if partidos:
+            marcas = db.q(
+                lambda: db.sb().table('fut_match_stats').select('*')
+                .in_('match_id', [m['id'] for m in partidos])
+                .eq('player_id', pid).execute().data or [], [], 'stats jugador')
+        valoraciones = [float(m['valoracion']) for m in marcas if m.get('valoracion')]
+        stats = {
+            'partidos': len(marcas),
+            'minutos': sum(int(m.get('minutos') or 0) for m in marcas),
+            'goles': sum(int(m.get('goles') or 0) for m in marcas),
+            'asistencias': sum(int(m.get('asistencias') or 0) for m in marcas),
+            'rating': round(sum(valoraciones) / len(valoraciones), 1) if valoraciones else '—',
+        }
+        auto = True
+
+    fila = db.fila_atributos(**dueno) or {}
+    perfil = {} if manual else db.perfil_jugador(pid)
+
     return render_template('c_evaluar.html',
                            hide_tabbar=True,
                            jugador=jugador,
+                           es_manual=bool(manual),
+                           stats_auto=auto,
                            ficha=ficha,
+                           posicion=(manual or {}).get('posicion') or perfil.get('posicion'),
+                           deltas=deltas,
+                           delta=delta_overall,
+                           historial=historial,
+                           stats=stats,
+                           # El informe lo escribe la IA (fase 6): hasta que el
+                           # proxy esté desplegado, la tarjeta lo dice y ya.
+                           reporte=None,
+                           actualizado=db.parse_fecha(fila.get('actualizado')),
                            niveles_fatiga=db.NIVELES_FATIGA,
                            fatiga_nivel=db.nivel_de_fatiga(ficha.get('fatiga')))
 

@@ -417,12 +417,19 @@ def fila_atributos(player_id=None, manual_player_id=None):
     return one('fut_attributes', 'fila atributos', **dueno)
 
 
+#  Los 18 atributos van en escala 1-100, igual que en la app
+#  (PlayerEvaluationScreen.tsx: «los 18 atributos son la fuente de verdad,
+#  escala 1-100»). El overall es su media directa, sin convertir nada: por eso
+#  un jugador con casi todo en 50 tiene overall 49 o 50.
+ESCALA_MIN, ESCALA_MAX = 1, 100
+
+
 def calcular_overall(valores):
-    """Media de los 18 (escala 1-10) llevada a 0-100. `None` si no hay ninguno."""
+    """Media de los 18 (escala 1-100). `None` si no hay ninguno."""
     vals = [valores.get(k) for k in ATRIBUTOS_18 if valores.get(k) is not None]
     if not vals:
         return None
-    return max(1, min(100, round(sum(vals) / len(vals) * 10)))
+    return max(ESCALA_MIN, min(ESCALA_MAX, round(sum(vals) / len(vals))))
 
 
 def _media_familia(valores, claves):
@@ -430,7 +437,7 @@ def _media_familia(valores, claves):
     vals = [valores.get(k) for k in claves if valores.get(k) is not None]
     if not vals:
         return None
-    return max(1, min(100, round(sum(vals) / len(vals) * 10)))
+    return max(ESCALA_MIN, min(ESCALA_MAX, round(sum(vals) / len(vals))))
 
 
 def ficha_atributos(player_id=None, manual_player_id=None):
@@ -443,7 +450,7 @@ def ficha_atributos(player_id=None, manual_player_id=None):
     fila = fila_atributos(player_id, manual_player_id) or {}
     tiene_perfil = fila.get('overall') is not None
 
-    ficha = {k: (fila.get(k) if fila.get(k) is not None else 5) for k in ATRIBUTOS_18}
+    ficha = {k: (fila.get(k) if fila.get(k) is not None else 50) for k in ATRIBUTOS_18}
     ficha['overall'] = fila.get('overall') if fila.get('overall') is not None else 50
     ficha['potencial'] = fila.get('potencial') if fila.get('potencial') is not None else ficha['overall']
     ficha['media_tecnica'] = _media_familia(fila, ATRIBUTOS_TECNICOS) or 50

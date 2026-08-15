@@ -767,6 +767,17 @@ img, svg { max-width: 100%; }
 .pf-riesgo__btn[aria-pressed="true"][data-apto="precaucion"] { background: var(--warning); }
 .pf-riesgo__btn[aria-pressed="true"][data-apto="no_apto"]    { background: var(--danger); }
 
+/* ─── MINIGRÁFICA (ui.tsx › Sparkline) ─────────────────────────────────── */
+/* La usa _spark.html. El color se hereda con currentColor, así que la línea y
+   el área se tiñen juntas con solo pasar `color`. */
+.pf-spark { display: block; width: 100%; height: auto; overflow: visible; }
+.pf-spark__area { fill: currentColor; opacity: 0.12; stroke: none; }
+.pf-spark__linea {
+  fill: none; stroke: currentColor; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
 /* Fatiga: aquí «alto» es malo, al revés que en el resto de escalas. */
 .pf-riesgo__btn[aria-pressed="true"][data-fatiga="bajo"]  { background: var(--success); }
 .pf-riesgo__btn[aria-pressed="true"][data-fatiga="medio"] { background: var(--warning); }

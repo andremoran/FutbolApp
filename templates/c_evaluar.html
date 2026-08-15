@@ -1,52 +1,251 @@
 {% extends '_shell.html' %}
-{% from '_rating.html' import rating %}
-{% block title %}Evaluar a {{ jugador.name }} · ProFoot{% endblock %}
+{% block title %}Evaluación de {{ jugador.name }} · ProFoot{% endblock %}
 
-{# screens/PlayerEvaluationScreen.tsx: los 18 atributos del Perfil Dinámico,
-   por familia, más el estado del jugador. Lo que guarda aquí es lo que
-   alimenta el overall/potencial que se ve en Equipo y en su ficha. #}
+{# screens/PlayerEvaluationScreen.tsx — la evaluacion Y el perfil dinamico en
+   una sola pantalla, que es como la trata la app: los 18 atributos (escala
+   1-100) son la fuente de verdad y de ahi salen el overall, el potencial y la
+   evolucion semanal.
 
+   Adaptacion a web: la app abre un modal con botones -5/-1/+1/+5 para editar
+   cada atributo. Aqui la propia barra es el control (un range), que da lo
+   mismo con menos toques y sin modal. #}
+
+{# La flecha vuelve SIEMPRE a Equipo. Antes iba a la pantalla de la que se
+   suponía que venías, y como esa otra usaba history.back() se hacía un bucle:
+   Equipo → Evaluación → atrás → Evaluaciones → atrás → Evaluación… #}
 {% block hero_back %}
-<a class="pf-hero__btn" href="{{ url_for('futbol.c_jugador', pid=jugador.id) }}" aria-label="Volver">
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_equipo') }}" aria-label="Volver al equipo">
   <i data-ico="arrow-left" class="pf-ico--sm"></i>
 </a>
 {% endblock %}
-{% block hero_label %}<div class="pf-hero__label">Evaluación</div>{% endblock %}
-{% block hero_title %}{{ jugador.name }}{% endblock %}
-{% block hero_subtitle %}
-{% if ficha._tiene_perfil %}
-<div class="pf-hero__subtitle">{{ ficha.overall }} OVR actual · POT {{ ficha.potencial }}</div>
-{% endif %}
+{% block hero_label %}<div class="pf-hero__label">Perfil dinámico</div>{% endblock %}
+{% block hero_title %}Evaluación{% endblock %}
+
+{% block head %}
+<style>
+  /* ── Cabecera del jugador (heroCard) ── */
+  .ev-hero__n { font-size: 22px; font-weight: 800; letter-spacing: -0.3px; margin: 0; }
+  .ev-hero__p { font-size: 13px; color: var(--text-sec); margin: 2px 0 0; }
+  .ev-cifras { display: flex; align-items: center; margin-top: 16px; }
+  .ev-cifra { flex: 1; text-align: center; }
+  .ev-cifra__n { font-size: 34px; font-weight: 800; letter-spacing: -1px; line-height: 1.05; }
+  .ev-cifra__e { font-size: 10px; font-weight: 800; letter-spacing: 1px;
+                 color: var(--text-sec); margin-top: 2px; }
+  .ev-cifra__sep { width: 1px; height: 44px; background: var(--border); flex: none; }
+  .ev-hero__ia { font-size: 11.5px; color: var(--text-muted); text-align: center; margin: 12px 0 0; }
+
+  /* ── Fila de atributo (AttributeRow) ── */
+  .ev-fam__cab { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .ev-fam__ico { width: 30px; height: 30px; border-radius: 15px; flex: none;
+                 display: flex; align-items: center; justify-content: center; }
+  .ev-attr { display: flex; align-items: center; gap: 8px; padding: 7px 0; }
+  .ev-attr__l { width: 106px; flex: none; font-size: 12px; font-weight: 600; }
+  .ev-attr__v { width: 62px; flex: none; display: flex; align-items: baseline;
+                justify-content: flex-end; gap: 3px; }
+  .ev-attr__n { font-size: 13px; font-weight: 800; min-width: 22px; text-align: right; }
+  .ev-attr__d { font-size: 10px; font-weight: 700; }
+
+  /* La barra ES el control: un range disfrazado de barra de progreso. */
+  .ev-bar { flex: 1; min-width: 0; height: 8px; padding: 0; margin: 0;
+            -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer; }
+  .ev-bar::-webkit-slider-runnable-track { height: 8px; border-radius: 4px; background: var(--pista); }
+  .ev-bar::-moz-range-track { height: 8px; border-radius: 4px; background: var(--border-soft); }
+  .ev-bar::-moz-range-progress { height: 8px; border-radius: 4px; background: var(--tono); }
+  .ev-bar::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 16px; height: 16px; border-radius: 8px; margin-top: -4px;
+    background: #fff; border: 2px solid var(--tono); box-shadow: 0 1px 3px rgba(0,0,0,.2);
+  }
+  .ev-bar::-moz-range-thumb {
+    width: 14px; height: 14px; border-radius: 7px;
+    background: #fff; border: 2px solid var(--tono); box-shadow: 0 1px 3px rgba(0,0,0,.2);
+  }
+
+  /* ── Stepper (potencial) ── */
+  .ev-step { display: flex; align-items: center; justify-content: center; gap: 20px; }
+  .ev-step__b { width: 44px; height: 44px; border-radius: 12px; flex: none;
+                background: var(--border-soft); font-size: 22px; font-weight: 700;
+                display: flex; align-items: center; justify-content: center; }
+  .ev-step__b:active { background: var(--border); }
+  .ev-step__n { font-size: 30px; font-weight: 800; min-width: 70px; text-align: center; }
+
+  /* ── Reporte de la IA ── */
+  .ev-ia__cab { display: flex; align-items: center; gap: 10px; }
+  .ev-ia__f { font-size: 11.5px; color: var(--text-sec); }
+  .ev-ia__t { font-size: 13px; line-height: 1.6; margin: 12px 0 0; }
+  .ev-ia__sub { display: flex; align-items: center; gap: 6px; font-size: 13px;
+                font-weight: 700; margin: 14px 0 6px; }
+  .ev-ia__li { font-size: 12.5px; line-height: 1.6; margin: 0 0 4px; padding-left: 14px;
+               position: relative; color: var(--text); }
+  .ev-ia__li::before { content: '•'; position: absolute; left: 3px; color: var(--text-muted); }
+  .ev-ia__vacio { font-size: 12.5px; color: var(--text-sec); line-height: 1.6; margin: 10px 0 0; }
+
+  /* ── Stats competitivas ── */
+  .ev-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .ev-stat { background: var(--border-soft); border-radius: var(--r-lg); padding: 12px 8px; text-align: center; }
+  .ev-stat__n { font-size: 20px; font-weight: 800; }
+  .ev-stat__e { font-size: 11px; color: var(--text-sec); margin-top: 2px; }
+</style>
 {% endblock %}
 
 {% block content %}
 
+{# ══════════ CABECERA ══════════ #}
 <div class="pf-card">
-  <div class="cm-head" style="display:flex;align-items:center;gap:10px;margin-bottom:2px">
-    <span class="pf-item__icon"><i data-ico="target" class="pf-ico--sm"></i></span>
-    <h2 class="pf-card__title">Técnico</h2>
+  <h2 class="ev-hero__n">{{ jugador.name }}</h2>
+  {% if posicion %}
+  <p class="ev-hero__p">
+    {{ posicion }}{% if ficha.posicion_secundaria %} · {{ ficha.posicion_secundaria }}{% endif %}
+  </p>
+  {% endif %}
+
+  {% if ficha._tiene_perfil %}
+  <div class="ev-cifras">
+    <div class="ev-cifra">
+      <div class="ev-cifra__n" id="ev-overall">{{ ficha.overall }}</div>
+      <div class="ev-cifra__e">OVERALL</div>
+    </div>
+    <div class="ev-cifra__sep"></div>
+    <div class="ev-cifra">
+      <div class="ev-cifra__n" style="color:var(--primary)" id="ev-pot-cifra">{{ ficha.potencial }}</div>
+      <div class="ev-cifra__e">POTENCIAL</div>
+    </div>
+    {% if delta %}
+    <div class="ev-cifra__sep"></div>
+    <div class="ev-cifra">
+      <div class="ev-cifra__n" style="font-size:26px;color:{{ 'var(--primary)' if delta > 0 else 'var(--danger)' }}">
+        {{ '+' if delta > 0 else '' }}{{ delta }}
+      </div>
+      <div class="ev-cifra__e">ESTA SEMANA</div>
+    </div>
+    {% endif %}
   </div>
-  {{ rating('pase', 'Pase', ficha.pase) }}
-  {{ rating('control', 'Control', ficha.control) }}
-  {{ rating('regate', 'Regate', ficha.regate) }}
-  {{ rating('tiro', 'Tiro', ficha.tiro) }}
-  {{ rating('definicion', 'Definición', ficha.definicion) }}
-  {{ rating('centros', 'Centros', ficha.centros) }}
-  {{ rating('vision_juego', 'Visión de juego', ficha.vision_juego) }}
+  {% else %}
+  <div class="pf-alerta pf-alerta--warn" style="margin-top:14px">
+    <i data-ico="info" class="pf-ico--xs"></i>
+    <span>Aún no hay perfil dinámico. Ajustá los atributos y guardá para crearlo.</span>
+  </div>
+  {% endif %}
+
+  {% if actualizado %}
+  <p class="ev-hero__ia">Última actualización: {{ actualizado.strftime('%d/%m/%Y') }}</p>
+  {% endif %}
 </div>
 
+{# ══════════ LOS 18 ATRIBUTOS ══════════ #}
+{% for familia, etiqueta, ico, tono, fondo, claves in [
+    ('tecnico', 'Técnico', 'target', 'var(--primary)', 'var(--primary-soft)', [
+        ('pase','Pase'), ('control','Control'), ('regate','Regate'), ('tiro','Tiro'),
+        ('definicion','Definición'), ('centros','Centros'), ('vision_juego','Visión de juego')]),
+    ('fisico', 'Físico', 'zap', '#475569', '#f1f5f9', [
+        ('velocidad','Velocidad'), ('resistencia','Resistencia'), ('fuerza','Fuerza'),
+        ('agilidad','Agilidad'), ('aceleracion','Aceleración')]),
+    ('mental', 'Mental', 'cpu', '#7e6acb', '#ede9fe', [
+        ('liderazgo','Liderazgo'), ('disciplina','Disciplina'), ('concentracion','Concentración'),
+        ('confianza','Confianza'), ('trabajo_equipo','Trabajo en equipo'), ('mentalidad','Mentalidad')]),
+] %}
 <div class="pf-card">
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:2px">
-    <span class="pf-item__icon"><i data-ico="activity" class="pf-ico--sm"></i></span>
-    <h2 class="pf-card__title">Físico</h2>
+  <div class="ev-fam__cab">
+    <span class="ev-fam__ico" style="background:{{ fondo }};color:{{ tono }}">
+      <i data-ico="{{ ico }}" class="pf-ico--sm"></i>
+    </span>
+    <h2 class="pf-card__title">{{ etiqueta }}</h2>
   </div>
-  {{ rating('velocidad', 'Velocidad', ficha.velocidad) }}
-  {{ rating('resistencia', 'Resistencia', ficha.resistencia) }}
-  {{ rating('fuerza', 'Fuerza', ficha.fuerza) }}
-  {{ rating('agilidad', 'Agilidad', ficha.agilidad) }}
-  {{ rating('aceleracion', 'Aceleración', ficha.aceleracion) }}
-  <div class="pf-field pf-mt-16">
-    <label class="pf-label">Nivel de Fatiga Actual</label>
+
+  {% for clave, nombre in claves %}
+  {% set v = ficha[clave] %}
+  <div class="ev-attr" data-attr="{{ clave }}" style="--tono:{{ tono }}">
+    <label class="ev-attr__l" for="a-{{ clave }}">{{ nombre }}</label>
+    <input class="ev-bar" type="range" id="a-{{ clave }}" min="1" max="100" value="{{ v }}"
+           data-campo="{{ clave }}" data-tono="{{ tono }}" aria-label="{{ nombre }}">
+    <span class="ev-attr__v">
+      <span class="ev-attr__n" data-valor>{{ v }}</span>
+      {% set d = deltas.get(clave) %}
+      {% if d %}
+      <span class="ev-attr__d" style="color:{{ 'var(--primary)' if d > 0 else 'var(--danger)' }}">
+        {{ '+' if d > 0 else '' }}{{ d }}
+      </span>
+      {% endif %}
+    </span>
+  </div>
+  {% endfor %}
+</div>
+{% endfor %}
+
+{# ══════════ POTENCIAL ══════════ #}
+<div class="pf-card">
+  <label class="pf-label">Potencial estimado (1-100)</label>
+  <div class="ev-step pf-mt-12">
+    <button class="ev-step__b" type="button" id="ev-pot-menos" aria-label="Bajar potencial">−</button>
+    <span class="ev-step__n" id="ev-pot">{{ ficha.potencial }}</span>
+    <button class="ev-step__b" type="button" id="ev-pot-mas" aria-label="Subir potencial">+</button>
+  </div>
+</div>
+
+{# ══════════ EVOLUCIÓN ══════════ #}
+{% if historial|length > 1 %}
+<div class="pf-card">
+  <div class="ev-fam__cab">
+    <span class="ev-fam__ico" style="background:var(--primary-soft);color:var(--primary)">
+      <i data-ico="activity" class="pf-ico--sm"></i>
+    </span>
+    <h2 class="pf-card__title">Evolución del overall</h2>
+  </div>
+  {% with datos = historial, color = 'var(--primary)', ancho = 320, alto = 90 %}
+    {% include '_spark.html' %}
+  {% endwith %}
+  <p style="margin:8px 0 0;text-align:center;font-size:11.5px;color:var(--text-sec)">
+    Últimas {{ historial|length }} semanas — overall actual: {{ ficha.overall }}
+  </p>
+</div>
+{% endif %}
+
+{# ══════════ REPORTE DE LA IA ══════════ #}
+<div class="pf-card">
+  <div class="ev-ia__cab">
+    <span class="ev-fam__ico" style="background:#ede9fe;color:#7e6acb">
+      <i data-ico="cpu" class="pf-ico--sm"></i>
+    </span>
+    <h2 class="pf-card__title">Reporte IA semanal</h2>
+    {% if reporte and reporte.rango %}<span class="ev-ia__f">{{ reporte.rango }}</span>{% endif %}
+  </div>
+
+  {% if reporte and reporte.resumen %}
+    <p class="ev-ia__t">{{ reporte.resumen }}</p>
+    {% for titulo, ico, color, puntos in [
+        ('Recomendaciones', 'target', 'var(--primary)', reporte.recomendaciones or []),
+        ('Próxima semana', 'flag', 'var(--text-sec)', reporte.proxima or [])] %}
+      {% if puntos %}
+      <div class="ev-ia__sub" style="color:{{ color }}">
+        <i data-ico="{{ ico }}" class="pf-ico--xs"></i> {{ titulo }}
+      </div>
+      {% for p in puntos %}<p class="ev-ia__li">{{ p }}</p>{% endfor %}
+      {% endif %}
+    {% endfor %}
+  {% else %}
+    <p class="ev-ia__vacio">
+      Todavía no hay informe. Lo escribe la IA a partir de la asistencia, los
+      partidos y las pruebas de la semana — está pendiente de que se despliegue
+      el servicio de IA.
+    </p>
+  {% endif %}
+</div>
+
+{# ══════════ ESTADO FÍSICO ══════════ #}
+<div class="pf-card">
+  <div class="ev-fam__cab">
+    <span class="ev-fam__ico" style="background:var(--danger-bg);color:#dc2626">
+      <i data-ico="heart" class="pf-ico--sm"></i>
+    </span>
+    <h2 class="pf-card__title">Estado físico</h2>
+  </div>
+
+  <div class="pf-field pf-mt-12">
+    <label class="pf-label" for="ev-lesiones">Historial de lesiones</label>
+    <textarea class="pf-textarea" id="ev-lesiones" rows="2" maxlength="600">{{ ficha.lesiones_historial }}</textarea>
+  </div>
+
+  <div class="pf-field">
+    <label class="pf-label">Fatiga actual</label>
     <div class="pf-riesgo" role="group" aria-label="Nivel de fatiga" id="ev-fatiga">
       {% for clave, etiqueta, _n in niveles_fatiga %}
       <button type="button" class="pf-riesgo__btn" data-fatiga="{{ clave }}"
@@ -55,8 +254,8 @@
     </div>
   </div>
 
-  <div class="pf-field">
-    <label class="pf-label">Riesgo de Sobrecarga</label>
+  <div class="pf-field" style="margin-bottom:0">
+    <label class="pf-label">Riesgo de sobrecarga</label>
     <div class="pf-riesgo" role="group" aria-label="Riesgo de sobrecarga" id="ev-riesgo">
       {% for r in ['bajo', 'medio', 'alto'] %}
       <button type="button" class="pf-riesgo__btn" data-riesgo="{{ r }}"
@@ -66,50 +265,63 @@
   </div>
 </div>
 
+{# ══════════ STATS COMPETITIVAS ══════════ #}
 <div class="pf-card">
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:2px">
-    <span class="pf-item__icon"><i data-ico="heart" class="pf-ico--sm"></i></span>
-    <h2 class="pf-card__title">Mental</h2>
+  <div class="ev-fam__cab">
+    <span class="ev-fam__ico" style="background:var(--warning-bg);color:#b45309">
+      <i data-ico="award" class="pf-ico--sm"></i>
+    </span>
+    <h2 class="pf-card__title">Stats competitivas</h2>
+    <span class="pf-pill pf-pill--muted">auto</span>
   </div>
-  {{ rating('confianza', 'Confianza', ficha.confianza) }}
-  {{ rating('mentalidad', 'Mentalidad / Motivación', ficha.mentalidad) }}
-  {{ rating('concentracion', 'Concentración', ficha.concentracion) }}
-  {{ rating('liderazgo', 'Liderazgo', ficha.liderazgo) }}
-  {{ rating('disciplina', 'Disciplina', ficha.disciplina) }}
-  {{ rating('trabajo_equipo', 'Trabajo en equipo', ficha.trabajo_equipo) }}
+  <div class="ev-stats pf-mt-12">
+    {% for etiqueta, valor in [('Partidos', stats.partidos), ('Minutos', stats.minutos),
+                               ('Goles', stats.goles), ('Asistencias', stats.asistencias),
+                               ('Rating prom.', stats.rating)] %}
+    <div class="ev-stat">
+      <div class="ev-stat__n">{{ valor }}</div>
+      <div class="ev-stat__e">{{ etiqueta }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  <p style="margin:10px 0 0;font-size:11.5px;color:var(--text-muted);line-height:1.5;font-style:italic">
+    {% if stats_auto %}
+      Calculadas automáticamente desde los partidos registrados en la agenda.
+    {% else %}
+      Las cargaste al dar de alta al jugador. Un jugador sin cuenta no aparece
+      en las estadísticas de partido, así que no se calculan solas.
+    {% endif %}
+  </p>
 </div>
 
+{# ══════════ NOTAS ══════════ #}
 <div class="pf-card">
-  <div class="pf-card__head"><h2 class="pf-card__title">Notas y evolución</h2></div>
+  <div class="pf-card__head"><h2 class="pf-card__title">Notas del entrenador</h2></div>
   <div class="pf-field">
-    <label class="pf-label" for="ev-fortalezas">Fortalezas específicas</label>
+    <label class="pf-label" for="ev-fortalezas">Fortalezas</label>
     <textarea class="pf-textarea" id="ev-fortalezas" rows="2" maxlength="600">{{ ficha.fortalezas }}</textarea>
   </div>
   <div class="pf-field">
-    <label class="pf-label" for="ev-debilidades">Debilidades detectadas</label>
+    <label class="pf-label" for="ev-debilidades">Debilidades</label>
     <textarea class="pf-textarea" id="ev-debilidades" rows="2" maxlength="600">{{ ficha.debilidades }}</textarea>
   </div>
   <div class="pf-field">
-    <label class="pf-label" for="ev-evoltec">Evolución técnica mensual</label>
+    <label class="pf-label" for="ev-evoltec">Evolución técnica del mes</label>
     <textarea class="pf-textarea" id="ev-evoltec" rows="2" maxlength="600">{{ ficha.evolucion_tecnica }}</textarea>
   </div>
-  <div class="pf-field">
-    <label class="pf-label" for="ev-lesiones">Historial de lesiones</label>
-    <textarea class="pf-textarea" id="ev-lesiones" rows="2" maxlength="600">{{ ficha.lesiones_historial }}</textarea>
-  </div>
   <div class="pf-field" style="margin-bottom:0">
-    <label class="pf-label" for="ev-notas">Notas para el jugador</label>
-    <textarea class="pf-textarea" id="ev-notas" rows="4" maxlength="2000"
-              placeholder="Qué hizo bien, en qué debe insistir, qué le pides para las próximas semanas…"></textarea>
+    <label class="pf-label" for="ev-notas">Nota para el jugador</label>
+    <textarea class="pf-textarea" id="ev-notas" rows="3" maxlength="2000"
+              placeholder="Qué hizo bien, en qué debe insistir…"></textarea>
     <p style="font-size:12px;color:var(--text-sec);margin:8px 0 0;line-height:1.5">
-      El jugador lee estas notas en su pestaña «Mi Ficha».
+      El jugador la lee en su pestaña «Mi Ficha».
     </p>
   </div>
 </div>
 
-<div style="padding:0 16px 30px">
+<div style="padding:0 16px 34px">
   <button class="pf-btn pf-btn--primary pf-btn--block" type="button" id="btn-guardar">
-    <i data-ico="check" class="pf-ico--sm"></i> Guardar evaluación
+    <i data-ico="check" class="pf-ico--sm"></i> Guardar cambios
   </button>
 </div>
 
@@ -118,36 +330,96 @@
 {% block scripts %}
 <script>
 (function () {
+  var barras = [].slice.call(document.querySelectorAll('.ev-bar'));
+
+  /* Mismo criterio de color que scoreColor() en la app. */
+  function color(v) {
+    if (v >= 80) return '#10b981';
+    if (v >= 65) return '#047857';
+    if (v >= 50) return '#d97706';
+    if (v >= 35) return '#fb923c';
+    return '#dc2626';
+  }
+
+  /* El track no se puede pintar por partes con CSS, asi que el relleno se
+     dibuja con un degradado duro que corta justo en el valor. */
+  function pintar(bar) {
+    var v = parseInt(bar.value, 10);
+    var pct = ((v - 1) / 99) * 100;
+    var tono = bar.dataset.tono;
+    bar.style.setProperty('--pista',
+      'linear-gradient(90deg,' + tono + ' 0 ' + pct + '%, var(--border-soft) ' + pct + '% 100%)');
+    var fila = bar.closest('.ev-attr');
+    var num = fila.querySelector('[data-valor]');
+    num.textContent = v;
+    num.style.color = color(v);
+  }
+
+  function overall() {
+    var suma = barras.reduce(function (s, b) { return s + parseInt(b.value, 10); }, 0);
+    return Math.round(suma / barras.length);
+  }
+
+  var cifraOverall = document.getElementById('ev-overall');
+  function refrescar() {
+    if (cifraOverall) cifraOverall.textContent = overall();
+  }
+
+  barras.forEach(function (b) {
+    pintar(b);
+    b.addEventListener('input', function () { pintar(b); refrescar(); });
+  });
+
+  /* ── Potencial ── */
+  var pot = parseInt(document.getElementById('ev-pot').textContent, 10) || 50;
+  function verPot() {
+    document.getElementById('ev-pot').textContent = pot;
+    var cifra = document.getElementById('ev-pot-cifra');
+    if (cifra) cifra.textContent = pot;
+  }
+  document.getElementById('ev-pot-menos').onclick = function () {
+    pot = Math.max(1, pot - 1); verPot();
+  };
+  document.getElementById('ev-pot-mas').onclick = function () {
+    pot = Math.min(100, pot + 1); verPot();
+  };
+
+  /* ── Botones excluyentes ── */
   function excluyentes(caja, attr) {
     if (!caja) return;
     var btns = caja.querySelectorAll('[' + attr + ']');
     btns.forEach(function (b) {
       b.addEventListener('click', function () {
-        btns.forEach(function (o) {
-          o.setAttribute('aria-pressed', o === b ? 'true' : 'false');
-        });
+        btns.forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); });
       });
     });
   }
-  var riesgoBox = document.getElementById('ev-riesgo');
-  var fatigaBox = document.getElementById('ev-fatiga');
-  excluyentes(riesgoBox, 'data-riesgo');
-  excluyentes(fatigaBox, 'data-fatiga');
+  var cajaFatiga = document.getElementById('ev-fatiga');
+  var cajaRiesgo = document.getElementById('ev-riesgo');
+  excluyentes(cajaFatiga, 'data-fatiga');
+  excluyentes(cajaRiesgo, 'data-riesgo');
 
+  function elegido(caja, campo) {
+    var b = caja ? caja.querySelector('[aria-pressed="true"]') : null;
+    return b ? b.dataset[campo] : null;
+  }
+  function texto(id) { return document.getElementById(id).value.trim(); }
+
+  /* ── Guardar ── */
   document.getElementById('btn-guardar').addEventListener('click', function () {
     var btn = this;
-    var riesgo = riesgoBox.querySelector('[aria-pressed="true"]');
-    var fatiga = fatigaBox.querySelector('[aria-pressed="true"]');
-    var datos = Object.assign({
-      fatiga: fatiga ? fatiga.dataset.fatiga : 'bajo',
+    var datos = {
       player_id: {{ jugador.id|tojson }},
-      notas: document.getElementById('ev-notas').value.trim(),
-      fortalezas: document.getElementById('ev-fortalezas').value.trim(),
-      debilidades: document.getElementById('ev-debilidades').value.trim(),
-      evolucion_tecnica: document.getElementById('ev-evoltec').value.trim(),
-      lesiones_historial: document.getElementById('ev-lesiones').value.trim(),
-      riesgo_sobrecarga: riesgo ? riesgo.dataset.riesgo : 'bajo',
-    }, PF.leerRatings());
+      potencial: pot,
+      fatiga: elegido(cajaFatiga, 'fatiga') || 'bajo',
+      riesgo_sobrecarga: elegido(cajaRiesgo, 'riesgo') || 'bajo',
+      lesiones_historial: texto('ev-lesiones'),
+      fortalezas: texto('ev-fortalezas'),
+      debilidades: texto('ev-debilidades'),
+      evolucion_tecnica: texto('ev-evoltec'),
+      notas: texto('ev-notas'),
+    };
+    barras.forEach(function (b) { datos[b.dataset.campo] = parseInt(b.value, 10); });
 
     btn.disabled = true;
     PF.api('{{ url_for("futbol.api_evaluacion") }}', datos)

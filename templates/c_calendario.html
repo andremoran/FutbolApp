@@ -5,8 +5,64 @@
    para editar: es el mismo formulario, así que solo hay un sitio donde puede
    romperse. #}
 
-{% block hero_label %}<div class="pf-hero__label">Planificación</div>{% endblock %}
-{% block hero_title %}Calendario{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Agenda · Entrenador</div>{% endblock %}
+{% block hero_title %}Calendario del equipo{% endblock %}
+
+{% block head %}
+<style>
+  /* ── Barra de navegación (ScheduleScreen › header) ── */
+  .cal-barra {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 16px; background: #fff; border-bottom: 1px solid var(--border-soft);
+  }
+  .cal-barra__b {
+    width: 36px; height: 36px; border-radius: 18px; flex: none;
+    background: var(--primary-soft); color: var(--primary);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .cal-barra__centro { flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px; min-width: 0; }
+  .cal-barra__n { width: 30px; height: 30px; border-radius: 15px; flex: none;
+                  display: flex; align-items: center; justify-content: center; color: var(--text); }
+  .cal-barra__n:active { background: var(--border-soft); }
+  .cal-barra__t { font-size: 15px; font-weight: 800; color: var(--text);
+                  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cal-toggle { display: flex; flex: none; background: var(--border-soft);
+                border-radius: 100px; padding: 2px; }
+  .cal-toggle__b { padding: 6px 13px; border-radius: 100px; font-size: 12.5px;
+                   font-weight: 700; color: var(--text-sec); }
+  .cal-toggle__b.on { background: var(--primary); color: #fff; }
+
+  /* ── Tira de la semana (weekStrip) ── */
+  .cal-tira { display: flex; gap: 4px; padding: 14px 16px 0; }
+  .cal-tira__d { flex: 1; display: flex; flex-direction: column; align-items: center;
+                 gap: 4px; padding: 8px 0; border-radius: var(--r-lg); }
+  .cal-tira__wd { font-size: 10px; font-weight: 800; color: var(--text-sec); }
+  .cal-tira__n { font-size: 15px; font-weight: 700; color: var(--text);
+                 width: 32px; height: 32px; border-radius: 16px;
+                 display: flex; align-items: center; justify-content: center; }
+  .cal-tira__d.es-hoy { background: var(--primary-soft); }
+  .cal-tira__d.es-hoy .cal-tira__n { background: var(--primary); color: #fff; }
+
+  /* ── Un día de la semana ── */
+  .cal-dia__cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .cal-dia__t { font-size: 15px; font-weight: 800; }
+  .cal-dia--hoy { background: var(--primary-faint); border-color: var(--primary-soft); }
+  .cal-dia--hoy .cal-dia__t { color: var(--primary); }
+  .cal-dia__vacio { margin: 8px 0 0; font-size: 13px; color: var(--text-muted); font-style: italic; }
+
+  /* ── Botón flotante (FAB) ── */
+  .cal-fab {
+    position: fixed; right: 18px; z-index: 200;
+    bottom: calc(104px + env(safe-area-inset-bottom, 0px));
+    width: 56px; height: 56px; border-radius: 28px;
+    background: var(--primary); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 6px 16px rgba(4,120,87,.4);
+  }
+  .cal-fab:active { transform: scale(.94); }
+  @media (min-width: 1024px) { .cal-fab { bottom: 84px; right: calc(50vw - 430px); } }
+</style>
+{% endblock %}
 {% block hero_subtitle %}
 <div class="pf-hero__subtitle">
   {{ n_jugadores }} jugador{{ '' if n_jugadores == 1 else 'es' }} en la plantilla
@@ -20,24 +76,49 @@
 
 {% block content %}
 
-{# ══════════ NAVEGACIÓN DE MES ══════════ #}
-<div class="pf-mes">
-  <a class="pf-mes__b" href="{{ url_for('futbol.c_calendario', a=mes_ant.a, m=mes_ant.m) }}"
-     aria-label="Mes anterior"><i data-ico="chevron-left" class="pf-ico--sm"></i></a>
-  <h2 class="pf-mes__t">{{ nombre_mes }} {{ anio }}</h2>
-  <a class="pf-mes__b" href="{{ url_for('futbol.c_calendario', a=mes_sig.a, m=mes_sig.m) }}"
-     aria-label="Mes siguiente"><i data-ico="chevron-right" class="pf-ico--sm"></i></a>
-</div>
-
-{% if not es_mes_actual %}
-<div class="pf-center" style="margin-bottom:10px">
-  <a href="{{ url_for('futbol.c_calendario') }}"
-     style="font-size:12.5px;font-weight:650;color:var(--primary);text-decoration:none">
-    Volver a hoy
+{# ══════════ BARRA DE NAVEGACIÓN ══════════ #}
+{# Igual que la app: los dos atajos a la izquierda, el periodo en medio y el
+   conmutador Sem/Mes a la derecha. #}
+<div class="cal-barra">
+  <a class="cal-barra__b" href="{{ url_for('futbol.c_planes') }}"
+     aria-label="Planes de sesión" title="Planes de sesión">
+    <i data-ico="clipboard" class="pf-ico--sm"></i>
   </a>
-</div>
-{% endif %}
+  <a class="cal-barra__b" href="{{ url_for('futbol.c_observaciones') }}"
+     aria-label="Observaciones" title="Observaciones">
+    <i data-ico="edit-3" class="pf-ico--sm"></i>
+  </a>
 
+  {% if vista == 'mes' %}
+    {% set atras = url_for('futbol.c_calendario', v='mes', a=mes_ant.a, m=mes_ant.m) %}
+    {% set alante = url_for('futbol.c_calendario', v='mes', a=mes_sig.a, m=mes_sig.m) %}
+    {% set etiqueta = nombre_mes ~ ' ' ~ anio %}
+  {% else %}
+    {% set atras = url_for('futbol.c_calendario', v='semana', d=semana_ant) %}
+    {% set alante = url_for('futbol.c_calendario', v='semana', d=semana_sig) %}
+    {% set etiqueta = etiqueta_semana %}
+  {% endif %}
+
+  <div class="cal-barra__centro">
+    <a class="cal-barra__n" href="{{ atras }}" aria-label="Anterior">
+      <i data-ico="chevron-left" class="pf-ico--sm"></i>
+    </a>
+    <a class="cal-barra__t" href="{{ url_for('futbol.c_calendario', v=vista) }}"
+       title="Volver a hoy">{{ etiqueta }}</a>
+    <a class="cal-barra__n" href="{{ alante }}" aria-label="Siguiente">
+      <i data-ico="chevron-right" class="pf-ico--sm"></i>
+    </a>
+  </div>
+
+  <div class="cal-toggle">
+    <a class="cal-toggle__b {{ 'on' if vista == 'semana' }}"
+       href="{{ url_for('futbol.c_calendario', v='semana') }}">Sem</a>
+    <a class="cal-toggle__b {{ 'on' if vista == 'mes' }}"
+       href="{{ url_for('futbol.c_calendario', v='mes', a=anio, m=mes) }}">Mes</a>
+  </div>
+</div>
+
+{% if vista == 'mes' %}
 {# ══════════ REJILLA ══════════ #}
 <div class="pf-cal">
   <div class="pf-cal__cab">
@@ -67,6 +148,48 @@
   </div>
   {% endfor %}
 </div>
+{% endif %}
+
+{% if vista == 'semana' %}
+{# ══════════ TIRA DE LA SEMANA ══════════ #}
+<div class="cal-tira">
+  {% for d in semana %}
+  <a class="cal-tira__d {{ 'es-hoy' if d.hoy }}" href="#dia-{{ d.iso }}">
+    <span class="cal-tira__wd">{{ d.inicial }}</span>
+    <span class="cal-tira__n">{{ d.dia }}</span>
+  </a>
+  {% endfor %}
+</div>
+
+{# ══════════ LOS SIETE DÍAS ══════════ #}
+{% for d in semana %}
+<div class="pf-card cal-dia {{ 'cal-dia--hoy' if d.hoy }}" id="dia-{{ d.iso }}">
+  <div class="cal-dia__cab">
+    <span class="cal-dia__t">{{ d.nombre }} {{ d.dia }}</span>
+    {% if d.hoy %}<span class="pf-pill">HOY</span>{% endif %}
+  </div>
+
+  {% for e in d.eventos %}
+  <button class="pf-item" type="button" onclick="verEvento('{{ e.id }}')">
+    <span class="pf-item__icon" style="background:{{ e._color }}1a;color:{{ e._color }}">
+      <i data-ico="{{ e._meta.icono | default('calendar', true) }}" class="pf-ico--sm"></i>
+    </span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">{{ e.titulo }}</span>
+      <span class="pf-item__sub">
+        {%- if e.hora %}{{ e.hora }}{% endif -%}
+        {%- if e.lugar %} · {{ e.lugar }}{% endif -%}
+        {%- if e._etiqueta %} · {{ e._etiqueta }}{% endif -%}
+      </span>
+    </span>
+    <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+  </button>
+  {% else %}
+  <p class="cal-dia__vacio">Sin eventos</p>
+  {% endfor %}
+</div>
+{% endfor %}
+{% endif %}
 
 {# ══════════ ANÁLISIS DE LA SEMANA ══════════ #}
 <details class="pf-card pf-mt-16" open>
@@ -372,6 +495,12 @@
   </div>
 </aside>
 
+{# Botón flotante para crear, como en la app. #}
+<button class="cal-fab" type="button" onclick="nuevoEvento('{{ hoy }}')"
+        aria-label="Nuevo evento">
+  <i data-ico="plus" class="pf-ico--lg"></i>
+</button>
+
 {% endblock %}
 
 {% block scripts %}
@@ -429,6 +558,14 @@ function escapar(s) {
   const d = document.createElement('div');
   d.textContent = s;
   return d.innerHTML;
+}
+
+/* ─── Abrir un evento por su id ───
+   Lo usa la vista de semana, que pinta los eventos en el HTML y no desde
+   EVENTOS: solo tiene el id a mano. */
+function verEvento(id) {
+  const e = EVENTOS.find(x => String(x.id) === String(id));
+  if (e) editar(e);
 }
 
 /* ─── Crear / editar ─── */

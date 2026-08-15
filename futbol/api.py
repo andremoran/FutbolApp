@@ -363,11 +363,22 @@ def api_evaluacion():
         return jsonify({'error': 'Solo el entrenador evalúa.'}), 403
     d = body()
     pid = d.get('player_id')
-    if not pid or not de_mi_plantilla(pid):
-        return jsonify({'error': 'Ese jugador no es de tu plantilla.'}), 403
+    if not pid:
+        return jsonify({'error': 'Falta el jugador.'}), 400
 
-    campos_numericos = set(db.ATRIBUTOS_18) | {'potencial', 'fatiga'}
-    campos_texto = ('riesgo_sobrecarga', 'fortalezas', 'debilidades', 'evolucion_tecnica',
+    # Vale para los dos tipos de jugador: en un equipo de formación casi nadie
+    # tiene cuenta, y sin esto no se podía guardar su evaluación.
+    uid = db.equipo_id(current_user.id)
+    if de_mi_plantilla(pid):
+        dueno = db.dueno_filtro(player_id=pid)
+    elif db.one('fut_manual_players', 'manual eval', id=pid, coach_id=uid):
+        dueno = db.dueno_filtro(manual_player_id=pid)
+    else:
+        return jsonify({'error': 'Ese jugador no es de tu plantilla.'}), 403
+    es_manual = 'manual_player_id' in dueno
+
+    campos_numericos = set(db.ATRIBUTOS_18) | {'potencial'}
+    campos_texto = ('fortalezas', 'debilidades', 'evolucion_tecnica',
                     'lesiones_historial', 'posicion_secundaria')
     campos_perfil = {}
     for k in list(campos_numericos) + list(campos_texto):
@@ -376,31 +387,43 @@ def api_evaluacion():
             continue
         if k in campos_numericos:
             try:
-                campos_perfil[k] = int(v)
+                campos_perfil[k] = max(1, min(100, int(v)))
             except (TypeError, ValueError):
                 pass
         else:
             campos_perfil[k] = str(v)[:600]
 
-    fila = db.guardar_atributos(player_id=pid, **campos_perfil) if campos_perfil else None
+    # La fatiga llega como bajo|medio|alto y se guarda como número (db.py).
+    if d.get('fatiga') in db.FATIGA_A_NUMERO:
+        campos_perfil['fatiga'] = db.FATIGA_A_NUMERO[d['fatiga']]
+    if d.get('riesgo_sobrecarga') in ('bajo', 'medio', 'alto'):
+        campos_perfil['riesgo_sobrecarga'] = d['riesgo_sobrecarga']
+
+    fila = db.guardar_atributos(**dueno, **campos_perfil) if campos_perfil else None
 
     # Nota histórica: lo que el jugador lee en "Mi Ficha" y lo que ve el coach
     # en "Observaciones". La puntuación que se guarda aquí son los 3 de
     # siempre (recién recalculados) para no romper las pantallas que todavía
     # muestran ese resumen (no hay familia táctica en el modelo nuevo).
+    #
+    # Solo para quien tiene cuenta: fut_evaluations referencia `usuarios`, así
+    # que la nota de un jugador sin cuenta no cabe ahí. La suya vive en los
+    # campos de texto de su propia ficha.
     puntuaciones = {k: fila[k] for k in ('tecnica', 'fisico', 'mental')
                     if fila and fila.get(k) is not None}
 
-    db.insert('fut_evaluations', {
-        'player_id': pid,
-        'coach_id': current_user.id,
-        'fecha': d.get('fecha') or db.hoy_iso(),
-        'notas': (d.get('notas') or '')[:2000],
-        'puntuaciones': puntuaciones,
-        'creado': ahora(),
-    })
+    if not es_manual:
+        db.insert('fut_evaluations', {
+            'player_id': pid,
+            'coach_id': current_user.id,
+            'fecha': d.get('fecha') or db.hoy_iso(),
+            'notas': (d.get('notas') or '')[:2000],
+            'puntuaciones': puntuaciones,
+            'creado': ahora(),
+        })
 
-    return jsonify({'ok': True, 'redirect': url_for('futbol.c_jugador', pid=pid)})
+    destino = ('futbol.c_eval_jugador' if es_manual else 'futbol.c_jugador')
+    return jsonify({'ok': True, 'redirect': url_for(destino, pid=pid)})
 
 
 @bp.route('/api/equipo/recalcular', methods=['POST'])
