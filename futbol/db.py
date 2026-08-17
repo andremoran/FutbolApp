@@ -243,6 +243,18 @@ def jugadores_del_entrenador(coach_id):
                   key=lambda j: (j.get('fut', {}).get('dorsal') or 999, j.get('name') or ''))
 
 
+def tamano_plantilla(coach_id):
+    """Cuántos jugadores tiene el equipo, con cuenta y sin ella.
+
+    Existe porque este cálculo estaba repetido a mano por media docena de
+    pantallas y en varias se había olvidado sumar los que no tienen cuenta:
+    un equipo de formación lleno se veía como si estuviera vacío.
+    """
+    return (len(jugadores_del_entrenador(coach_id))
+            + len(rows('fut_manual_players', 'tamano plantilla',
+                       coach_id=coach_id, activo=True) or []))
+
+
 def entrenador_del_jugador(player_id):
     """Entrenador vinculado al jugador (o None si aún no se unió a un equipo)."""
     v = one('fut_plantilla', 'mi coach', player_id=player_id, activo=True)

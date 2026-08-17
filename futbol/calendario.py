@@ -460,9 +460,7 @@ def c_calendario():
                        _order='creado', _desc=True) or [],
         # Cuenta la plantilla entera: el que no tiene cuenta entrena y se le
         # pasa lista igual, así que también cuenta para la agenda.
-        n_jugadores=(len(db.jugadores_del_entrenador(uid))
-                     + len(db.rows('fut_manual_players', 'manuales agenda',
-                                   coach_id=uid, activo=True) or [])),
+        n_jugadores=db.tamano_plantilla(uid),
         hoy=date.today().isoformat())
 
 
@@ -496,7 +494,43 @@ def c_asistencia():
                            estados=ESTADOS_ASISTENCIA)
 
 
-@bp.route('/coach/asistencia/<eid>')
+@bp.route('/coach/evento/<eid>')
+@login_required
+def c_evento(eid):
+    """Detalle de un evento ya agendado (EventDetailModal de la app).
+
+    Al tocar un entrenamiento la app NO abre el formulario de edición: abre
+    esta ficha, con sus datos y las dos acciones que de verdad se hacen sobre
+    un entreno —pasar lista y dejar la observación— y el cambio de estado.
+    """
+    fuera = _coach_o_fuera()
+    if fuera:
+        return fuera
+
+    uid = db.equipo_id(current_user.id)
+    evento = db.one('fut_events', 'evento', id=eid, coach_id=uid)
+    if not evento:
+        abort(404)
+    decorar([evento])
+
+    #  Cuántos hay marcados ya, para que el botón de asistencia lo diga.
+    marcas = asistencia_evento(eid)
+    fueron = len([a for a in marcas if a.get('estado') in ('presente', 'tarde')])
+    plantilla = db.tamano_plantilla(uid)
+
+    observacion = db.one('fut_observaciones', 'obs del evento',
+                         event_id=eid, coach_id=uid)
+
+    return render_template('c_evento.html',
+                           tab_activa='agenda', hide_tabbar=True,
+                           evento=evento,
+                           marcados=len(marcas), fueron=fueron,
+                           plantilla=plantilla,
+                           observacion=observacion,
+                           es_pro=roles.es_pro(current_user))
+
+
+@bp.route('/coach/evento/<eid>/lista')
 @login_required
 def c_pasar_lista(eid):
     fuera = _coach_o_fuera()

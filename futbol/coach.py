@@ -436,7 +436,10 @@ def c_agenda():
     conteo = {}
     if eventos:
         for a in db.asistencia_de([e['id'] for e in eventos]):
-            if a.get('estado') == 'asiste':
+            # 'asiste' es el nombre VIEJO: schema_v2 lo migró a 'presente' y
+            # añadió 'tarde'. Comparando con el viejo, el contador de cada
+            # evento salía siempre en 0 por más lista que se pasara.
+            if a.get('estado') in ('presente', 'tarde'):
                 conteo[a['event_id']] = conteo.get(a['event_id'], 0) + 1
 
     hoy = date.today()
@@ -450,26 +453,15 @@ def c_agenda():
                            tab_activa='agenda',
                            proximos=[e for e in eventos if not e['_pasado']],
                            pasados=list(reversed([e for e in eventos if e['_pasado']]))[:10],
-                           n_jugadores=len(db.jugadores_del_entrenador(uid)))
+                           n_jugadores=db.tamano_plantilla(uid))
 
 
-@bp.route('/coach/agenda/<eid>')
-@solo_entrenador
-def c_evento(eid):
-    uid = db.equipo_id(current_user.id)
-    evento = db.one('fut_events', 'evento', id=eid, coach_id=uid)
-    if not evento:
-        abort(404)
-    evento['_fecha'] = db.parse_fecha(evento.get('fecha'))
-
-    jugadores = db.jugadores_del_entrenador(uid)
-    estados = {a['player_id']: a.get('estado') for a in db.asistencia_de([eid])}
-    for j in jugadores:
-        j['_asistencia'] = estados.get(j['id'])
-
-    return render_template('c_evento.html',
-                           tab_activa='agenda', hide_tabbar=True,
-                           evento=evento, jugadores=jugadores)
+#  El detalle del evento vive ahora en futbol/calendario.py (/coach/evento/<id>),
+#  que es donde está todo lo del calendario. El que había aquí pintaba la
+#  asistencia con los tres estados viejos (asiste/duda/falta), que dejaron de
+#  existir al pasar a cuatro (presente/tarde/justificado/ausente) en schema_v2:
+#  marcaba a todo el mundo como «sin marcar». Las plantillas que lo enlazan lo
+#  hacen por nombre de endpoint, así que siguen funcionando.
 
 
 # ═══════════════════════ 4. TÁCTICA ═══════════════════════

@@ -1,133 +1,176 @@
 {% extends '_shell.html' %}
 {% block title %}{{ evento.titulo }} · ProFoot{% endblock %}
 
-{# screens/EventAttendanceScreen.tsx: pasar lista. El entrenador puede marcar
-   por cada jugador aunque este no haya confirmado desde su teléfono. #}
+{# EventDetailModal de ScheduleScreen.tsx: la ficha de un evento ya agendado.
+   Tocar un entreno abre esto, no el formulario de edición: lo que se hace
+   sobre un entrenamiento es pasar lista, dejar la observación y marcarlo
+   hecho — editarlo es lo raro, y por eso va en un botón aparte. #}
 
-{% block hero_back %}
-<a class="pf-hero__btn" href="{{ url_for('futbol.c_agenda') }}" aria-label="Volver">
-  <i data-ico="arrow-left" class="pf-ico--sm"></i>
-</a>
-{% endblock %}
-{% block hero_label %}<div class="pf-hero__label">{{ (evento.tipo or 'evento')|capitalize }}</div>{% endblock %}
-{% block hero_title %}{{ evento.titulo }}{% endblock %}
-{% block hero_subtitle %}
-<div class="pf-hero__subtitle">
-  {{ evento.fecha }}{% if evento.hora %} · {{ evento.hora[:5] }}{% endif %}
-  {%- if evento.lugar %} · {{ evento.lugar }}{% endif %}
-</div>
+{% block hero %}
+{# Cabecera del color del tipo de evento, como en la app. #}
+<header class="ev-cab" style="background:{{ evento._color }}">
+  <a class="ev-cab__x" href="{{ url_for('futbol.c_calendario') }}" aria-label="Cerrar">
+    <i data-ico="x" class="pf-ico--sm"></i>
+  </a>
+  <div class="pf-grow" style="min-width:0">
+    <div class="ev-cab__l">{{ evento._etiqueta }}</div>
+    <h1 class="ev-cab__t">{{ evento.titulo }}</h1>
+  </div>
+  <button class="ev-cab__b" type="button" onclick="editar()">
+    <i data-ico="edit-2" class="pf-ico--xs"></i> Editar
+  </button>
+</header>
 {% endblock %}
 
 {% block head %}
 <style>
-  .as-btns { display: flex; gap: 5px; flex: none; }
-  .as-btn {
-    padding: 6px 10px; border-radius: 100px; font-size: 11px; font-weight: 800;
-    background: var(--border-soft); color: var(--text-sec); transition: all .15s;
-  }
-  .as-btn.is-on[data-estado="asiste"] { background: var(--success); color: #fff; }
-  .as-btn.is-on[data-estado="duda"]   { background: var(--warning); color: #fff; }
-  .as-btn.is-on[data-estado="falta"]  { background: var(--danger);  color: #fff; }
-  .as-btn:active { transform: scale(.94); }
+  .ev-cab { display: flex; align-items: flex-start; gap: 12px;
+            padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 14px; color: #fff; }
+  .ev-cab__x, .ev-cab__b { flex: none; color: #fff; }
+  .ev-cab__x { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
+  .ev-cab__l { font-size: 10px; font-weight: 800; letter-spacing: 1px;
+               text-transform: uppercase; opacity: .85; }
+  .ev-cab__t { font-size: 20px; font-weight: 800; margin: 2px 0 0;
+               overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ev-cab__b { display: inline-flex; align-items: center; gap: 5px;
+               background: rgba(255,255,255,.22); border-radius: 100px;
+               padding: 7px 13px; font-size: 13px; font-weight: 700; }
+
+  .ev-estado { display: inline-flex; align-items: center; gap: 6px;
+               padding: 6px 13px; border-radius: 100px; margin: 16px 16px 0;
+               font-size: 13px; font-weight: 700; }
+
+  .ev-fila { display: flex; align-items: center; gap: 12px; padding: 11px 16px;
+             border-bottom: 1px solid var(--border-soft); }
+  .ev-fila i { color: var(--text-muted); }
+  .ev-fila__e { width: 88px; flex: none; font-size: 13px; color: var(--text-sec); }
+  .ev-fila__v { flex: 1; font-size: 13.5px; font-weight: 600; }
+
+  /* Las dos acciones grandes */
+  .ev-acc { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+            margin: 12px 16px 0; padding: 15px; border-radius: var(--r-xl); color: #fff; }
+  .ev-acc--lista { background: var(--info); }
+  .ev-acc--ia { background: var(--purple); }
+  .ev-acc__ico { width: 34px; height: 34px; flex: none;
+                 display: flex; align-items: center; justify-content: center; }
+  .ev-acc__t { font-size: 15px; font-weight: 800; }
+  .ev-acc__s { font-size: 12px; opacity: .9; margin-top: 2px; line-height: 1.4; }
+
+  .ev-pie { display: flex; gap: 10px; padding: 16px 16px 0; }
+  .ev-pie__b { flex: 1; padding: 13px; border-radius: var(--r-lg);
+               font-size: 13.5px; font-weight: 700; display: flex;
+               align-items: center; justify-content: center; gap: 7px; }
+  .ev-pie__b--ok { background: var(--primary-soft); color: var(--primary); }
+  .ev-pie__b--no { background: var(--border-soft); color: var(--text-sec); }
+  .ev-borrar { display: flex; align-items: center; justify-content: center; gap: 7px;
+               width: calc(100% - 32px); margin: 10px 16px 0; padding: 14px;
+               background: #fff; border: 1px solid var(--border); border-radius: var(--r-lg);
+               color: var(--danger); font-size: 13.5px; font-weight: 700; }
 </style>
 {% endblock %}
 
 {% block content %}
 
-{% if evento.descripcion %}
-<div class="pf-card">
-  <p style="font-size:14px;line-height:1.6;margin:0;color:var(--text-sec)">{{ evento.descripcion }}</p>
-</div>
-{% endif %}
+<span class="ev-estado"
+      style="background:{{ evento._color }}1a;color:{{ evento._color }}">
+  ● {{ {'programado': 'Programado', 'hecho': 'Completado',
+        'cancelado': 'Cancelado'}.get(evento.estado, 'Programado') }}
+</span>
 
-<div class="pf-card">
-  <div class="pf-card__head">
-    <h2 class="pf-card__title">Asistencia</h2>
-    <span class="pf-card__badge" id="conteo">
-      {{ jugadores|selectattr('_asistencia', 'equalto', 'asiste')|list|length }}/{{ jugadores|length }}
-    </span>
-  </div>
-
-  {% for j in jugadores %}
-  <div class="pf-item" data-fila="{{ j.id }}">
-    <span class="pf-avatar pf-avatar--sm">
-      {%- if j.profile_photo %}<img src="{{ j.profile_photo }}" alt="">
-      {%- else %}{{ (j.name or '?')[:1]|upper }}{% endif -%}
-    </span>
-    <span class="pf-item__body">
-      <span class="pf-item__title">{{ j.name }}</span>
-      <span class="pf-item__sub">{{ (j.fut or {}).get('posicion') or 'Sin posición' }}</span>
-    </span>
-    <span class="as-btns">
-      {% for clave, texto in [('asiste','✓'), ('duda','?'), ('falta','✕')] %}
-      <button type="button" class="as-btn {{ 'is-on' if j._asistencia == clave }}"
-              data-estado="{{ clave }}" data-jugador="{{ j.id }}"
-              aria-label="{{ texto }} {{ j.name }}">{{ texto }}</button>
-      {% endfor %}
-    </span>
+<div class="pf-mt-16">
+  {% for ico, etiqueta, valor in [
+      ('calendar', 'Fecha', evento._fecha.strftime('%A, %d de %B %Y') if evento._fecha else '—'),
+      ('clock', 'Hora', (evento.hora or '—')|string|truncate(5, true, '')),
+      ('watch', 'Duración', (evento.duracion_min ~ ' minutos') if evento.duracion_min else '—'),
+      ('target', 'Tipo', evento._etiqueta),
+      ('zap', 'Intensidad', evento._intensidad.etiqueta if evento._intensidad else '—'),
+      ('map-pin', 'Lugar', evento.lugar),
+      ('file-text', 'Notas', evento.descripcion),
+  ] if valor %}
+  <div class="ev-fila">
+    <i data-ico="{{ ico }}" class="pf-ico--sm"></i>
+    <span class="ev-fila__e">{{ etiqueta }}</span>
+    <span class="ev-fila__v">{{ valor }}</span>
   </div>
   {% endfor %}
-
-  {% if not jugadores %}
-  <div class="pf-empty" style="padding:22px 8px">
-    <div class="pf-empty__icon"><i data-ico="users" class="pf-ico--xxl"></i></div>
-    <h3 class="pf-empty__title">Sin jugadores</h3>
-    <p class="pf-empty__text">Suma jugadores a tu plantilla para poder pasar lista.</p>
-  </div>
-  {% endif %}
 </div>
 
-<div style="padding:0 16px 30px">
-  <button class="pf-btn pf-btn--danger pf-btn--block" type="button" id="btn-borrar">
-    <i data-ico="trash-2" class="pf-ico--sm"></i> Eliminar evento
+{# ══════════ LAS DOS ACCIONES ══════════ #}
+<a class="ev-acc ev-acc--lista" href="{{ url_for('futbol.c_pasar_lista', eid=evento.id) }}">
+  <span class="ev-acc__ico"><i data-ico="check-circle" class="pf-ico--lg"></i></span>
+  <span class="pf-grow">
+    <span class="ev-acc__t" style="display:block">Tomar asistencia</span>
+    <span class="ev-acc__s" style="display:block">
+      {% if marcados %}
+        {{ fueron }} de {{ plantilla }} vinieron · toca para corregir
+      {% else %}
+        Marca quién vino y agrega notas del entrenamiento
+      {% endif %}
+    </span>
+  </span>
+  <i data-ico="chevron-right" class="pf-ico--sm"></i>
+</a>
+
+<a class="ev-acc ev-acc--ia" href="{{ url_for('futbol.c_observaciones', evento=evento.id) }}">
+  <span class="ev-acc__ico"><i data-ico="cpu" class="pf-ico--lg"></i></span>
+  <span class="pf-grow">
+    <span class="ev-acc__t" style="display:block">
+      Observación con IA{% if not es_pro %} 🔒{% endif %}
+    </span>
+    <span class="ev-acc__s" style="display:block">
+      {% if observacion %}
+        Ya hay una observación de esta sesión
+      {% else %}
+        Escribe tus notas. La IA resume el entrenamiento.
+      {% endif %}
+    </span>
+  </span>
+  <i data-ico="chevron-right" class="pf-ico--sm"></i>
+</a>
+
+{# ══════════ ESTADO ══════════ #}
+<div class="ev-pie">
+  <button class="ev-pie__b ev-pie__b--ok" type="button" onclick="marcar('hecho')">
+    <i data-ico="check-circle" class="pf-ico--sm"></i> Completado
+  </button>
+  <button class="ev-pie__b ev-pie__b--no" type="button" onclick="marcar('cancelado')">
+    <i data-ico="x" class="pf-ico--sm"></i> Cancelar
   </button>
 </div>
 
+<button class="ev-borrar" type="button" onclick="borrar()">
+  <i data-ico="trash-2" class="pf-ico--sm"></i> Eliminar evento
+</button>
+
+<div style="height:34px"></div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-(function () {
-  function recontar() {
-    var total = document.querySelectorAll('[data-fila]').length;
-    var van = document.querySelectorAll('.as-btn.is-on[data-estado="asiste"]').length;
-    document.getElementById('conteo').textContent = van + '/' + total;
-  }
+const EID = {{ evento.id|tojson }};
 
-  document.querySelectorAll('.as-btn').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      PF.api('{{ url_for("futbol.api_asistencia") }}', {
-        event_id: {{ evento.id|tojson }},
-        player_id: btn.dataset.jugador,
-        estado: btn.dataset.estado
-      })
-        .then(function () {
-          document.querySelectorAll('[data-fila="' + btn.dataset.jugador + '"] .as-btn')
-            .forEach(function (b) { b.classList.toggle('is-on', b === btn); });
-          recontar();
-        })
-        .catch(function (e) { PF.toast(e.message, 'error'); });
-    });
-  });
+/* Editar y borrar viven en el calendario, que es donde está el formulario. */
+function editar() {
+  location.href = '{{ url_for("futbol.c_calendario") }}?editar=' + encodeURIComponent(EID);
+}
 
-  // Borrado en dos toques: el primero pide confirmación en el propio botón.
-  var borrar = document.getElementById('btn-borrar');
-  var armado = false;
-  borrar.addEventListener('click', function () {
-    if (!armado) {
-      armado = true;
-      borrar.innerHTML = 'Toca otra vez para confirmar';
-      setTimeout(function () {
-        armado = false;
-        borrar.innerHTML = '<i data-ico="trash-2" class="pf-ico--sm"></i> Eliminar evento';
-        PF.icons(borrar);
-      }, 4000);
-      return;
-    }
-    PF.api('/futbol/api/evento/{{ evento.id }}', null, 'DELETE')
-      .then(function () { window.location.href = '{{ url_for("futbol.c_agenda") }}'; })
-      .catch(function (e) { PF.toast(e.message, 'error'); });
-  });
-})();
+function marcar(estado) {
+  PF.api('/api/calendario/evento', { id: EID, estado: estado })
+    .then(() => {
+      PF.toast(estado === 'hecho' ? 'Entrenamiento completado.' : 'Evento cancelado.', 'success');
+      setTimeout(() => location.reload(), 700);
+    })
+    .catch(e => PF.toast(e.message, 'error'));
+}
+
+function borrar() {
+  if (!confirm('¿Eliminar este evento?\n\nSe borra también su asistencia.')) return;
+  PF.api('/api/calendario/evento/' + EID, {}, 'DELETE')
+    .then(() => {
+      PF.toast('Evento eliminado.', 'success');
+      setTimeout(() => { location.href = '{{ url_for("futbol.c_calendario") }}'; }, 700);
+    })
+    .catch(e => PF.toast(e.message, 'error'));
+}
 </script>
 {% endblock %}

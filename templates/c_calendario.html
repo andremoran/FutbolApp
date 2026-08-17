@@ -577,7 +577,7 @@ function verDia(iso) {
       escapar(e.titulo || '') + '</div><div class="pf-ev__s">' +
       escapar(e._etiqueta || '') + (e.hora ? ' · ' + String(e.hora).slice(0, 5) : '') +
       (e.lugar ? ' · ' + escapar(e.lugar) : '') + '</div></div>';
-    div.onclick = () => editar(e);
+    div.onclick = () => abrirEvento(e.id);
     caja.appendChild(div);
   });
   $('sel-vacio').style.display = delDia.length ? 'none' : '';
@@ -592,9 +592,12 @@ function escapar(s) {
 /* ─── Abrir un evento por su id ───
    Lo usa la vista de semana, que pinta los eventos en el HTML y no desde
    EVENTOS: solo tiene el id a mano. */
-function verEvento(id) {
-  const e = EVENTOS.find(x => String(x.id) === String(id));
-  if (e) editar(e);
+function verEvento(id) { abrirEvento(id); }
+
+/* Tocar un evento abre su FICHA, no el formulario: es lo que hace la app.
+   Desde la ficha se pasa lista, se deja la observación y se edita. */
+function abrirEvento(id) {
+  location.href = '/coach/evento/' + encodeURIComponent(id);
 }
 
 /* ─── Crear / editar ─── */

@@ -371,7 +371,7 @@ def c_solicitudes():
         s['_jugador'] = db._normalizar_usuario(personas.get(s.get('player_id')))
         s['_fecha'] = db.parse_fecha(s.get('creado'))
 
-    n = len(db.jugadores_del_entrenador(uid))
+    n = db.tamano_plantilla(uid)
     return render_template('c_solicitudes.html',
                            tab_activa='equipo', hide_tabbar=True,
                            pendientes=[s for s in todas if s.get('estado') == 'pendiente'],

@@ -25,7 +25,7 @@ def perfil():
     if es_coach:
         datos['equipo'] = db.equipo_del_entrenador(uid)
         datos['codigo'] = db.codigo_equipo(uid)
-        datos['n_jugadores'] = len(db.jugadores_del_entrenador(uid))
+        datos['n_jugadores'] = db.tamano_plantilla(uid)
     else:
         datos['perfil'] = db.perfil_jugador(uid)
         datos['entrenador'] = db.entrenador_del_jugador(uid)
