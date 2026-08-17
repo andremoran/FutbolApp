@@ -17,7 +17,10 @@
       <span class="pf-tab__label">Equipo</span>
     </a>
 
-    <a class="pf-tab {{ 'is-active' if tab == 'agenda' }}" href="{{ url_for('futbol.c_agenda') }}"
+    {# La pestaña abre el CALENDARIO, como en la app: ScheduleScreen es la
+       pantalla de la pestaña Agenda. c_agenda (lista + formulario rápido)
+       sigue existiendo y se llega desde la hoja «⋯ Ver más». #}
+    <a class="pf-tab {{ 'is-active' if tab == 'agenda' }}" href="{{ url_for('futbol.c_calendario') }}"
        {{ 'aria-current=page' if tab == 'agenda' }}>
       <span class="pf-tab__icon"><i data-ico="calendar"></i></span>
       <span class="pf-tab__label">Agenda</span>

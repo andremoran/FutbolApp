@@ -50,6 +50,14 @@
   .cal-dia--hoy .cal-dia__t { color: var(--primary); }
   .cal-dia__vacio { margin: 8px 0 0; font-size: 13px; color: var(--text-muted); font-style: italic; }
 
+  /* ── El día elegido, bajo la rejilla ── */
+  .pf-cal__dia--sel { background: var(--primary-faint); border-radius: var(--r-md); }
+  .pf-cal__mas { font-size: 9px; font-weight: 800; color: var(--text-muted); }
+  .cal-sel { display: flex; align-items: center; gap: 8px; padding: 18px 16px 4px; }
+  .cal-sel__t { font-size: 17px; font-weight: 800; margin: 0; }
+  .cal-sel__vacio { text-align: center; padding: 28px 16px; color: var(--text-sec); }
+  .cal-sel__vacio p { margin: 8px 0 0; font-size: 13.5px; }
+
   /* ── Botón flotante (FAB) ── */
   .cal-fab {
     position: fixed; right: 18px; z-index: 200;
@@ -132,21 +140,37 @@
                 {{ 'pf-cal__dia--fuera' if not c.del_mes }}
                 {{ 'pf-cal__dia--finde' if c.finde and c.del_mes }}
                 {{ 'pf-cal__dia--hoy' if c.hoy }}"
+         data-iso="{{ c.iso }}"
          onclick="verDia('{{ c.iso }}')" role="button" tabindex="0"
          aria-label="{{ c.dia }}, {{ c.eventos|length }} evento(s)">
       <div class="pf-cal__n">{{ c.dia }}</div>
+      {# Como en la app: hasta tres puntos y «+N» si hay más. El título del
+         primer evento se quita: la celda es pequeña y el detalle va abajo. #}
       <div class="pf-cal__puntos">
-        {% for col in c.colores %}
+        {% for col in c.colores[:3] %}
           <span class="pf-cal__punto" style="background:{{ col }}"></span>
         {% endfor %}
+        {% if c.colores|length > 3 %}
+          <span class="pf-cal__mas">+{{ c.colores|length - 3 }}</span>
+        {% endif %}
       </div>
-      {% if c.eventos and c.del_mes %}
-        <div class="pf-cal__mini">{{ c.eventos[0].titulo }}</div>
-      {% endif %}
     </div>
     {% endfor %}
   </div>
   {% endfor %}
+</div>
+
+{# ══════════ EL DÍA ELEGIDO ══════════ #}
+{# En la app el detalle va aquí debajo, no en una hoja emergente: se ve el
+   calendario y el día a la vez. #}
+<div class="cal-sel">
+  <h2 class="cal-sel__t" id="sel-titulo">—</h2>
+  <span class="pf-pill cal-sel__hoy" id="sel-hoy" style="display:none">Hoy</span>
+</div>
+<div id="sel-eventos"></div>
+<div class="cal-sel__vacio" id="sel-vacio">
+  <i data-ico="calendar" class="pf-ico--xxl"></i>
+  <p>Sin eventos este día</p>
 </div>
 {% endif %}
 
@@ -522,20 +546,30 @@ function ponerTipo(t) {
   $('bloque-partido').style.display = (t === 'partido') ? '' : 'none';
 }
 
-/* ─── Ver un día ─── */
-function verDia(iso) {
-  const delDia = EVENTOS.filter(e => String(e.fecha).slice(0, 10) === iso);
-  const [a, m, d] = [iso.slice(0, 4), iso.slice(5, 7), iso.slice(8, 10)];
-  $('dia-titulo').textContent = d + '/' + m + '/' + a;
-  $('dia-sub').textContent = delDia.length
-    ? delDia.length + (delDia.length === 1 ? ' evento' : ' eventos')
-    : 'Sin nada agendado';
+/* ─── Ver un día ───
+   Rellena el panel de debajo de la rejilla (en la app el detalle va ahí, no
+   en una hoja emergente: así se ve el mes y el día a la vez). */
+const DIAS_ES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+const MESES_ES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio',
+                  'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
-  const caja = $('dia-eventos');
+function verDia(iso) {
+  if (!$('sel-titulo')) return;          // en la vista de semana no hay panel
+
+  document.querySelectorAll('.pf-cal__dia').forEach(c =>
+    c.classList.toggle('pf-cal__dia--sel', c.dataset.iso === iso));
+
+  const f = new Date(iso + 'T00:00:00');
+  $('sel-titulo').textContent =
+    DIAS_ES[f.getDay()] + ', ' + f.getDate() + ' de ' + MESES_ES[f.getMonth()];
+  $('sel-hoy').style.display = (iso === HOY) ? '' : 'none';
+
+  const delDia = EVENTOS.filter(e => String(e.fecha).slice(0, 10) === iso);
+  const caja = $('sel-eventos');
   caja.innerHTML = '';
   delDia.forEach(e => {
     const div = document.createElement('div');
-    div.className = 'pf-ev';
+    div.className = 'pf-card pf-ev';
     div.style.cursor = 'pointer';
     div.innerHTML =
       '<div class="pf-ev__bar" style="background:' + (e._color || '#94a3b8') + '"></div>' +
@@ -543,15 +577,10 @@ function verDia(iso) {
       escapar(e.titulo || '') + '</div><div class="pf-ev__s">' +
       escapar(e._etiqueta || '') + (e.hora ? ' · ' + String(e.hora).slice(0, 5) : '') +
       (e.lugar ? ' · ' + escapar(e.lugar) : '') + '</div></div>';
-    div.onclick = () => { PF.closeSheet('pf-sheet-dia'); editar(e); };
+    div.onclick = () => editar(e);
     caja.appendChild(div);
   });
-
-  $('dia-nuevo').onclick = () => {
-    PF.closeSheet('pf-sheet-dia');
-    nuevoEvento(iso);
-  };
-  PF.openSheet('pf-sheet-dia');
+  $('sel-vacio').style.display = delDia.length ? 'none' : '';
 }
 
 function escapar(s) {
@@ -650,5 +679,13 @@ $('f-borrar').onclick = function () {
     })
     .catch(e => PF.toast(e.message, 'error'));
 };
+
+/* Al abrir el mes, el día elegido es hoy — o el 1 si se está viendo otro mes. */
+if ($('sel-titulo')) {
+  const celdas = document.querySelectorAll('.pf-cal__dia[data-iso]');
+  const hayHoy = [].some.call(celdas, c => c.dataset.iso === HOY);
+  const inicial = hayHoy ? HOY : (celdas[0] ? celdas[0].dataset.iso : HOY);
+  verDia(inicial);
+}
 </script>
 {% endblock %}

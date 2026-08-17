@@ -10,7 +10,58 @@
 </a>
 {% endblock %}
 {% block hero_label %}<div class="pf-hero__label">Planificación</div>{% endblock %}
-{% block hero_title %}Planes de sesión{% endblock %}
+{% block hero_title %}Crear Entrenamiento{% endblock %}
+
+{% block head %}
+<style>
+  /* ── Tipo de entrenamiento (TRAINING_TYPES) ── */
+  .pl-tipos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .pl-tipo {
+    display: flex; align-items: center; gap: 10px; padding: 10px;
+    border: 1.5px solid var(--border); border-radius: var(--r-lg);
+    background: #fff; font: inherit; text-align: left;
+  }
+  .pl-tipo[aria-pressed="true"] { border-color: var(--primary); background: var(--primary-faint); }
+  .pl-tipo__ico {
+    width: 34px; height: 34px; border-radius: 17px; flex: none; color: #fff;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .pl-tipo__t { font-size: 14px; font-weight: 700; }
+
+  /* ── Intensidad, con su frase ── */
+  .pl-int {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+    padding: 11px 12px; margin-bottom: 6px; background: #fff;
+    border: 1.5px solid var(--border); border-radius: var(--r-lg); font: inherit;
+  }
+  .pl-int[aria-pressed="true"] { border-color: var(--primary); background: var(--primary-faint); }
+  .pl-int__punto { width: 12px; height: 12px; border-radius: 6px; flex: none; }
+  .pl-int__t { display: block; font-size: 14px; font-weight: 700; }
+  .pl-int__d { display: block; font-size: 12px; color: var(--text-sec); margin-top: 1px; }
+  .pl-int__ok { color: var(--primary); visibility: hidden; flex: none; }
+  .pl-int[aria-pressed="true"] .pl-int__ok { visibility: visible; }
+
+  /* ── Deslizador de carga ── */
+  .pl-carga { width: 100%; accent-color: var(--primary); height: 8px; }
+  .pl-carga__ejes {
+    display: flex; justify-content: space-between; margin-top: 6px;
+    font-size: 11.5px; color: var(--text-sec);
+  }
+
+  /* ── Programar ── */
+  .pl-cal__ico {
+    width: 32px; height: 32px; border-radius: 16px; flex: none;
+    background: var(--primary-soft); color: var(--primary);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .pl-aviso {
+    display: flex; align-items: flex-start; gap: 7px;
+    background: var(--primary-soft); color: #065f46;
+    padding: 10px 12px; border-radius: var(--r-md);
+    font-size: 12.5px; line-height: 1.5;
+  }
+</style>
+{% endblock %}
 {% block hero_subtitle %}
 <div class="pf-hero__subtitle">
   {{ planes|length }} plan{{ '' if planes|length == 1 else 'es' }} guardado{{ '' if planes|length == 1 else 's' }}
@@ -19,62 +70,139 @@
 
 {% block content %}
 
-{# ══════════ CREAR ══════════ #}
+{# ══════════ 1. INFORMACIÓN GENERAL ══════════ #}
+{# CreateTrainingPlanScreen.tsx: cuatro tarjetas, de lo general a la fecha. #}
 <div class="pf-card">
-  <div class="pf-card__head">
-    <h2 class="pf-card__title">Nuevo plan</h2>
+  <div class="pf-card__head"><h2 class="pf-card__title">Información General</h2></div>
+
+  <div class="pf-field pf-mt-12">
+    <label class="pf-label">Tipo de Entrenamiento *</label>
+    <div class="pl-tipos" role="group" aria-label="Tipo de entrenamiento" id="p-tipos">
+      {% for clave, etiqueta, color in tipos_entreno if clave != 'mixto' %}
+      <button type="button" class="pl-tipo" data-tipo="{{ clave }}" data-color="{{ color }}"
+              aria-pressed="{{ 'true' if clave == 'fisico' else 'false' }}">
+        <span class="pl-tipo__ico" style="background:{{ color }}">
+          <i data-ico="{{ iconos_tipo.get(clave, 'activity') }}" class="pf-ico--sm"></i>
+        </span>
+        <span class="pl-tipo__t">{{ etiqueta }}</span>
+      </button>
+      {% endfor %}
+    </div>
   </div>
 
   <div class="pf-field">
-    <label class="pf-label" for="p-nombre">Nombre</label>
+    <label class="pf-label" for="p-subtipo">Subtipo *</label>
+    <select class="pf-select" id="p-subtipo"></select>
+  </div>
+
+  <div class="pf-field" style="margin-bottom:0">
+    <label class="pf-label" for="p-nombre">Título del Entrenamiento *</label>
     <input class="pf-input" id="p-nombre" maxlength="120"
-           placeholder="Ej. Sesión de fuerza + finalización">
+           placeholder="Ej: Sesión de Velocidad y Explosividad">
   </div>
+</div>
+
+{# ══════════ 2. DETALLES ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Detalles</h2></div>
 
   <div class="pf-field pf-mt-12">
-    <label class="pf-label" for="p-objetivo">Objetivo</label>
-    <input class="pf-input" id="p-objetivo" maxlength="400"
-           placeholder="Qué se busca con esta sesión">
+    <label class="pf-label" for="p-descripcion">Descripción (opcional)</label>
+    <textarea class="pf-textarea" id="p-descripcion" rows="2" maxlength="600"
+              placeholder="Describe brevemente el entrenamiento…"></textarea>
   </div>
 
-  <div class="pf-row pf-mt-12" style="gap:10px">
-    <div class="pf-grow">
-      <label class="pf-label" for="p-tipo">Trabajo</label>
-      <select class="pf-select" id="p-tipo">
-        {% for clave, etiqueta, color in tipos_entreno %}
-          <option value="{{ clave }}" {{ 'selected' if clave == 'mixto' }}>{{ etiqueta }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="pf-grow">
-      <label class="pf-label" for="p-intensidad">Intensidad</label>
-      <select class="pf-select" id="p-intensidad">
-        {% for clave, etiqueta, factor in intensidades %}
-          <option value="{{ clave }}" {{ 'selected' if clave == 'media' }}>{{ etiqueta }}</option>
-        {% endfor %}
-      </select>
-    </div>
+  <div class="pf-field">
+    <label class="pf-label" for="p-objetivo">Objetivos (opcional)</label>
+    <textarea class="pf-textarea" id="p-objetivo" rows="2" maxlength="400"
+              placeholder="¿Qué quieres lograr con este entrenamiento?"></textarea>
   </div>
 
-  <div class="pf-mt-16">
-    <div class="pf-row pf-row--between" style="margin-bottom:8px">
-      <span class="pf-label" style="margin:0">Bloques de la sesión</span>
-      <span class="pf-pill pf-pill--muted" id="total-min">0 min</span>
-    </div>
-    <div id="bloques"></div>
-    <button class="pf-btn pf-btn--ghost pf-btn--block pf-mt-8" type="button" id="btn-bloque">
-      <i data-ico="plus" class="pf-ico--sm"></i> Añadir bloque
-    </button>
-  </div>
-
-  <div class="pf-field pf-mt-12">
-    <label class="pf-label" for="p-material">Material</label>
+  <div class="pf-field" style="margin-bottom:0">
+    <label class="pf-label" for="p-material">Material (opcional)</label>
     <input class="pf-input" id="p-material" maxlength="400"
            placeholder="Conos, petos, escalera, 6 balones…">
   </div>
+</div>
 
-  <button class="pf-btn pf-btn--primary pf-btn--block pf-mt-16" type="button" id="btn-crear">
-    <i data-ico="save" class="pf-ico--sm"></i> Guardar el plan
+{# ══════════ 3. INTENSIDAD Y CARGA ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Intensidad y Carga</h2></div>
+
+  <div class="pf-field pf-mt-12">
+    <label class="pf-label">Intensidad</label>
+    <div id="p-intensidades">
+      {% for clave, etiqueta, color, descripcion in intensidad_plan %}
+      <button type="button" class="pl-int" data-intensidad="{{ clave }}" data-color="{{ color }}"
+              aria-pressed="{{ 'true' if clave == 'media' else 'false' }}">
+        <span class="pl-int__punto" style="background:{{ color }}"></span>
+        <span class="pf-grow">
+          <span class="pl-int__t">{{ etiqueta }}</span>
+          <span class="pl-int__d">{{ descripcion }}</span>
+        </span>
+        <i data-ico="check" class="pf-ico--sm pl-int__ok"></i>
+      </button>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="pf-field" style="margin-bottom:0">
+    <div class="pf-row pf-row--between" style="margin-bottom:8px">
+      <span class="pf-label" style="margin:0">Carga Física</span>
+      <span id="p-carga-n" style="font-size:15px;font-weight:800;color:var(--primary)">50%</span>
+    </div>
+    <input class="pl-carga" type="range" id="p-carga" min="0" max="100" step="5" value="50"
+           aria-label="Carga física">
+    <div class="pl-carga__ejes"><span>Baja</span><span>Media</span><span>Alta</span></div>
+  </div>
+</div>
+
+{# ══════════ 4. PROGRAMAR EN CALENDARIO ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head" style="gap:10px">
+    <span class="pl-cal__ico"><i data-ico="calendar" class="pf-ico--sm"></i></span>
+    <h2 class="pf-card__title">Programar en Calendario</h2>
+  </div>
+
+  <div class="pf-field pf-mt-12">
+    <label class="pf-label" for="p-fecha">Fecha del entrenamiento *</label>
+    <input class="pf-input" id="p-fecha" type="date" value="{{ hoy }}">
+  </div>
+
+  <div class="pf-row" style="gap:10px">
+    <div style="width:130px;flex:none">
+      <label class="pf-label" for="p-hora">Hora de inicio</label>
+      <input class="pf-input" id="p-hora" type="time" value="09:00">
+    </div>
+    <div class="pf-grow">
+      <label class="pf-label" for="p-lugar">Lugar (opcional)</label>
+      <input class="pf-input" id="p-lugar" maxlength="120"
+             placeholder="Ej: Campo Municipal, Cancha 2…">
+    </div>
+  </div>
+
+  <div class="pl-aviso pf-mt-12" id="p-aviso">
+    <i data-ico="check-circle" class="pf-ico--xs"></i>
+    <span>Aparecerá en la Agenda el <strong id="p-aviso-f">—</strong>
+      a las <strong id="p-aviso-h">09:00</strong></span>
+  </div>
+</div>
+
+{# ══════════ BLOQUES ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Bloques de la sesión</h2>
+    <span class="pf-pill pf-pill--muted" id="total-min">0 min</span>
+  </div>
+  <div id="bloques" class="pf-mt-12"></div>
+  <button class="pf-btn pf-btn--ghost pf-btn--block pf-mt-8" type="button" id="btn-bloque">
+    <i data-ico="plus" class="pf-ico--sm"></i> Añadir bloque
+  </button>
+</div>
+
+<div style="padding:0 16px 30px">
+  <button class="pf-btn pf-btn--primary pf-btn--block" type="button" id="btn-crear">
+    <i data-ico="check" class="pf-ico--sm"></i> Crear Plan de Entrenamiento
   </button>
 </div>
 
@@ -174,14 +302,22 @@ document.getElementById('btn-crear').onclick = function () {
     }
   });
 
+  const val = id => document.getElementById(id).value;
   boton.disabled = true;
   PF.api('/api/plan', {
-    nombre:     document.getElementById('p-nombre').value,
-    objetivo:   document.getElementById('p-objetivo').value,
-    tipo:       document.getElementById('p-tipo').value,
-    intensidad: document.getElementById('p-intensidad').value,
-    material:   document.getElementById('p-material').value,
-    bloques:    bloques,
+    nombre:       val('p-nombre'),
+    descripcion:  val('p-descripcion'),
+    objetivo:     val('p-objetivo'),
+    tipo:         elegido('p-tipos', 'tipo') || 'fisico',
+    subtipo:      val('p-subtipo'),
+    intensidad:   elegido('p-intensidades', 'intensidad') || 'media',
+    carga_fisica: +val('p-carga'),
+    material:     val('p-material'),
+    bloques:      bloques,
+    // Programar en calendario: el evento se crea junto al plan.
+    fecha:        val('p-fecha'),
+    hora:         val('p-hora'),
+    lugar:        val('p-lugar'),
   }).then(j => {
     PF.toast(j.mensaje, 'success');
     setTimeout(() => { location.href = j.redirect; }, 700);
@@ -190,5 +326,58 @@ document.getElementById('btn-crear').onclick = function () {
     boton.disabled = false;
   });
 };
+
+/* ─── Tipo, subtipo, intensidad y carga ─── */
+const SUBTIPOS = {{ subtipos|tojson }};
+
+function elegido(cajaId, campo) {
+  const b = document.querySelector('#' + cajaId + ' [aria-pressed="true"]');
+  return b ? b.dataset[campo] : null;
+}
+
+function excluyentes(cajaId, attr, alCambiar) {
+  const caja = document.getElementById(cajaId);
+  if (!caja) return;
+  const btns = caja.querySelectorAll('[data-' + attr + ']');
+  btns.forEach(b => b.addEventListener('click', () => {
+    btns.forEach(o => o.setAttribute('aria-pressed', o === b ? 'true' : 'false'));
+    if (alCambiar) alCambiar(b.dataset[attr]);
+  }));
+}
+
+/* El subtipo depende del tipo: ocho opciones distintas por familia. */
+function cargarSubtipos(tipo) {
+  const sel = document.getElementById('p-subtipo');
+  const lista = SUBTIPOS[tipo] || [];
+  sel.innerHTML = '<option value="">Seleccionar subtipo</option>' +
+    lista.map(s => '<option value="' + s + '">' + s + '</option>').join('');
+}
+
+excluyentes('p-tipos', 'tipo', cargarSubtipos);
+excluyentes('p-intensidades', 'intensidad');
+cargarSubtipos('fisico');
+
+const carga = document.getElementById('p-carga');
+carga.addEventListener('input', () => {
+  document.getElementById('p-carga-n').textContent = carga.value + '%';
+});
+
+/* El aviso de abajo repite en cristiano cuándo caerá en la agenda. */
+const MESES_ES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio',
+                  'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+function verAviso() {
+  const f = document.getElementById('p-fecha').value;
+  const h = document.getElementById('p-hora').value || '09:00';
+  const caja = document.getElementById('p-aviso');
+  if (!f) { caja.style.display = 'none'; return; }
+  caja.style.display = '';
+  const d = new Date(f + 'T00:00:00');
+  document.getElementById('p-aviso-f').textContent =
+    d.getDate() + ' de ' + MESES_ES[d.getMonth()] + ' de ' + d.getFullYear();
+  document.getElementById('p-aviso-h').textContent = h;
+}
+document.getElementById('p-fecha').addEventListener('change', verAviso);
+document.getElementById('p-hora').addEventListener('change', verAviso);
+verAviso();
 </script>
 {% endblock %}

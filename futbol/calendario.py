@@ -58,6 +58,36 @@ INTENSIDADES = [
     ('muy_alta', 'Máxima',   2.0),
 ]
 FACTOR = {c: f for c, _, f in INTENSIDADES}
+
+#  Lo que se pide al crear un entrenamiento (CreateTrainingPlanScreen.tsx).
+#  La intensidad lleva una frase que explica para qué sirve ese nivel: sin
+#  ella «Media» no le dice nada a quien está empezando.
+INTENSIDAD_PLAN = [
+    ('baja',     'Baja',      '#10b981', 'Recuperación activa'),
+    ('media',    'Media',     '#f59e0b', 'Entrenamiento base'),
+    ('alta',     'Alta',      '#ef4444', 'Rendimiento óptimo'),
+    ('muy_alta', 'Muy Alta',  '#991b1b', 'Máximo esfuerzo'),
+]
+
+#  Ocho subtipos por familia, los mismos que la app.
+SUBTIPOS = {
+    'fisico': ['Pesas y Fuerza', 'Resistencia Aeróbica', 'Core y Estabilidad',
+               'Velocidad y Explosividad', 'Flexibilidad y Movilidad', 'Agilidad',
+               'Potencia', 'Coordinación'],
+    'tecnico': ['Control y Conducción', 'Pases y Recepción', 'Tiros a Portería',
+                'Regate y Finta', 'Centros y Remates', 'Juego Aéreo',
+                'Desmarques', 'Transiciones'],
+    'tactico': ['Posicionamiento', 'Presión Alta', 'Juego Defensivo',
+                'Salida de Balón', 'Ataque Organizado', 'Contraataques',
+                'Balón Parado', 'Transiciones Ofensivas'],
+    'mental': ['Concentración', 'Gestión de Presión', 'Confianza', 'Motivación',
+               'Comunicación', 'Liderazgo', 'Resiliencia', 'Visualización'],
+    'mixto': [],
+}
+
+#  El icono de cada familia, para el círculo de color del selector.
+ICONO_TIPO = {'fisico': 'activity', 'tecnico': 'target', 'tactico': 'grid',
+              'mental': 'cpu', 'mixto': 'layers'}
 INTENSIDAD_META = {c: {'etiqueta': e, 'factor': f} for c, e, f in INTENSIDADES}
 
 ESTADOS_ASISTENCIA = [
@@ -428,7 +458,11 @@ def c_calendario():
         tipos=TIPOS_EVENTO, tipos_entreno=TIPOS_ENTRENO, intensidades=INTENSIDADES,
         planes=db.rows('fut_training_plans', 'planes', coach_id=uid,
                        _order='creado', _desc=True) or [],
-        n_jugadores=len(db.jugadores_del_entrenador(uid)),
+        # Cuenta la plantilla entera: el que no tiene cuenta entrena y se le
+        # pasa lista igual, así que también cuenta para la agenda.
+        n_jugadores=(len(db.jugadores_del_entrenador(uid))
+                     + len(db.rows('fut_manual_players', 'manuales agenda',
+                                   coach_id=uid, activo=True) or [])),
         hoy=date.today().isoformat())
 
 
@@ -521,7 +555,11 @@ def c_planes():
                            tab_activa='agenda', hide_tabbar=True,
                            planes=planes,
                            tipos_entreno=TIPOS_ENTRENO,
-                           intensidades=INTENSIDADES)
+                           intensidades=INTENSIDADES,
+                           intensidad_plan=INTENSIDAD_PLAN,
+                           subtipos=SUBTIPOS,
+                           iconos_tipo=ICONO_TIPO,
+                           hoy=date.today().isoformat())
 
 
 @bp.route('/coach/planes/<plid>')
@@ -778,7 +816,19 @@ def api_plan():
                          or max(0, min(600, int(d.get('duracion_min') or 90)))),
         'bloques': bloques,
         'material': (d.get('material') or '')[:400],
+        'descripcion': (d.get('descripcion') or '')[:600],
     }
+
+    #  El subtipo tiene que ser uno de los ocho de SU familia: si se cambia el
+    #  tipo despues de elegirlo, el que venia deja de valer.
+    sub = (d.get('subtipo') or '').strip()
+    datos['subtipo'] = sub if sub in SUBTIPOS.get(datos['tipo'], []) else None
+
+    if d.get('carga_fisica') not in (None, ''):
+        try:
+            datos['carga_fisica'] = max(0, min(100, int(d['carga_fisica'])))
+        except (TypeError, ValueError):
+            pass
 
     plid = d.get('id')
     if plid:
@@ -791,7 +841,31 @@ def api_plan():
     fila = db.insert('fut_training_plans', datos, 'plan nuevo')
     if not fila:
         return jsonify({'error': 'No se pudo guardar el plan.'}), 500
-    return jsonify({'ok': True, 'id': fila['id'], 'mensaje': 'Plan guardado.',
+
+    #  «Programar en Calendario»: si viene fecha, el plan nace ya agendado.
+    #  Es lo que hace la app —el boton dice «Crear Plan de Entrenamiento» y el
+    #  entrenamiento aparece en la agenda— en vez de obligar a agendarlo aparte.
+    mensaje = 'Plan guardado.'
+    fecha = (d.get('fecha') or '').strip()
+    if fecha and db.parse_fecha(fecha):
+        db.insert('fut_events', {
+            'coach_id': uid,
+            'titulo': datos['nombre'],
+            'tipo': 'entreno',
+            'tipo_entreno': datos['tipo'],
+            'intensidad': datos['intensidad'],
+            'duracion_min': datos['duracion_min'],
+            'fecha': fecha[:10],
+            'hora': (d.get('hora') or '')[:5] or None,
+            'lugar': (d.get('lugar') or '')[:120],
+            'descripcion': datos['descripcion'],
+            'plan_id': fila['id'],
+            'estado': 'programado',
+            'creado': _ahora(),
+        }, 'evento del plan')
+        mensaje = 'Plan creado y agendado.'
+
+    return jsonify({'ok': True, 'id': fila['id'], 'mensaje': mensaje,
                     'redirect': url_for('futbol.c_plan', plid=fila['id'])})
 
 
