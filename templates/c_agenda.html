@@ -26,44 +26,27 @@
   </a>
 </div>
 
-{# ── Nuevo evento ── #}
-<div class="pf-card">
-  <div class="pf-card__head"><h2 class="pf-card__title">Agendar</h2></div>
+{# ── Agendar ──
+   Aquí había un formulario rápido propio. Se retira: el calendario ya tiene el
+   alta completa —tipo de entreno, intensidad, duración, rival, volcar un plan—
+   y aquélla no llegaba a eso. Tener dos altas distintas de la misma cosa además
+   hacía que el evento saliera distinto según por dónde entraras. #}
+{# pf-action no lleva margen lateral propio: necesita contenedor, o se pega a
+   los bordes. Los 16px son los mismos que usa pf-card en esta pantalla. #}
+<div class="pf-px-16 pf-mt-16">
+<a class="pf-action" href="{{ url_for('futbol.c_calendario') }}">
+  <i data-ico="plus" class="pf-ico--lg"></i>
+  <span class="pf-grow">Agendar un evento</span>
+  <i data-ico="chevron-right" class="pf-ico--sm"></i>
+</a>
 
-  <div class="pf-field pf-mt-12">
-    <input class="pf-input" id="ev-titulo" type="text" maxlength="120"
-           placeholder="Ej. Entrenamiento táctico">
-  </div>
-
-  <div class="pf-row" style="gap:10px">
-    <div class="pf-grow">
-      <label class="pf-label" for="ev-tipo">Tipo</label>
-      <select class="pf-select" id="ev-tipo">
-        <option value="entreno">Entrenamiento</option>
-        <option value="partido">Partido</option>
-        <option value="reunion">Reunión</option>
-      </select>
-    </div>
-    <div class="pf-grow">
-      <label class="pf-label" for="ev-fecha">Fecha</label>
-      <input class="pf-input" id="ev-fecha" type="date">
-    </div>
-  </div>
-
-  <div class="pf-row pf-mt-12" style="gap:10px">
-    <div style="width:120px;flex:none">
-      <label class="pf-label" for="ev-hora">Hora</label>
-      <input class="pf-input" id="ev-hora" type="time">
-    </div>
-    <div class="pf-grow">
-      <label class="pf-label" for="ev-lugar">Lugar</label>
-      <input class="pf-input" id="ev-lugar" type="text" maxlength="120" placeholder="Cancha 2">
-    </div>
-  </div>
-
-  <button class="pf-btn pf-btn--primary pf-btn--block pf-mt-12" type="button" id="btn-evento">
-    <i data-ico="plus" class="pf-ico--sm"></i> Agendar evento
-  </button>
+<a class="pf-action pf-action--sec" href="{{ url_for('futbol.c_planes') }}">
+  <i data-ico="clipboard" class="pf-ico--sm"></i>
+  <span class="pf-grow">Crear un entrenamiento
+    {% if not fut_es_pro %}<span class="pf-pro">Pro</span>{% endif %}
+  </span>
+  <i data-ico="chevron-right" class="pf-ico--sm"></i>
+</a>
 </div>
 
 {# ── Próximos ── #}
@@ -128,28 +111,4 @@
 </div>
 {% endif %}
 
-{% endblock %}
-
-{% block scripts %}
-<script>
-(function () {
-  // La fecha arranca en hoy: es lo que se agenda el 90% de las veces
-  document.getElementById('ev-fecha').value = new Date().toISOString().slice(0, 10);
-
-  document.getElementById('btn-evento').addEventListener('click', function () {
-    var titulo = document.getElementById('ev-titulo').value.trim();
-    if (!titulo) { document.getElementById('ev-titulo').focus(); return; }
-
-    PF.api('{{ url_for("futbol.api_evento_crear") }}', {
-      titulo: titulo,
-      tipo: document.getElementById('ev-tipo').value,
-      fecha: document.getElementById('ev-fecha').value,
-      hora: document.getElementById('ev-hora').value || null,
-      lugar: document.getElementById('ev-lugar').value.trim()
-    })
-      .then(function () { location.reload(); })
-      .catch(function (e) { PF.toast(e.message, 'error'); });
-  });
-})();
-</script>
 {% endblock %}

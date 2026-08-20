@@ -214,29 +214,13 @@ def api_entreno_borrar(eid):
 
 
 # ═══════════════════════ AGENDA Y ASISTENCIA ═══════════════════════
-@bp.route('/api/evento', methods=['POST'])
-@api
-def api_evento_crear():
-    if not es_coach():
-        return jsonify({'error': 'Solo el entrenador agenda eventos.'}), 403
-    d = body()
-    titulo = (d.get('titulo') or '').strip()
-    if not titulo:
-        return jsonify({'error': 'Ponle un título al evento.'}), 400
-    fila = db.insert('fut_events', {
-        'coach_id': current_user.id,
-        'tipo': (d.get('tipo') or 'entreno')[:20],
-        'titulo': titulo[:120],
-        'fecha': d.get('fecha') or db.hoy_iso(),
-        'hora': d.get('hora') or None,
-        'lugar': (d.get('lugar') or '')[:120],
-        'descripcion': (d.get('descripcion') or '')[:800],
-        'creado': ahora(),
-    })
-    if not fila:
-        return jsonify({'error': 'No se pudo crear el evento.'}), 500
-    return jsonify({'ok': True, 'evento': fila})
-
+#  El alta rapida de eventos vivia aqui y se ha retirado: la creaba solo el
+#  formulario de la pestaña Lista, que ya no existe porque el calendario tiene
+#  el alta completa (tipo de entreno, intensidad, duracion, rival, volcar un
+#  plan). Ademas estaba peor hecha que la del calendario: guardaba el evento
+#  bajo `current_user.id` en vez del equipo —los de un asistente tecnico se
+#  perdian— y no pasaba por el tope de eventos del plan gratuito.
+#  El alta buena es POST /api/calendario/evento, en calendario.py.
 
 @bp.route('/api/evento/<eid>', methods=['DELETE'])
 @api
