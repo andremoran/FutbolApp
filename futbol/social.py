@@ -100,7 +100,7 @@ def api_mensaje():
             return jsonify({'error': 'Ese jugador no es de tu plantilla.'}), 403
 
     fila = db.insert('fut_messages', {
-        'coach_id': current_user.id,
+        'coach_id': db.equipo_id(current_user.id),
         'player_id': destino,
         'texto': texto[:2000],
         'leido': False,
@@ -204,7 +204,7 @@ def api_observacion():
             return jsonify({'error': 'Ese jugador no es de tu plantilla.'}), 403
 
     fila = db.insert('fut_observaciones', {
-        'coach_id': current_user.id,
+        'coach_id': db.equipo_id(current_user.id),
         'player_id': destino,
         'fecha': d.get('fecha') or db.hoy_iso(),
         'titulo': (d.get('titulo') or 'Sesión')[:120],

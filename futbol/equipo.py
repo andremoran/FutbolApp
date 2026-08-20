@@ -498,7 +498,10 @@ def c_unirme_equipo():
                            tab_activa='', hide_tabbar=True,
                            solicitud=mia,
                            principal=principal,
-                           n_propios=len(db.jugadores_del_entrenador(uid)))
+                           # Con tamano_plantilla, que suma a los apuntados a
+                           # mano: si no, a quien tiene la plantilla entera sin
+                           # cuenta le salia 0 y el aviso no aparecia.
+                           n_propios=db.tamano_plantilla(uid))
 
 
 @bp.route('/api/unirme-equipo', methods=['POST'])

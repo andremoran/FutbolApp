@@ -807,7 +807,9 @@ def c_eval_nueva():
     return render_template('c_eval_nueva.html',
                            tab_activa='equipo', hide_tabbar=True,
                            categorias=cat.CATEGORIAS,
-                           propias=pruebas_propias(current_user.id))
+                           # Por equipo_id: las pruebas propias son del
+                           # EQUIPO, y un asistente no veia ninguna.
+                           propias=pruebas_propias(db.equipo_id(current_user.id)))
 
 
 def _recordatorio_protocolo(texto, tope=400):
@@ -1219,7 +1221,7 @@ def api_eval_test_crear():
         return jsonify({'error': 'Añade al menos una medida.'}), 400
 
     fila = db.insert('fut_eval_templates', {
-        'coach_id': current_user.id,
+        'coach_id': db.equipo_id(current_user.id),
         'clave': f'propia:{uuid.uuid4().hex[:12]}',
         'nombre': nombre[:120],
         'categoria': (d.get('categoria') if d.get('categoria') in dict(

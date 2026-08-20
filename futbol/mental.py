@@ -127,7 +127,7 @@ def api_mental_asignar():
     creadas = 0
     for pid in destinos:
         fila = db.insert('fut_mental_asignaciones', {
-            'coach_id': current_user.id,
+            'coach_id': db.equipo_id(current_user.id),
             'player_id': pid,
             'mensaje': mensaje,
             'fecha_limite': limite,

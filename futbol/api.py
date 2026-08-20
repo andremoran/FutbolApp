@@ -280,20 +280,26 @@ def api_equipo_guardar():
     if not es_coach():
         return jsonify({'error': 'Solo el entrenador edita el equipo.'}), 403
     d = body()
+    uid = db.equipo_id(current_user.id)
     datos = {
-        'coach_id': current_user.id,
         'nombre': (d.get('nombre') or 'Mi equipo')[:80],
-        'codigo': db.codigo_equipo(current_user.id),
+        'codigo': db.codigo_equipo(uid),
     }
     # `categoria` es texto libre y ya no se edita desde la pantalla (la
     # categoría de verdad es `categoria_edad`, que se elige en «Nivel del
     # equipo»). Solo se toca si llega: si no, se conserva lo que hubiera.
     if 'categoria' in d:
         datos['categoria'] = (d.get('categoria') or '')[:60]
-    existente = db.one('fut_teams', 'equipo', coach_id=db.equipo_id(current_user.id))
+
+    existente = db.one('fut_teams', 'equipo', coach_id=uid)
     if existente:
+        # El `coach_id` NO se toca al actualizar. Antes se reescribía con
+        # `current_user.id`, así que un ASISTENTE que cambiara el nombre del
+        # equipo se lo quedaba: el equipo pasaba a ser suyo y el principal lo
+        # perdía de vista. El dueño solo se fija al crearlo.
         db.update('fut_teams', datos, 'equipo up', id=existente['id'])
     else:
+        datos['coach_id'] = uid
         datos['creado'] = ahora()
         if not db.insert('fut_teams', datos):
             return jsonify({'error': 'No se pudo guardar el equipo.'}), 500
@@ -399,7 +405,7 @@ def api_evaluacion():
     if not es_manual:
         db.insert('fut_evaluations', {
             'player_id': pid,
-            'coach_id': current_user.id,
+            'coach_id': db.equipo_id(current_user.id),
             'fecha': d.get('fecha') or db.hoy_iso(),
             'notas': (d.get('notas') or '')[:2000],
             'puntuaciones': puntuaciones,
@@ -432,7 +438,7 @@ def api_partido():
         return jsonify({'error': 'Solo el entrenador registra partidos.'}), 403
     d = body()
     fila = db.insert('fut_matches', {
-        'coach_id': current_user.id,
+        'coach_id': db.equipo_id(current_user.id),
         'rival': (d.get('rival') or 'Rival')[:80],
         'fecha': d.get('fecha') or db.hoy_iso(),
         'local': bool(d.get('local', True)),
@@ -483,7 +489,7 @@ def api_test_crear():
     if not nombre:
         return jsonify({'error': 'Ponle un nombre a la prueba.'}), 400
     fila = db.insert('fut_tests', {
-        'coach_id': current_user.id,
+        'coach_id': db.equipo_id(current_user.id),
         'nombre': nombre[:80],
         'tipo': (d.get('tipo') or 'distancia')[:30],
         'unidad': (d.get('unidad') or '')[:20],
@@ -528,17 +534,20 @@ def api_jugada_guardar():
         return jsonify({'error': 'Solo el entrenador guarda jugadas.'}), 403
     d = body()
     nombre = (d.get('nombre') or '').strip() or 'Jugada sin nombre'
+    uid = db.equipo_id(current_user.id)
     datos = {
-        'coach_id': current_user.id,
         'nombre': nombre[:80],
         'formacion': (d.get('formacion') or '')[:20],
         'datos': d.get('datos') or {},
     }
     jid = d.get('id')
     if jid:
-        db.update('fut_tactical_plays', datos, 'jugada up', id=jid, coach_id=db.equipo_id(current_user.id))
+        # Sin tocar el dueño: se filtraba por el equipo pero se reescribía el
+        # `coach_id` con el del asistente, y la jugada desaparecía de la lista.
+        db.update('fut_tactical_plays', datos, 'jugada up', id=jid, coach_id=uid)
         return jsonify({'ok': True, 'id': jid})
 
+    datos['coach_id'] = uid
     datos['creado'] = ahora()
     fila = db.insert('fut_tactical_plays', datos)
     if not fila:
