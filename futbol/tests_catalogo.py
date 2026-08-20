@@ -824,12 +824,1089 @@ _EXTRA = {
 }
 
 
-# El catálogo que ve la app: primero las del MVP, luego las añadidas.
-CATALOGO = {**_MVP, **_EXTRA}
+# ═══════════════════════════════════════════════════════════════════════════
+#  BLOQUE C — LAS PRUEBAS AVALADAS DE LA BIBLIOTECA
+# ═══════════════════════════════════════════════════════════════════════════
+#  La biblioteca son 40 pruebas con protocolo y bibliografía publicados, las
+#  mismas que la app nativa enseña en «Biblioteca de tests». Trece de ellas ya
+#  estaban arriba midiendo exactamente lo mismo (Yo-Yo, CMJ, T-Test, LSPT...) y
+#  NO se repiten aquí: se enriquecen en su sitio desde `tests_biblioteca.py`.
+#  Duplicarlas partiría en dos el histórico del jugador.
+#
+#  Estas son las 27 restantes. Los baremos salen de `_baremos_40.py`, que parte
+#  de los valores normativos que cada prueba publica y los proyecta a los once
+#  contextos con la curva medida sobre las doce de la biblioteca que ya traían
+#  baremo real. Los valores publicados se respetan tal cual en su contexto: si
+#  la fuente dice que el sub-18 bueno son 20 m, en sub-18 salen 20 m.
+# ═══════════════════════════════════════════════════════════════════════════
+
+_BIBLIOTECA_TESTS = {
+
+    'squat_1rm': {
+        'nombre': '1RM Back Squat',
+        'categoria': 'fisico',
+        'orden': 250,
+        'icono': 'trending-up',
+        'fuente': 'Brzycki, M. (1993). JOPERD, 64(1), 88–90',
+        'campos': [
+            _campo('ratio', 'Ratio 1RM / peso corporal', '×', 0.4, 3.0, 2, '1.50', MAYOR),
+            _campo('one_rm_kg', 'Carga máxima', 'kg', 20, 300, 1, '110.0', MAYOR, False),
+            _campo('bw_kg', 'Peso corporal', 'kg', 25, 130, 1, '73.0', MAYOR, False),
+        ],
+        'baremos': {
+            'ratio': {
+                ('general', 'elite'):        [1.95, 1.8, 1.65, 1.5],
+                ('general', 'profesional'):  [1.75, 1.6, 1.45, 1.3],
+                ('general', 'semipro'):      [1.65, 1.5, 1.35, 1.2],
+                ('general', 'amateur'):      [1.55, 1.4, 1.25, 1.1],
+                ('sub_18', 'general'):       [1.55, 1.35, 1.15, 1.0],
+                ('sub_17', 'general'):       [1.4, 1.2, 1.0, 0.85],
+                ('sub_16', 'general'):       [1.3, 1.1, 0.92, 0.77],
+                ('sub_15', 'general'):       [1.2, 1.0, 0.85, 0.7],
+                ('sub_14', 'general'):       [1.14, 0.95, 0.8, 0.66],
+                ('sub_12', 'general'):       [0.98, 0.82, 0.7, 0.57],
+                ('general', 'general'):      [1.68, 1.53, 1.39, 1.25],
+            },
+        },
+    },
+
+    'ift_30_15': {
+        'nombre': '30-15 Intermittent Fitness Test (30-15IFT)',
+        'categoria': 'fisico',
+        'orden': 260,
+        'icono': 'activity',
+        'fuente': 'Buchheit, M. (2008). The 30-15 Intermittent Fitness Test: accuracy '
+        'for individualizing interval training. Journal of Strength and '
+        'Conditioning Research, 22(2), 365–374',
+        'campos': [
+            _campo('vift_kmh', 'VIFT', 'km/h', 8, 26, 1, '18.5', MAYOR),
+            _campo('vo2max', 'VO₂max estimado', 'ml/kg/min', 25, 80, 1, '55.0', MAYOR, False),
+        ],
+        'baremos': {
+            'vift_kmh': {
+                ('general', 'elite'):        [21.0, 20.0, 19.0, 18.0],
+                ('general', 'profesional'):  [20.0, 19.0, 18.0, 17.0],
+                ('general', 'semipro'):      [19.4, 18.4, 17.4, 16.4],
+                ('general', 'amateur'):      [18.7, 17.7, 16.7, 15.7],
+                ('sub_18', 'general'):       [19.0, 18.0, 17.0, 16.0],
+                ('sub_17', 'general'):       [17.7, 16.8, 15.8, 14.9],
+                ('sub_16', 'general'):       [16.8, 15.9, 15.0, 14.1],
+                ('sub_15', 'general'):       [15.9, 15.1, 14.2, 13.4],
+                ('sub_14', 'general'):       [15.5, 14.7, 13.9, 13.1],
+                ('sub_12', 'general'):       [14.4, 13.6, 12.9, 12.1],
+                ('general', 'general'):      [19.9, 18.9, 17.9, 16.9],
+            },
+            'vo2max': {
+                ('general', 'elite'):        [62.0, 58.0, 54.0, 50.0],
+                ('general', 'profesional'):  [58.4, 54.6, 50.8, 47.1],
+                ('general', 'semipro'):      [56.4, 52.7, 49.1, 45.5],
+                ('general', 'amateur'):      [53.9, 50.4, 47.0, 43.5],
+                ('sub_18', 'general'):       [54.9, 51.3, 47.8, 44.3],
+                ('sub_17', 'general'):       [51.1, 47.8, 44.5, 41.2],
+                ('sub_16', 'general'):       [48.5, 45.3, 42.2, 39.1],
+                ('sub_15', 'general'):       [45.9, 43.0, 40.0, 37.0],
+                ('sub_14', 'general'):       [44.8, 41.9, 39.0, 36.1],
+                ('sub_12', 'general'):       [41.6, 38.9, 36.2, 33.6],
+                ('general', 'general'):      [58.0, 54.2, 50.5, 46.7],
+            },
+        },
+    },
+
+    'dinamometria': {
+        'nombre': 'Dinamometría Manual',
+        'categoria': 'fisico',
+        'orden': 270,
+        'icono': 'minimize-2',
+        'fuente': 'Leyk, D. et al. (2007). European Journal of Applied Physiology, '
+        '99(4), 415–421',
+        'campos': [
+            _campo('grip_dom_kg', 'Prensión mano dominante', 'kg', 10, 100, 1, '52.0', MAYOR),
+            _campo('grip_nd_kg', 'Prensión mano no dominante', 'kg', 10, 100, 1, '49.0', MAYOR, False),
+        ],
+        'baremos': {
+            'grip_dom_kg': {
+                ('general', 'elite'):        [83.6, 74.6, 66.9, 59.1],
+                ('general', 'profesional'):  [74.3, 66.3, 59.4, 52.6],
+                ('general', 'semipro'):      [69.6, 62.1, 55.7, 49.3],
+                ('general', 'amateur'):      [65.0, 58.0, 52.0, 46.0],
+                ('sub_18', 'general'):       [61.4, 54.8, 49.1, 43.4],
+                ('sub_17', 'general'):       [54.9, 49.0, 43.9, 38.9],
+                ('sub_16', 'general'):       [49.8, 44.5, 39.9, 35.3],
+                ('sub_15', 'general'):       [45.2, 40.3, 36.2, 32.0],
+                ('sub_14', 'general'):       [42.8, 38.2, 34.2, 30.3],
+                ('sub_12', 'general'):       [37.0, 33.1, 29.6, 26.2],
+                ('general', 'general'):      [71.2, 63.5, 57.0, 50.4],
+            },
+            'grip_nd_kg': {
+                ('general', 'elite'):        [78.4, 70.7, 63.0, 55.3],
+                ('general', 'profesional'):  [69.7, 62.9, 56.0, 49.1],
+                ('general', 'semipro'):      [65.4, 58.9, 52.5, 46.1],
+                ('general', 'amateur'):      [61.0, 55.0, 49.0, 43.0],
+                ('sub_18', 'general'):       [57.6, 51.9, 46.3, 40.6],
+                ('sub_17', 'general'):       [51.5, 46.5, 41.4, 36.3],
+                ('sub_16', 'general'):       [46.8, 42.2, 37.6, 33.0],
+                ('sub_15', 'general'):       [42.4, 38.3, 34.1, 29.9],
+                ('sub_14', 'general'):       [40.2, 36.2, 32.3, 28.3],
+                ('sub_12', 'general'):       [34.8, 31.3, 27.9, 24.5],
+                ('general', 'general'):      [66.8, 60.2, 53.7, 47.1],
+            },
+        },
+    },
+
+    'list_test': {
+        'nombre': 'Loughborough Intermittent Shuttle Test (LIST)',
+        'categoria': 'fisico',
+        'orden': 280,
+        'icono': 'clock',
+        'fuente': 'Nicholas, C.W. et al. (1995). Journal of Sports Sciences, 13(6), '
+        '474–481',
+        'campos': [
+            _campo('total_min', 'Minutos mantenidos', 'min', 0, 90, 0, '75', MAYOR),
+            _campo('sprint_dec_pct', 'Descenso del sprint', '%', 0, 30, 1, '4.0', MENOR, False),
+        ],
+        'baremos': {
+            'total_min': {
+                ('general', 'elite'):        [90, 85, 75, 60],
+                ('general', 'profesional'):  [80, 76, 67, 53],
+                ('general', 'semipro'):      [75, 71, 62, 50],
+                ('general', 'amateur'):      [70, 66, 58, 47],
+                ('sub_18', 'general'):       [66, 62, 55, 44],
+                ('sub_17', 'general'):       [59, 56, 49, 39],
+                ('sub_16', 'general'):       [54, 51, 45, 36],
+                ('sub_15', 'general'):       [49, 46, 41, 32],
+                ('sub_14', 'general'):       [46, 44, 38, 31],
+                ('sub_12', 'general'):       [40, 38, 33, 27],
+                ('general', 'general'):      [77, 72, 64, 51],
+            },
+            'sprint_dec_pct': {
+                ('general', 'elite'):        [1.9, 3.3, 4.7, 6.6],
+                ('general', 'profesional'):  [2.0, 3.5, 5.0, 7.0],
+                ('general', 'semipro'):      [2.1, 3.6, 5.2, 7.2],
+                ('general', 'amateur'):      [2.2, 3.8, 5.4, 7.6],
+                ('sub_18', 'general'):       [2.1, 3.7, 5.3, 7.4],
+                ('sub_17', 'general'):       [2.3, 4.0, 5.7, 8.0],
+                ('sub_16', 'general'):       [2.4, 4.2, 6.0, 8.4],
+                ('sub_15', 'general'):       [2.5, 4.4, 6.4, 8.9],
+                ('sub_14', 'general'):       [2.6, 4.6, 6.5, 9.1],
+                ('sub_12', 'general'):       [2.8, 4.9, 7.0, 9.8],
+                ('general', 'general'):      [2.0, 3.5, 5.0, 7.0],
+            },
+        },
+    },
+
+    'margaria_kalamen': {
+        'nombre': 'Margaria-Kalamen (Escalera)',
+        'categoria': 'fisico',
+        'orden': 290,
+        'icono': 'chevron-up',
+        'fuente': 'Kalamen, J. (1968). Doctoral Dissertation, The Ohio State University',
+        'campos': [
+            _campo('power_wkg', 'Potencia relativa', 'W/kg', 5, 35, 1, '20.0', MAYOR),
+            _campo('power_w', 'Potencia', 'W', 300, 2600, 0, '1600', MAYOR, False),
+        ],
+        'baremos': {
+            'power_wkg': {
+                ('general', 'elite'):        [23.4, 21.2, 19.1, 17.0],
+                ('general', 'profesional'):  [22.0, 20.0, 18.0, 16.0],
+                ('general', 'semipro'):      [21.2, 19.3, 17.4, 15.5],
+                ('general', 'amateur'):      [20.3, 18.5, 16.6, 14.8],
+                ('sub_18', 'general'):       [20.7, 18.8, 16.9, 15.0],
+                ('sub_17', 'general'):       [19.3, 17.5, 15.8, 14.0],
+                ('sub_16', 'general'):       [18.3, 16.6, 14.9, 13.3],
+                ('sub_15', 'general'):       [17.3, 15.7, 14.2, 12.6],
+                ('sub_14', 'general'):       [16.9, 15.4, 13.8, 12.3],
+                ('sub_12', 'general'):       [15.7, 14.3, 12.8, 11.4],
+                ('general', 'general'):      [21.9, 19.9, 17.9, 15.9],
+            },
+            'power_w': {
+                ('general', 'elite'):        [2138, 1912, 1688, 1462],
+                ('general', 'profesional'):  [1900, 1700, 1500, 1300],
+                ('general', 'semipro'):      [1781, 1594, 1406, 1219],
+                ('general', 'amateur'):      [1662, 1488, 1312, 1138],
+                ('sub_18', 'general'):       [1570, 1404, 1239, 1074],
+                ('sub_17', 'general'):       [1404, 1256, 1109, 961],
+                ('sub_16', 'general'):       [1274, 1140, 1006, 872],
+                ('sub_15', 'general'):       [1157, 1035, 913, 791],
+                ('sub_14', 'general'):       [1094, 979, 864, 749],
+                ('sub_12', 'general'):       [948, 848, 748, 648],
+                ('general', 'general'):      [1821, 1629, 1437, 1246],
+            },
+        },
+    },
+
+    'rast': {
+        'nombre': 'RAST (Running-based Anaerobic Sprint Test)',
+        'categoria': 'fisico',
+        'orden': 300,
+        'icono': 'zap',
+        'fuente': 'Zacharogiannis, E., Paradisis, G., & Tziortzis, S. (2004). Medicine '
+        'and Science in Sports and Exercise, 36(5), S116',
+        'campos': [
+            _campo('pmax_w', 'Potencia máxima', 'W', 200, 1600, 0, '850', MAYOR),
+            _campo('pmin_w', 'Potencia mínima', 'W', 100, 1200, 0, '600', MAYOR, False),
+            _campo('fatigue_idx', 'Índice de fatiga', 'W/s', 0, 40, 1, '8.0', MENOR, False),
+        ],
+        'baremos': {
+            'pmax_w': {
+                ('general', 'elite'):        [1000, 900, 800, 700],
+                ('general', 'profesional'):  [889, 800, 711, 622],
+                ('general', 'semipro'):      [833, 750, 667, 583],
+                ('general', 'amateur'):      [778, 700, 622, 544],
+                ('sub_18', 'general'):       [734, 661, 587, 514],
+                ('sub_17', 'general'):       [657, 591, 526, 460],
+                ('sub_16', 'general'):       [596, 537, 477, 417],
+                ('sub_15', 'general'):       [541, 487, 433, 379],
+                ('sub_14', 'general'):       [512, 461, 410, 358],
+                ('sub_12', 'general'):       [443, 399, 355, 310],
+                ('general', 'general'):      [852, 767, 681, 596],
+            },
+            'pmin_w': {
+                ('general', 'elite'):        [700, 620, 540, 460],
+                ('general', 'profesional'):  [622, 551, 480, 409],
+                ('general', 'semipro'):      [583, 517, 450, 383],
+                ('general', 'amateur'):      [544, 482, 420, 358],
+                ('sub_18', 'general'):       [514, 455, 397, 338],
+                ('sub_17', 'general'):       [460, 407, 355, 302],
+                ('sub_16', 'general'):       [417, 370, 322, 274],
+                ('sub_15', 'general'):       [379, 335, 292, 249],
+                ('sub_14', 'general'):       [358, 317, 276, 235],
+                ('sub_12', 'general'):       [310, 275, 239, 204],
+                ('general', 'general'):      [596, 528, 460, 392],
+            },
+            'fatigue_idx': {
+                ('general', 'elite'):        [4.7, 6.6, 9.4, 12.2],
+                ('general', 'profesional'):  [5.0, 7.0, 10.0, 13.0],
+                ('general', 'semipro'):      [5.2, 7.2, 10.4, 13.5],
+                ('general', 'amateur'):      [5.4, 7.6, 10.8, 14.1],
+                ('sub_18', 'general'):       [5.3, 7.4, 10.6, 13.8],
+                ('sub_17', 'general'):       [5.7, 8.0, 11.4, 14.8],
+                ('sub_16', 'general'):       [6.0, 8.4, 12.0, 15.7],
+                ('sub_15', 'general'):       [6.4, 8.9, 12.7, 16.5],
+                ('sub_14', 'general'):       [6.5, 9.1, 13.0, 16.9],
+                ('sub_12', 'general'):       [7.0, 9.8, 14.0, 18.2],
+                ('general', 'general'):      [5.0, 7.0, 10.1, 13.1],
+            },
+        },
+    },
+
+    'abdominales_60s': {
+        'nombre': 'Resistencia Abdominal (NSCA/ACSM)',
+        'categoria': 'fisico',
+        'orden': 310,
+        'icono': 'octagon',
+        'fuente': 'ACSM. (2022). ACSM\'s Guidelines for Exercise Testing and '
+        'Prescription (11th ed.)',
+        'campos': [
+            _campo('reps', 'Repeticiones en 60 s', 'reps', 0, 100, 0, '45', MAYOR),
+        ],
+        'baremos': {
+            'reps': {
+                ('general', 'elite'):        [58, 52, 46, 39],
+                ('general', 'profesional'):  [54, 49, 43, 37],
+                ('general', 'semipro'):      [52, 47, 42, 36],
+                ('general', 'amateur'):      [50, 45, 40, 34],
+                ('sub_18', 'general'):       [51, 46, 41, 35],
+                ('sub_17', 'general'):       [47, 43, 38, 32],
+                ('sub_16', 'general'):       [45, 40, 36, 31],
+                ('sub_15', 'general'):       [43, 38, 34, 29],
+                ('sub_14', 'general'):       [42, 37, 33, 28],
+                ('sub_12', 'general'):       [39, 35, 31, 26],
+                ('general', 'general'):      [54, 48, 43, 37],
+            },
+        },
+    },
+
+    'y_balance': {
+        'nombre': 'Y-Balance Test (YBT)',
+        'categoria': 'fisico',
+        'orden': 320,
+        'icono': 'compass',
+        'fuente': 'Plisky, P.J. et al. (2006). J. Orthopaedic & Sports Physical '
+        'Therapy, 36(12), 911–919',
+        'campos': [
+            _campo('composite_pct', 'Score compuesto', '%', 50, 130, 1, '94.0', MAYOR),
+            _campo('asym_ant_cm', 'Asimetría anterior', 'cm', 0, 15, 1, '2.0', MENOR, False),
+        ],
+        'baremos': {
+            'composite_pct': {
+                ('general', 'elite'):        [100, 94, 89, 84],
+                ('general', 'profesional'):  [100, 94, 89, 84],
+                ('general', 'semipro'):      [100, 94, 89, 84],
+                ('general', 'amateur'):      [100, 94, 89, 84],
+                ('sub_18', 'general'):       [100, 94, 89, 84],
+                ('sub_17', 'general'):       [100, 94, 89, 84],
+                ('sub_16', 'general'):       [100, 94, 89, 84],
+                ('sub_15', 'general'):       [100, 94, 89, 84],
+                ('sub_14', 'general'):       [100, 94, 89, 84],
+                ('sub_12', 'general'):       [100, 94, 89, 84],
+                ('general', 'general'):      [100, 94, 89, 84],
+            },
+            'asym_ant_cm': {
+                ('general', 'elite'):        [1, 2, 3, 4],
+                ('general', 'profesional'):  [1, 2, 3, 4],
+                ('general', 'semipro'):      [1, 2, 3, 4],
+                ('general', 'amateur'):      [1, 2, 3, 4],
+                ('sub_18', 'general'):       [1, 2, 3, 4],
+                ('sub_17', 'general'):       [1, 2, 3, 4],
+                ('sub_16', 'general'):       [1, 2, 3, 4],
+                ('sub_15', 'general'):       [1, 2, 3, 4],
+                ('sub_14', 'general'):       [1, 2, 3, 4],
+                ('sub_12', 'general'):       [1, 2, 3, 4],
+                ('general', 'general'):      [1, 2, 3, 4],
+            },
+        },
+    },
+
+    'cabeceo_bangsbo': {
+        'nombre': 'Cabeceo — Precisión y Distancia (Bangsbo)',
+        'categoria': 'tecnico',
+        'orden': 370,
+        'icono': 'circle',
+        'fuente': 'Bangsbo, J. (1994). Fitness Training in Football — A Scientific '
+        'Approach. HO+Storm',
+        'campos': [
+            _campo('precision_score', 'Precisión', '/15', 0, 15, 0, '9', MAYOR),
+            _campo('max_distance_m', 'Distancia máxima en salto', 'm', 2, 25, 1, '8.0', MAYOR, False),
+        ],
+        'baremos': {
+            'precision_score': {
+                ('general', 'elite'):        [12, 10, 8, 6],
+                ('general', 'profesional'):  [12, 9, 7, 6],
+                ('general', 'semipro'):      [12, 9, 7, 5],
+                ('general', 'amateur'):      [12, 9, 7, 5],
+                ('sub_18', 'general'):       [12, 9, 7, 5],
+                ('sub_17', 'general'):       [12, 9, 6, 4],
+                ('sub_16', 'general'):       [12, 8, 6, 4],
+                ('sub_15', 'general'):       [11, 8, 5, 3],
+                ('sub_14', 'general'):       [11, 8, 5, 3],
+                ('sub_12', 'general'):       [11, 7, 4, 2],
+                ('general', 'general'):      [12, 9, 7, 6],
+            },
+            'max_distance_m': {
+                ('general', 'elite'):        [15.0, 10.9, 8.2, 5.4],
+                ('general', 'profesional'):  [13.3, 9.7, 7.3, 4.8],
+                ('general', 'semipro'):      [12.5, 9.1, 6.8, 4.5],
+                ('general', 'amateur'):      [11.7, 8.5, 6.4, 4.2],
+                ('sub_18', 'general'):       [11.0, 8.0, 6.0, 4.0],
+                ('sub_17', 'general'):       [9.8, 7.2, 5.4, 3.6],
+                ('sub_16', 'general'):       [8.9, 6.5, 4.9, 3.2],
+                ('sub_15', 'general'):       [8.1, 5.9, 4.4, 2.9],
+                ('sub_14', 'general'):       [7.7, 5.6, 4.2, 2.8],
+                ('sub_12', 'general'):       [6.6, 4.8, 3.6, 2.4],
+                ('general', 'general'):      [12.8, 9.3, 7.0, 4.6],
+            },
+        },
+    },
+
+    'conduccion_cambio_ritmo': {
+        'nombre': 'Conducción con Cambio de Ritmo',
+        'categoria': 'tecnico',
+        'orden': 380,
+        'icono': 'fast-forward',
+        'fuente': 'Stølen, T. et al. (2005). Sports Medicine, 35(6), 501–536',
+        'campos': [
+            _campo('time_s', 'Tiempo total', 's', 4, 20, 2, '8.50', MENOR),
+            _campo('balls_lost', 'Balones perdidos', 'balones', 0, 10, 0, '1', MENOR, False),
+        ],
+        'baremos': {
+            'time_s': {
+                ('general', 'elite'):        [7.0, 7.5, 8.3, 9.3],
+                ('general', 'profesional'):  [7.39, 7.98, 8.83, 9.88],
+                ('general', 'semipro'):      [7.62, 8.27, 9.15, 10.22],
+                ('general', 'amateur'):      [7.94, 8.65, 9.57, 10.69],
+                ('sub_18', 'general'):       [7.8, 8.5, 9.4, 10.5],
+                ('sub_17', 'general'):       [8.37, 9.12, 10.09, 11.27],
+                ('sub_16', 'general'):       [8.83, 9.63, 10.65, 11.89],
+                ('sub_15', 'general'):       [9.32, 10.16, 11.23, 12.55],
+                ('sub_14', 'general'):       [9.56, 10.41, 11.52, 12.87],
+                ('sub_12', 'general'):       [10.29, 11.21, 12.4, 13.85],
+                ('general', 'general'):      [7.43, 8.04, 8.89, 9.94],
+            },
+            'balls_lost': {
+                ('general', 'elite'):        [0, 1, 2, 3],
+                ('general', 'profesional'):  [0, 1, 2, 3],
+                ('general', 'semipro'):      [0, 1, 2, 3],
+                ('general', 'amateur'):      [0, 1, 2, 3],
+                ('sub_18', 'general'):       [0, 1, 2, 3],
+                ('sub_17', 'general'):       [0, 1, 2, 3],
+                ('sub_16', 'general'):       [0, 1, 2, 3],
+                ('sub_15', 'general'):       [0, 1, 2, 3],
+                ('sub_14', 'general'):       [0, 1, 2, 3],
+                ('sub_12', 'general'):       [0, 1, 2, 3],
+                ('general', 'general'):      [0, 1, 2, 3],
+            },
+        },
+    },
+
+    'conduccion_vallas': {
+        'nombre': 'Conducción con Vallas y Slalom',
+        'categoria': 'tecnico',
+        'orden': 390,
+        'icono': 'grid',
+        'fuente': 'Reilly, T., & Holmes, M. (1983). Physical Education Review, 6(1), '
+        '64–71',
+        'campos': [
+            _campo('time_s', 'Tiempo total penalizado', 's', 6, 30, 2, '13.00', MENOR),
+        ],
+        'baremos': {
+            'time_s': {
+                ('general', 'elite'):        [8.47, 9.41, 10.54, 12.05],
+                ('general', 'profesional'):  [9.0, 10.0, 11.2, 12.8],
+                ('general', 'semipro'):      [10.34, 11.6, 12.96, 14.78],
+                ('general', 'amateur'):      [11.71, 13.23, 14.76, 16.8],
+                ('sub_18', 'general'):       [11.5, 13.0, 14.5, 16.5],
+                ('sub_17', 'general'):       [12.34, 13.95, 15.56, 17.71],
+                ('sub_16', 'general'):       [13.02, 14.72, 16.42, 18.69],
+                ('sub_15', 'general'):       [13.74, 15.53, 17.33, 19.72],
+                ('sub_14', 'general'):       [14.09, 15.93, 17.77, 20.22],
+                ('sub_12', 'general'):       [15.17, 17.15, 19.13, 21.77],
+                ('general', 'general'):      [9.24, 10.29, 11.52, 13.16],
+            },
+        },
+    },
+
+    'conduccion_circuito_30s': {
+        'nombre': 'Conducción en Circuito Cerrado 30 s',
+        'categoria': 'tecnico',
+        'orden': 400,
+        'icono': 'rotate-cw',
+        'fuente': 'Impellizzeri, F.M. et al. (2008). Level of competition and '
+        'soccer-specific fitness of under-17 players. Int. J. Sports '
+        'Medicine, 29(7), 575–582',
+        'campos': [
+            _campo('laps', 'Vueltas en 30 s', 'vueltas', 0, 12, 1, '4.0', MAYOR),
+            _campo('diff_direction', 'Diferencia entre sentidos', 'vueltas', 0, 5, 1, '0.5', MENOR, False),
+        ],
+        'baremos': {
+            'laps': {
+                ('general', 'elite'):        [6.0, 5.0, 4.0, 3.0],
+                ('general', 'profesional'):  [5.5, 4.5, 3.5, 2.5],
+                ('general', 'semipro'):      [5.2, 4.2, 3.2, 2.2],
+                ('general', 'amateur'):      [4.9, 3.9, 2.9, 2.0],
+                ('sub_18', 'general'):       [5.0, 4.0, 3.0, 2.0],
+                ('sub_17', 'general'):       [4.7, 3.7, 2.8, 1.9],
+                ('sub_16', 'general'):       [4.4, 3.5, 2.6, 1.8],
+                ('sub_15', 'general'):       [4.2, 3.3, 2.5, 1.7],
+                ('sub_14', 'general'):       [4.1, 3.3, 2.4, 1.6],
+                ('sub_12', 'general'):       [3.8, 3.0, 2.3, 1.5],
+                ('general', 'general'):      [5.4, 4.4, 3.4, 2.4],
+            },
+            'diff_direction': {
+                ('general', 'elite'):        [0.2, 0.5, 1.0, 1.5],
+                ('general', 'profesional'):  [0.2, 0.5, 1.0, 1.5],
+                ('general', 'semipro'):      [0.2, 0.5, 1.0, 1.5],
+                ('general', 'amateur'):      [0.2, 0.5, 1.0, 1.5],
+                ('sub_18', 'general'):       [0.2, 0.5, 1.0, 1.5],
+                ('sub_17', 'general'):       [0.2, 0.5, 1.0, 1.5],
+                ('sub_16', 'general'):       [0.2, 0.5, 1.0, 1.5],
+                ('sub_15', 'general'):       [0.2, 0.5, 1.0, 1.5],
+                ('sub_14', 'general'):       [0.2, 0.5, 1.0, 1.5],
+                ('sub_12', 'general'):       [0.2, 0.5, 1.0, 1.5],
+                ('general', 'general'):      [0.2, 0.5, 1.0, 1.5],
+            },
+        },
+    },
+
+    'trapping_test': {
+        'nombre': 'Control en Suelo — Trapping Test',
+        'categoria': 'tecnico',
+        'orden': 410,
+        'icono': 'box',
+        'fuente': 'Reilly, T., & Williams, A.M. (Eds.). (2003). Science and Soccer (2nd '
+        'ed.). Routledge',
+        'campos': [
+            _campo('success_10', 'Controles exitosos', '/10', 0, 10, 0, '7', MAYOR),
+        ],
+        'baremos': {
+            'success_10': {
+                ('general', 'elite'):        [10, 9, 8, 6],
+                ('general', 'profesional'):  [10, 9, 7, 5],
+                ('general', 'semipro'):      [10, 8, 7, 5],
+                ('general', 'amateur'):      [9, 8, 6, 5],
+                ('sub_18', 'general'):       [9, 8, 6, 5],
+                ('sub_17', 'general'):       [9, 7, 5, 4],
+                ('sub_16', 'general'):       [9, 7, 5, 4],
+                ('sub_15', 'general'):       [9, 7, 4, 3],
+                ('sub_14', 'general'):       [9, 7, 4, 3],
+                ('sub_12', 'general'):       [9, 6, 4, 3],
+                ('general', 'general'):      [10, 9, 7, 5],
+            },
+        },
+    },
+
+    'dominio_balon_fifa': {
+        'nombre': 'Dominio de Balón — 5 Superficies (FIFA)',
+        'categoria': 'tecnico',
+        'orden': 420,
+        'icono': 'circle',
+        'fuente': 'FIFA. (2014). Grassroots Football Manual — Technical Skill '
+        'Assessment Protocols. Zurich: FIFA',
+        'campos': [
+            _campo('cycles', 'Ciclos completos en 60 s', 'ciclos', 0, 30, 0, '6', MAYOR),
+            _campo('streak', 'Racha máxima de toques', 'toques', 0, 300, 0, '40', MAYOR, False),
+        ],
+        'baremos': {
+            'cycles': {
+                ('general', 'elite'):        [14, 10, 7, 5],
+                ('general', 'profesional'):  [13, 9, 6, 4],
+                ('general', 'semipro'):      [12, 8, 5, 4],
+                ('general', 'amateur'):      [11, 7, 5, 3],
+                ('sub_18', 'general'):       [11, 8, 5, 3],
+                ('sub_17', 'general'):       [10, 6, 4, 3],
+                ('sub_16', 'general'):       [9, 6, 3, 2],
+                ('sub_15', 'general'):       [8, 5, 3, 2],
+                ('sub_14', 'general'):       [8, 5, 3, 2],
+                ('sub_12', 'general'):       [7, 5, 3, 2],
+                ('general', 'general'):      [12, 9, 6, 4],
+            },
+            'streak': {
+                ('general', 'elite'):        [100, 60, 40, 25],
+                ('general', 'profesional'):  [89, 53, 36, 22],
+                ('general', 'semipro'):      [83, 50, 33, 21],
+                ('general', 'amateur'):      [78, 47, 31, 19],
+                ('sub_18', 'general'):       [73, 44, 29, 18],
+                ('sub_17', 'general'):       [66, 39, 26, 16],
+                ('sub_16', 'general'):       [60, 36, 24, 15],
+                ('sub_15', 'general'):       [54, 32, 22, 14],
+                ('sub_14', 'general'):       [51, 31, 20, 13],
+                ('sub_12', 'general'):       [44, 27, 18, 11],
+                ('general', 'general'):      [85, 51, 34, 21],
+            },
+        },
+    },
+
+    'dribbling_fpf': {
+        'nombre': 'Dribbling Speed Test (FPF)',
+        'categoria': 'tecnico',
+        'orden': 430,
+        'icono': 'shuffle',
+        'fuente': 'Federação Portuguesa de Futebol — FPF. (2017). Bateria de testes '
+        'técnicos para futebol formativo. Lisboa: FPF',
+        'campos': [
+            _campo('time_s', 'Tiempo total', 's', 5, 25, 2, '9.20', MENOR),
+            _campo('time_nd', 'Tiempo pierna no dominante', 's', 5, 25, 2, '9.80', MENOR, False),
+        ],
+        'baremos': {
+            'time_s': {
+                ('general', 'elite'):        [7.5, 8.0, 8.5, 9.4],
+                ('general', 'profesional'):  [8.0, 8.5, 9.0, 9.8],
+                ('general', 'semipro'):      [8.4, 8.8, 9.4, 10.2],
+                ('general', 'amateur'):      [8.7, 9.2, 9.8, 10.8],
+                ('sub_18', 'general'):       [8.5, 9.0, 9.7, 10.7],
+                ('sub_17', 'general'):       [9.0, 9.7, 10.5, 11.5],
+                ('sub_16', 'general'):       [9.49, 10.24, 10.99, 11.99],
+                ('sub_15', 'general'):       [10.0, 10.8, 11.5, 12.5],
+                ('sub_14', 'general'):       [10.25, 11.07, 11.79, 12.82],
+                ('sub_12', 'general'):       [11.04, 11.92, 12.69, 13.8],
+                ('general', 'general'):      [8.05, 8.56, 9.06, 9.87],
+            },
+            'time_nd': {
+                ('general', 'elite'):        [7.97, 8.41, 9.03, 9.91],
+                ('general', 'profesional'):  [8.46, 8.93, 9.59, 10.53],
+                ('general', 'semipro'):      [8.76, 9.25, 9.93, 10.91],
+                ('general', 'amateur'):      [9.16, 9.67, 10.38, 11.4],
+                ('sub_18', 'general'):       [9.0, 9.5, 10.2, 11.2],
+                ('sub_17', 'general'):       [9.66, 10.2, 10.95, 12.02],
+                ('sub_16', 'general'):       [10.19, 10.76, 11.55, 12.68],
+                ('sub_15', 'general'):       [10.75, 11.35, 12.19, 13.38],
+                ('sub_14', 'general'):       [11.03, 11.64, 12.5, 13.72],
+                ('sub_12', 'general'):       [11.87, 12.53, 13.46, 14.77],
+                ('general', 'general'):      [8.52, 8.99, 9.66, 10.6],
+            },
+        },
+    },
+
+    'golpeo_porteria_ali': {
+        'nombre': 'Golpeo a Portería (Ali — Loughborough)',
+        'categoria': 'tecnico',
+        'orden': 440,
+        'icono': 'target',
+        'fuente': 'Ali, A., Williams, C., Hulse, M. et al. (2007). Journal of Sports '
+        'Sciences, 25(13), 1461–1470',
+        'campos': [
+            _campo('score', 'Puntuación', 'pts', 0, 30, 0, '18', MAYOR),
+            _campo('velocity_kmh', 'Velocidad de disparo', 'km/h', 30, 140, 1, '85.0', MAYOR, False),
+        ],
+        'baremos': {
+            'score': {
+                ('general', 'elite'):        [28, 26, 22, 18],
+                ('general', 'profesional'):  [25, 22, 18, 15],
+                ('general', 'semipro'):      [23, 20, 17, 14],
+                ('general', 'amateur'):      [22, 19, 16, 13],
+                ('sub_18', 'general'):       [21, 18, 15, 12],
+                ('sub_17', 'general'):       [18, 15, 12, 9],
+                ('sub_16', 'general'):       [16, 13, 10, 7],
+                ('sub_15', 'general'):       [15, 12, 9, 6],
+                ('sub_14', 'general'):       [14, 11, 9, 6],
+                ('sub_12', 'general'):       [12, 10, 7, 5],
+                ('general', 'general'):      [24, 21, 17, 14],
+            },
+            'velocity_kmh': {
+                ('general', 'elite'):        [110.0, 100.0, 92.0, 84.0],
+                ('general', 'profesional'):  [103.5, 94.1, 86.6, 79.1],
+                ('general', 'semipro'):      [100.0, 90.9, 83.6, 76.4],
+                ('general', 'amateur'):      [95.7, 87.0, 80.0, 73.0],
+                ('sub_18', 'general'):       [97.4, 88.5, 81.4, 74.4],
+                ('sub_17', 'general'):       [90.7, 82.5, 75.9, 69.3],
+                ('sub_16', 'general'):       [86.0, 78.2, 71.9, 65.7],
+                ('sub_15', 'general'):       [81.5, 74.1, 68.1, 62.2],
+                ('sub_14', 'general'):       [79.5, 72.2, 66.5, 60.7],
+                ('sub_12', 'general'):       [73.8, 67.1, 61.7, 56.4],
+                ('general', 'general'):      [102.8, 93.5, 86.0, 78.5],
+            },
+        },
+    },
+
+    'juego_aereo': {
+        'nombre': 'Juego Aéreo — Duelos de Cabeza',
+        'categoria': 'tecnico',
+        'orden': 450,
+        'icono': 'arrow-up',
+        'fuente': 'Bangsbo, J. (1994). Fitness Training in Football. HO+Storm',
+        'campos': [
+            _campo('wins_opp', 'Duelos ganados con oponente', '/5', 0, 5, 0, '3', MAYOR),
+            _campo('wins_no_opp', 'Duelos ganados sin oponente', '/5', 0, 5, 0, '4', MAYOR, False),
+        ],
+        'baremos': {
+            'wins_opp': {
+                ('general', 'elite'):        [5, 4, 3, 2],
+                ('general', 'profesional'):  [5, 4, 3, 2],
+                ('general', 'semipro'):      [4, 3, 2, 1],
+                ('general', 'amateur'):      [4, 3, 2, 1],
+                ('sub_18', 'general'):       [4, 3, 2, 1],
+                ('sub_17', 'general'):       [4, 3, 2, 1],
+                ('sub_16', 'general'):       [4, 3, 2, 0],
+                ('sub_15', 'general'):       [4, 3, 1, 0],
+                ('sub_14', 'general'):       [4, 3, 1, 0],
+                ('sub_12', 'general'):       [4, 2, 1, 0],
+                ('general', 'general'):      [4, 3, 2, 1],
+            },
+            'wins_no_opp': {
+                ('general', 'elite'):        [5, 4, 3, 2],
+                ('general', 'profesional'):  [5, 4, 3, 2],
+                ('general', 'semipro'):      [5, 4, 3, 2],
+                ('general', 'amateur'):      [5, 4, 3, 2],
+                ('sub_18', 'general'):       [5, 4, 3, 2],
+                ('sub_17', 'general'):       [5, 4, 3, 2],
+                ('sub_16', 'general'):       [5, 4, 3, 2],
+                ('sub_15', 'general'):       [5, 4, 3, 1],
+                ('sub_14', 'general'):       [5, 4, 3, 1],
+                ('sub_12', 'general'):       [5, 4, 2, 1],
+                ('general', 'general'):      [5, 4, 3, 2],
+            },
+        },
+    },
+
+    'pared_primer_toque': {
+        'nombre': 'Pared — Pases de Primer Toque',
+        'categoria': 'tecnico',
+        'orden': 460,
+        'icono': 'repeat',
+        'fuente': 'Grehaigne, J.F., Bouthier, D., & David, B. (1997). Dynamic-system '
+        'analysis of opponent relationships in collective actions in soccer. '
+        'Journal of Sports Sciences, 15(2), 137–149',
+        'campos': [
+            _campo('hits_30s', 'Toques precisos en 30 s', 'toques', 0, 60, 0, '22', MAYOR),
+        ],
+        'baremos': {
+            'hits_30s': {
+                ('general', 'elite'):        [42, 36, 30, 23],
+                ('general', 'profesional'):  [40, 34, 28, 22],
+                ('general', 'semipro'):      [31, 25, 20, 15],
+                ('general', 'amateur'):      [26, 20, 15, 11],
+                ('sub_18', 'general'):       [26, 20, 15, 11],
+                ('sub_17', 'general'):       [24, 19, 14, 10],
+                ('sub_16', 'general'):       [23, 18, 13, 10],
+                ('sub_15', 'general'):       [22, 17, 13, 9],
+                ('sub_14', 'general'):       [21, 16, 12, 9],
+                ('sub_12', 'general'):       [20, 15, 11, 8],
+                ('general', 'general'):      [38, 32, 26, 20],
+            },
+        },
+    },
+
+    'pase_largo_precision': {
+        'nombre': 'Pase Largo — Precisión y Distancia',
+        'categoria': 'tecnico',
+        'orden': 470,
+        'icono': 'send',
+        'fuente': 'Haaland, E., & Hoff, J. (2003). Non-dominant leg training improves '
+        'the bilateral motor performance of soccer players. Scandinavian '
+        'Journal of Medicine & Science in Sports, 13(3), 179–184',
+        'campos': [
+            _campo('score', 'Puntuación', '/27', 0, 27, 0, '16', MAYOR),
+            _campo('asym', 'Asimetría entre piernas', 'pts', 0, 27, 0, '3', MENOR, False),
+        ],
+        'baremos': {
+            'score': {
+                ('general', 'elite'):        [23, 18, 15, 11],
+                ('general', 'profesional'):  [23, 17, 14, 10],
+                ('general', 'semipro'):      [22, 17, 13, 10],
+                ('general', 'amateur'):      [22, 17, 13, 9],
+                ('sub_18', 'general'):       [22, 17, 13, 9],
+                ('sub_17', 'general'):       [22, 16, 12, 8],
+                ('sub_16', 'general'):       [22, 15, 11, 7],
+                ('sub_15', 'general'):       [21, 15, 10, 6],
+                ('sub_14', 'general'):       [21, 14, 10, 5],
+                ('sub_12', 'general'):       [21, 13, 9, 4],
+                ('general', 'general'):      [23, 17, 14, 10],
+            },
+            'asym': {
+                ('general', 'elite'):        [1, 2, 3, 5],
+                ('general', 'profesional'):  [1, 2, 3, 5],
+                ('general', 'semipro'):      [1, 2, 3, 5],
+                ('general', 'amateur'):      [1, 2, 3, 5],
+                ('sub_18', 'general'):       [1, 2, 3, 5],
+                ('sub_17', 'general'):       [1, 2, 3, 5],
+                ('sub_16', 'general'):       [1, 2, 3, 5],
+                ('sub_15', 'general'):       [1, 2, 3, 5],
+                ('sub_14', 'general'):       [1, 2, 3, 5],
+                ('sub_12', 'general'):       [1, 2, 3, 5],
+                ('general', 'general'):      [1, 2, 3, 5],
+            },
+        },
+    },
+
+    'penalti_test': {
+        'nombre': 'Penalti — Velocidad, Precisión y Presión',
+        'categoria': 'tecnico',
+        'orden': 480,
+        'icono': 'target',
+        'fuente': 'Wilson, M.R. et al. (2009). Anxiety, attentional control, and '
+        'performance impairment in penalty kicks. J. Sport and Exercise '
+        'Psychology, 31(6), 761–775',
+        'campos': [
+            _campo('score', 'Puntuación', '/30', 0, 30, 0, '20', MAYOR),
+        ],
+        'baremos': {
+            'score': {
+                ('general', 'elite'):        [28, 26, 23, 20],
+                ('general', 'profesional'):  [26, 23, 20, 17],
+                ('general', 'semipro'):      [25, 22, 19, 16],
+                ('general', 'amateur'):      [23, 20, 17, 14],
+                ('sub_18', 'general'):       [22, 19, 16, 13],
+                ('sub_17', 'general'):       [20, 17, 14, 11],
+                ('sub_16', 'general'):       [18, 15, 12, 9],
+                ('sub_15', 'general'):       [17, 14, 11, 8],
+                ('sub_14', 'general'):       [16, 13, 10, 8],
+                ('sub_12', 'general'):       [14, 11, 9, 7],
+                ('general', 'general'):      [25, 22, 19, 16],
+            },
+        },
+    },
+
+    'recepcion_pivot': {
+        'nombre': 'Recepción en Movimiento — Pivot',
+        'categoria': 'tecnico',
+        'orden': 490,
+        'icono': 'rotate-ccw',
+        'fuente': 'Dellal, A. et al. (2011). Comparison of technical performances of '
+        'players in the top five European professional soccer league '
+        'tournaments. Journal of Sports Medicine and Physical Fitness, 51(4), '
+        '690–700',
+        'campos': [
+            _campo('correct', 'Controles orientados', '/10', 0, 10, 0, '7', MAYOR),
+            _campo('orientation_s', 'Tiempo de orientación', 's', 0.3, 6, 2, '1.50', MENOR, False),
+        ],
+        'baremos': {
+            'correct': {
+                ('general', 'elite'):        [9, 8, 6, 5],
+                ('general', 'profesional'):  [9, 7, 6, 5],
+                ('general', 'semipro'):      [9, 7, 5, 4],
+                ('general', 'amateur'):      [9, 7, 5, 4],
+                ('sub_18', 'general'):       [9, 7, 5, 4],
+                ('sub_17', 'general'):       [9, 7, 5, 4],
+                ('sub_16', 'general'):       [9, 7, 5, 4],
+                ('sub_15', 'general'):       [9, 7, 4, 3],
+                ('sub_14', 'general'):       [9, 7, 4, 3],
+                ('sub_12', 'general'):       [9, 6, 4, 3],
+                ('general', 'general'):      [9, 7, 6, 5],
+            },
+            'orientation_s': {
+                ('general', 'elite'):        [0.99, 1.24, 1.57, 1.98],
+                ('general', 'profesional'):  [1.05, 1.31, 1.66, 2.1],
+                ('general', 'semipro'):      [1.09, 1.36, 1.72, 2.18],
+                ('general', 'amateur'):      [1.14, 1.42, 1.8, 2.28],
+                ('sub_18', 'general'):       [1.12, 1.4, 1.77, 2.24],
+                ('sub_17', 'general'):       [1.2, 1.5, 1.9, 2.4],
+                ('sub_16', 'general'):       [1.27, 1.58, 2.0, 2.53],
+                ('sub_15', 'general'):       [1.34, 1.67, 2.12, 2.67],
+                ('sub_14', 'general'):       [1.37, 1.71, 2.17, 2.74],
+                ('sub_12', 'general'):       [1.47, 1.84, 2.34, 2.95],
+                ('general', 'general'):      [1.06, 1.32, 1.68, 2.12],
+            },
+        },
+    },
+
+    'recepcion_orientada': {
+        'nombre': 'Recepción y Control Orientado',
+        'categoria': 'tecnico',
+        'orden': 500,
+        'icono': 'corner-down-right',
+        'fuente': 'Castagna, C. et al. (2006). J. Strength and Conditioning Research, '
+        '20(2), 320–325',
+        'campos': [
+            _campo('success', 'Controles exitosos', '/10', 0, 10, 0, '7', MAYOR),
+            _campo('reaction_s', 'Tiempo de reacción', 's', 0.3, 5, 2, '1.10', MENOR, False),
+        ],
+        'baremos': {
+            'success': {
+                ('general', 'elite'):        [9, 8, 7, 6],
+                ('general', 'profesional'):  [9, 8, 6, 5],
+                ('general', 'semipro'):      [9, 8, 6, 5],
+                ('general', 'amateur'):      [9, 8, 6, 5],
+                ('sub_18', 'general'):       [9, 8, 6, 5],
+                ('sub_17', 'general'):       [9, 8, 6, 5],
+                ('sub_16', 'general'):       [9, 8, 6, 5],
+                ('sub_15', 'general'):       [9, 8, 6, 4],
+                ('sub_14', 'general'):       [9, 8, 5, 4],
+                ('sub_12', 'general'):       [9, 8, 5, 4],
+                ('general', 'general'):      [9, 8, 6, 5],
+            },
+            'reaction_s': {
+                ('general', 'elite'):        [0.66, 0.91, 1.15, 1.48],
+                ('general', 'profesional'):  [0.7, 0.96, 1.23, 1.58],
+                ('general', 'semipro'):      [0.73, 1.0, 1.27, 1.63],
+                ('general', 'amateur'):      [0.76, 1.04, 1.33, 1.71],
+                ('sub_18', 'general'):       [0.75, 1.02, 1.3, 1.68],
+                ('sub_17', 'general'):       [0.8, 1.1, 1.4, 1.8],
+                ('sub_16', 'general'):       [0.84, 1.16, 1.48, 1.9],
+                ('sub_15', 'general'):       [0.89, 1.22, 1.56, 2.0],
+                ('sub_14', 'general'):       [0.91, 1.26, 1.6, 2.05],
+                ('sub_12', 'general'):       [0.98, 1.35, 1.72, 2.21],
+                ('general', 'general'):      [0.71, 0.97, 1.24, 1.59],
+            },
+        },
+    },
+
+    'regate_1vs0': {
+        'nombre': 'Regate 1vs0 con Finta Obligatoria',
+        'categoria': 'tecnico',
+        'orden': 510,
+        'icono': 'corner-up-right',
+        'fuente': 'Rampinini, E. et al. (2009). J. Science and Medicine in Sport, '
+        '12(1), 227–233',
+        'campos': [
+            _campo('time_s', 'Tiempo penalizado', 's', 5, 25, 2, '10.00', MENOR),
+            _campo('finta_quality', 'Calidad de la finta', '1-3', 1, 3, 0, '2', MAYOR, False),
+        ],
+        'baremos': {
+            'time_s': {
+                ('general', 'elite'):        [7.79, 8.85, 10.0, 11.51],
+                ('general', 'profesional'):  [8.28, 9.4, 10.63, 12.23],
+                ('general', 'semipro'):      [8.57, 9.74, 11.0, 12.66],
+                ('general', 'amateur'):      [8.96, 10.18, 11.5, 13.23],
+                ('sub_18', 'general'):       [8.8, 10.0, 11.3, 13.0],
+                ('sub_17', 'general'):       [9.44, 10.73, 12.13, 13.95],
+                ('sub_16', 'general'):       [9.97, 11.32, 12.8, 14.72],
+                ('sub_15', 'general'):       [10.52, 11.95, 13.5, 15.53],
+                ('sub_14', 'general'):       [10.78, 12.25, 13.85, 15.93],
+                ('sub_12', 'general'):       [11.61, 13.19, 14.91, 17.15],
+                ('general', 'general'):      [8.33, 9.47, 10.7, 12.31],
+            },
+        },
+    },
+
+    'saque_banda': {
+        'nombre': 'Saque de Banda — Distancia y Precisión',
+        'categoria': 'tecnico',
+        'orden': 520,
+        'icono': 'arrow-right',
+        'fuente': 'Kollath, E., & Quade, K. (1993). Measurement of sprinting speed of '
+        'professional and amateur soccer players. In Science and Football II. '
+        'E&FN Spon',
+        'campos': [
+            _campo('max_distance_m', 'Distancia máxima', 'm', 5, 50, 1, '22.0', MAYOR),
+            _campo('accuracy_pct', 'Precisión zona media', '%', 0, 100, 0, '80', MAYOR, False),
+        ],
+        'baremos': {
+            'max_distance_m': {
+                ('general', 'elite'):        [38.2, 33.8, 28.1, 22.5],
+                ('general', 'profesional'):  [34.0, 30.0, 25.0, 20.0],
+                ('general', 'semipro'):      [31.1, 26.2, 21.5, 16.8],
+                ('general', 'amateur'):      [28.2, 22.6, 18.3, 14.0],
+                ('sub_18', 'general'):       [26.0, 20.0, 16.0, 12.0],
+                ('sub_17', 'general'):       [23.3, 17.9, 14.3, 10.7],
+                ('sub_16', 'general'):       [21.1, 16.2, 13.0, 9.7],
+                ('sub_15', 'general'):       [19.2, 14.7, 11.8, 8.8],
+                ('sub_14', 'general'):       [18.1, 13.9, 11.2, 8.4],
+                ('sub_12', 'general'):       [15.7, 12.1, 9.7, 7.2],
+                ('general', 'general'):      [32.0, 27.4, 22.6, 17.8],
+            },
+            'accuracy_pct': {
+                ('general', 'elite'):        [95, 81, 67, 53],
+                ('general', 'profesional'):  [95, 80, 65, 50],
+                ('general', 'semipro'):      [95, 79, 64, 48],
+                ('general', 'amateur'):      [95, 78, 62, 46],
+                ('sub_18', 'general'):       [95, 79, 63, 47],
+                ('sub_17', 'general'):       [94, 77, 60, 43],
+                ('sub_16', 'general'):       [94, 76, 58, 40],
+                ('sub_15', 'general'):       [94, 75, 56, 36],
+                ('sub_14', 'general'):       [93, 74, 54, 35],
+                ('sub_12', 'general'):       [93, 72, 51, 30],
+                ('general', 'general'):      [95, 80, 65, 50],
+            },
+        },
+    },
+
+    'tiro_potencia_radar': {
+        'nombre': 'Tiro con Potencia (Radar)',
+        'categoria': 'tecnico',
+        'orden': 530,
+        'icono': 'zap',
+        'fuente': 'Levanon, J., & Dapena, J. (1998). Comparison of the kinematics of '
+        'the full-instep and pass kicks in soccer. Medicine & Science in '
+        'Sports & Exercise, 30(6), 917–927',
+        'campos': [
+            _campo('vmax_kmh', 'Velocidad máxima', 'km/h', 30, 150, 1, '85.0', MAYOR),
+            _campo('vmean_kmh', 'Velocidad media', 'km/h', 25, 140, 1, '78.0', MAYOR, False),
+            _campo('diff_legs', 'Diferencial entre piernas', 'km/h', 0, 60, 1, '15.0', MENOR, False),
+        ],
+        'baremos': {
+            'vmax_kmh': {
+                ('general', 'elite'):        [120.0, 105.0, 95.0, 88.0],
+                ('general', 'profesional'):  [102.9, 90.6, 81.6, 73.9],
+                ('general', 'semipro'):      [94.2, 83.2, 74.8, 66.9],
+                ('general', 'amateur'):      [86.4, 76.6, 68.8, 60.9],
+                ('sub_18', 'general'):       [88.0, 78.0, 70.0, 62.0],
+                ('sub_17', 'general'):       [82.0, 72.7, 65.2, 57.8],
+                ('sub_16', 'general'):       [77.7, 68.9, 61.8, 54.7],
+                ('sub_15', 'general'):       [73.6, 65.3, 58.6, 51.9],
+                ('sub_14', 'general'):       [71.8, 63.7, 57.1, 50.6],
+                ('sub_12', 'general'):       [66.7, 59.1, 53.1, 47.0],
+                ('general', 'general'):      [101.1, 89.1, 80.3, 72.5],
+            },
+            'vmean_kmh': {
+                ('general', 'elite'):        [105.0, 95.0, 85.0, 78.0],
+                ('general', 'profesional'):  [98.8, 89.4, 80.0, 73.4],
+                ('general', 'semipro'):      [95.5, 86.4, 77.3, 70.9],
+                ('general', 'amateur'):      [91.3, 82.6, 73.9, 67.8],
+                ('sub_18', 'general'):       [92.9, 84.1, 75.2, 69.0],
+                ('sub_17', 'general'):       [86.6, 78.4, 70.1, 64.3],
+                ('sub_16', 'general'):       [82.1, 74.3, 66.4, 61.0],
+                ('sub_15', 'general'):       [77.8, 70.4, 63.0, 57.8],
+                ('sub_14', 'general'):       [75.9, 68.6, 61.4, 56.4],
+                ('sub_12', 'general'):       [70.5, 63.7, 57.0, 52.3],
+                ('general', 'general'):      [98.2, 88.8, 79.5, 72.9],
+            },
+            'diff_legs': {
+                ('general', 'elite'):        [8, 14, 20, 26],
+                ('general', 'profesional'):  [8, 14, 20, 26],
+                ('general', 'semipro'):      [8, 14, 20, 26],
+                ('general', 'amateur'):      [8, 14, 20, 26],
+                ('sub_18', 'general'):       [8, 14, 20, 26],
+                ('sub_17', 'general'):       [8, 14, 20, 26],
+                ('sub_16', 'general'):       [8, 14, 20, 26],
+                ('sub_15', 'general'):       [8, 14, 20, 26],
+                ('sub_14', 'general'):       [8, 14, 20, 26],
+                ('sub_12', 'general'):       [8, 14, 20, 26],
+                ('general', 'general'):      [8, 14, 20, 26],
+            },
+        },
+    },
+
+    'tecnica_bajo_fatiga': {
+        'nombre': 'Técnica Bajo Fatiga (FTT)',
+        'categoria': 'tecnico',
+        'orden': 540,
+        'icono': 'battery-low',
+        'fuente': 'Rampinini, E., Impellizzeri, F.M., Castagna, C. et al. (2008). '
+        'Technical performance during soccer matches of the Italian Serie A '
+        'league. J. Science and Medicine in Sport, 12(1), 179–184',
+        'campos': [
+            _campo('decay_pct', 'Deterioro técnico', '%', 0, 80, 1, '12.0', MENOR),
+            _campo('score_pre', 'Score técnico pre-fatiga', 'pts', 0, 100, 1, '80.0', MAYOR, False),
+            _campo('score_post', 'Score técnico post-fatiga', 'pts', 0, 100, 1, '70.0', MAYOR, False),
+        ],
+        'baremos': {
+            'decay_pct': {
+                ('general', 'elite'):        [7, 12, 20, 26],
+                ('general', 'profesional'):  [7, 12, 20, 26],
+                ('general', 'semipro'):      [7, 12, 20, 26],
+                ('general', 'amateur'):      [7, 12, 20, 26],
+                ('sub_18', 'general'):       [7, 12, 20, 26],
+                ('sub_17', 'general'):       [7, 12, 20, 26],
+                ('sub_16', 'general'):       [7, 12, 20, 26],
+                ('sub_15', 'general'):       [7, 12, 20, 26],
+                ('sub_14', 'general'):       [7, 12, 20, 26],
+                ('sub_12', 'general'):       [7, 12, 20, 26],
+                ('general', 'general'):      [7, 12, 20, 26],
+            },
+        },
+    },
+
+    'conduccion_recta': {
+        'nombre': 'Velocidad de Conducción Línea Recta',
+        'categoria': 'tecnico',
+        'orden': 550,
+        'icono': 'play',
+        'fuente': 'Reilly, T., & Holmes, M. (1983). Physical Education Review, 6(1), '
+        '64–71',
+        'campos': [
+            _campo('dribble_30m', 'Conducción 30 m', 's', 3, 15, 2, '5.40', MENOR),
+            _campo('diff_sprint', 'Diferencial vs sprint libre', 's', 0, 5, 2, '0.50', MENOR, False),
+        ],
+        'baremos': {
+            'dribble_30m': {
+                ('general', 'elite'):        [5.0, 5.2, 5.6, 6.2],
+                ('general', 'profesional'):  [5.31, 5.52, 5.95, 6.59],
+                ('general', 'semipro'):      [5.5, 5.72, 6.16, 6.82],
+                ('general', 'amateur'):      [5.75, 5.98, 6.44, 7.13],
+                ('sub_18', 'general'):       [5.65, 5.87, 6.33, 7.0],
+                ('sub_17', 'general'):       [6.06, 6.3, 6.79, 7.52],
+                ('sub_16', 'general'):       [6.4, 6.65, 7.16, 7.93],
+                ('sub_15', 'general'):       [6.75, 7.02, 7.56, 8.37],
+                ('sub_14', 'general'):       [6.92, 7.2, 7.75, 8.58],
+                ('sub_12', 'general'):       [7.45, 7.75, 8.35, 9.24],
+                ('general', 'general'):      [5.35, 5.56, 5.99, 6.63],
+            },
+            'diff_sprint': {
+                ('general', 'elite'):        [0.3, 0.5, 0.8, 1.1],
+                ('general', 'profesional'):  [0.3, 0.5, 0.8, 1.1],
+                ('general', 'semipro'):      [0.3, 0.5, 0.8, 1.1],
+                ('general', 'amateur'):      [0.3, 0.5, 0.8, 1.1],
+                ('sub_18', 'general'):       [0.3, 0.5, 0.8, 1.1],
+                ('sub_17', 'general'):       [0.3, 0.5, 0.8, 1.1],
+                ('sub_16', 'general'):       [0.3, 0.5, 0.8, 1.1],
+                ('sub_15', 'general'):       [0.3, 0.5, 0.8, 1.1],
+                ('sub_14', 'general'):       [0.3, 0.5, 0.8, 1.1],
+                ('sub_12', 'general'):       [0.3, 0.5, 0.8, 1.1],
+                ('general', 'general'):      [0.3, 0.5, 0.8, 1.1],
+            },
+        },
+    }
+}
+
+
+# El catálogo que ve la app: primero las del MVP, luego las añadidas, y al
+# final las avaladas de la biblioteca.
+CATALOGO = {**_MVP, **_EXTRA, **_BIBLIOTECA_TESTS}
 
 # Qué pruebas venían de la app original. La pantalla las marca para que se
 # distingan de las añadidas.
 CLAVES_MVP = set(_MVP)
+
+# ─── La ficha larga de las avaladas ─────────────────────────────────────────
+#  Objetivo, material, protocolo detallado, variables, valores normativos y
+#  bibliografía de las 40. Vive aparte porque son 38 KB de texto y aquí
+#  taparían los baremos.
+#
+#  Se fusiona con `setdefault` A PROPÓSITO: las trece que venían del MVP
+#  conservan su descripción y su protocolo tal cual. El entrenador ya sabe cómo
+#  se toma cada una y cambiarle el texto le obliga a releerlo todo.
+from . import tests_biblioteca  # noqa: E402
+
+for _clave, _ficha in tests_biblioteca.BIBLIOTECA.items():
+    _t = CATALOGO.get(_clave)
+    if not _t:
+        continue
+    for _k, _v in _ficha.items():
+        _t.setdefault(_k, _v)
+    _t['avalado'] = True
+
+# Las que tienen protocolo y bibliografía publicados. La biblioteca las muestra
+# aparte y la pantalla les pone la insignia.
+CLAVES_AVALADAS = set(tests_biblioteca.BIBLIOTECA)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -867,6 +1944,16 @@ PESOS_PROPIOS = {
     'perfil_tactico': {'tactico': 1.0},
     # Conducir entre conos es técnica, pero el cronómetro premia la agilidad.
     'conduccion_conos': {'tecnica': 0.7, 'fisico': 0.3},
+    # Las de conducción de la biblioteca son el mismo caso: se puntúan con el
+    # cronómetro, así que reparten igual que la de conos. Dejarlas en técnica
+    # pura haría que dos pruebas casi iguales movieran atributos distintos.
+    'dribbling_fpf': {'tecnica': 0.7, 'fisico': 0.3},
+    'conduccion_vallas': {'tecnica': 0.7, 'fisico': 0.3},
+    'conduccion_cambio_ritmo': {'tecnica': 0.7, 'fisico': 0.3},
+    'conduccion_circuito_30s': {'tecnica': 0.7, 'fisico': 0.3},
+    'regate_1vs0': {'tecnica': 0.7, 'fisico': 0.3},
+    # Esta es directamente un sprint con balón: manda lo físico.
+    'conduccion_recta': {'tecnica': 0.5, 'fisico': 0.5},
 }
 
 
@@ -1034,6 +2121,61 @@ def resumen_baremo(clave_test, campo, categoria_edad='general', nivel='general')
     for etq, corte in zip(etiquetas, baremo['cortes']):
         partes.append(f'{etq} {signo} {corte:g}{(" " + unidad) if unidad else ""}')
     return ' · '.join(partes)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  LA TABLA DE RANGOS DE LA FICHA
+# ═══════════════════════════════════════════════════════════════════════════
+#  Los once contextos en el orden en que se leen: primero el adulto de mejor a
+#  peor nivel y luego las categorías de mayor a menor edad. Cada uno lleva dos
+#  etiquetas porque así lo enseña la app —«Juvenil inicial» arriba y «Sub-15»
+#  debajo—: el entrenador piensa en categorías, pero el baremo compara contra
+#  un nivel competitivo y conviene que vea los dos.
+CONTEXTOS_BAREMO = [
+    (('general', 'elite'),       'Élite',            'Adulto'),
+    (('general', 'profesional'), 'Profesional',      'Adulto'),
+    (('general', 'semipro'),     'Semiprofesional',  'Adulto'),
+    (('general', 'amateur'),     'Amateur',          'Adulto'),
+    (('sub_18', 'general'),      'Juvenil avanzado', 'Sub-18'),
+    (('sub_17', 'general'),      'Juvenil',          'Sub-17'),
+    (('sub_16', 'general'),      'Juvenil',          'Sub-16'),
+    (('sub_15', 'general'),      'Juvenil inicial',  'Sub-15'),
+    (('sub_14', 'general'),      'Formativo',        'Sub-14'),
+    (('sub_12', 'general'),      'Escuela',          'Sub-12'),
+    (('general', 'general'),     'General',          'Sin contexto'),
+]
+
+
+def tabla_baremos(clave_test, campo, categoria_edad='general', nivel='general'):
+    """Las filas de «Rangos esperados por nivel» para la ficha de una prueba.
+
+    Solo devuelve los contextos que esa prueba tiene definidos: si una solo
+    trae el de respaldo, se enseña una fila y no diez vacías.
+
+    La fila que le toca al equipo va marcada con `actual`. Se resuelve con el
+    mismo `baremo_para` que usa la puntuación —y no comparando claves a
+    ojo— para que lo resaltado sea exactamente contra lo que se va a medir,
+    incluida la caída hacia atrás cuando el contexto exacto no existe.
+    """
+    tabla = (CATALOGO.get(clave_test) or {}).get('baremos', {}).get(campo)
+    if not tabla:
+        return []
+    usado = baremo_para(clave_test, campo, categoria_edad, nivel)
+    par_usado = (usado['edad'], usado['nivel']) if usado else None
+    filas = []
+    for par, et_nivel, et_edad in CONTEXTOS_BAREMO:
+        cortes = tabla.get(par)
+        if not cortes:
+            continue
+        filas.append({'nivel': et_nivel, 'edad': et_edad, 'cortes': cortes,
+                      'actual': par == par_usado})
+    return filas
+
+
+def campos_con_baremo(t):
+    """Los campos de una prueba que se pueden puntuar, el principal primero."""
+    baremos = (t or {}).get('baremos') or {}
+    return [c for c in (t.get('campos') or []) if c['clave'] in baremos]
 
 
 def categoria_por_edad(anio_nacimiento, hoy=None):
