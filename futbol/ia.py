@@ -30,7 +30,13 @@ PRESUPUESTO_S = int(os.getenv('IA_PRESUPUESTO_S', '30'))
 
 
 def _contexto_jugador(user):
-    """Datos reales del jugador para que la respuesta no sea genérica."""
+    """Datos reales del jugador para que la respuesta no sea genérica.
+
+    Lleva también sus evaluaciones: son sus marcas y su nivel medido, justo lo
+    que pregunta («¿cómo voy en velocidad?») y lo que antes no se le pasaba.
+    """
+    from . import evaluaciones as ev  # aquí dentro para no cruzar importaciones
+
     uid = user.id
     attrs = db.atributos(uid)
     perfil = db.perfil_jugador(uid)
@@ -59,35 +65,174 @@ def _contexto_jugador(user):
     if entrenos:
         partes.append("Últimos entrenos: " + "; ".join(
             f"{e.get('fecha')} {e.get('tipo')} {e.get('duracion_min')}min" for e in entrenos[:5]))
+
+    # ─── Sus evaluaciones ───────────────────────────────────────────────────
+    try:
+        mias = ev.enriquecer(ev.resultados_de(uid, 40),
+                             db.entrenador_del_jugador(uid))
+    except Exception as e:
+        logger.warning('IA: no pude leer las evaluaciones del jugador: %s', e)
+        mias = []
+
+    if mias:
+        partes.append(f"Evaluaciones que le han tomado: {len(mias)}")
+        lineas = []
+        for r in mias[:10]:
+            fecha = r['_fecha'].strftime('%d/%m/%Y') if r.get('_fecha') else 'sin fecha'
+            valor = r.get('_valor')
+            marca = f"{valor:g}" if isinstance(valor, (int, float)) else (valor or '?')
+            nivel_r = (r.get('_nivel_meta') or {}).get('etiqueta')
+            lineas.append(
+                f"{fecha}, {r.get('test_nombre') or r.get('test_clave')}: "
+                f"{marca} {r.get('_unidad') or ''}".rstrip()
+                + (f" ({nivel_r})" if nivel_r else '')
+                + (f", puntaje {r['puntaje']}" if r.get('puntaje') is not None else ''))
+        partes += _lista('Sus marcas:', lineas, 10)
+    else:
+        partes.append('Evaluaciones que le han tomado: 0')
+
+    # ─── Lo que tiene por delante ───────────────────────────────────────────
+    eventos = db.eventos_para_jugador(uid, desde=db.hoy_iso()) or []
+    partes += _lista(f'Proximos eventos ({len(eventos)}):', [
+        f"{e.get('fecha')}, {e.get('tipo') or 'evento'}: {e.get('titulo') or 'sin titulo'}"
+        for e in eventos], 6)
+
     return "\n".join(partes)
 
 
-def _contexto_entrenador(user):
-    uid = user.id
-    jugadores = db.jugadores_del_entrenador(uid)
-    equipo = db.equipo_del_entrenador(uid)
-    eventos = db.eventos_equipo(uid, desde=db.hoy_iso())
+def _lista(titulo, filas, tope):
+    """Una sección del contexto, o nada si no hay datos que contar."""
+    if not filas:
+        return []
+    salida = [titulo]
+    salida += ['  - ' + f for f in filas[:tope]]
+    if len(filas) > tope:
+        salida.append(f'  ... y {len(filas) - tope} más')
+    return salida
 
+
+def _contexto_entrenador(user):
+    """Todo lo que el entrenador tiene cargado, para que la IA no responda a ciegas.
+
+    Antes esto eran cuatro líneas —nombre del equipo, cuántos jugadores con
+    cuenta y cuántos eventos futuros— y la IA contestaba «no tienes jugadores» a
+    quien tenía diecinueve: los apuntados a mano no entraban, y las evaluaciones
+    y los planes de entrenamiento no se miraban siquiera.
+
+    Se pide por `equipo_id` y no por `user.id`: un asistente técnico trabaja
+    sobre el equipo del principal, y preguntando por el suyo no salía nada.
+    """
+    from . import evaluaciones as ev  # aquí dentro para no cruzar importaciones
+
+    uid = db.equipo_id(user.id)
+    equipo = db.equipo_del_entrenador(uid) or {}
+    jugadores = db.jugadores_del_entrenador(uid)
+    manuales = db.rows('fut_manual_players', 'ia manuales', coach_id=uid, activo=True) or []
+
+    edad = equipo.get('categoria_edad') or 'general'
+    nivel = equipo.get('nivel') or 'general'
     partes = [
-        f"Entrenador: {getattr(user, 'name', '') or 'entrenador'}",
+        f"Entrenador: {getattr(user, 'name', '') or 'entrenador'}"
+        + (' (asistente tecnico del equipo)' if uid != user.id else ''),
         f"Equipo: {equipo.get('nombre') or 'sin nombre'}",
-        f"Jugadores en plantilla: {len(jugadores)}",
-        f"Eventos próximos agendados: {len(eventos)}",
+        f"Categoria de referencia: {edad.replace('_', '-')}, nivel {nivel}",
+        f"Plantilla: {len(jugadores) + len(manuales)} jugadores "
+        f"({len(jugadores)} con cuenta, {len(manuales)} apuntados a mano)",
     ]
-    if jugadores:
-        ids = [j['id'] for j in jugadores]
+
+    # ─── Quiénes son ────────────────────────────────────────────────────────
+    fichas = []
+    for j in jugadores:
+        f = j.get('fut') or {}
+        fichas.append(f"{j.get('name')}: {f.get('posicion') or 'sin posicion'}"
+                      + (f", dorsal {f['dorsal']}" if f.get('dorsal') else ''))
+    for m in manuales:
+        fichas.append(f"{m.get('nombre')}: {m.get('posicion') or 'sin posicion'}"
+                      + (f", dorsal {m['dorsal']}" if m.get('dorsal') else '')
+                      + ' (sin cuenta)')
+    partes += _lista('Jugadores:', fichas, 30)
+
+    # ─── Cómo están ─────────────────────────────────────────────────────────
+    ids = [j['id'] for j in jugadores]
+    if ids:
         attrs = db.q(
             lambda: db.sb().table('fut_attributes').select('*').in_('player_id', ids).execute().data or [],
             [], 'ia attrs')
-        if attrs:
-            for k in db.ATRIBUTOS:
-                vals = [a[k] for a in attrs if a.get(k) is not None]
-                if vals:
-                    partes.append(f"Media del equipo en {k}: {round(sum(vals)/len(vals))}")
-        nombres = ", ".join(
-            f"{j.get('name')} ({(j.get('fut') or {}).get('posicion') or 'sin posición'})"
-            for j in jugadores[:12])
-        partes.append(f"Plantilla: {nombres}")
+        medias = []
+        for k in db.ATRIBUTOS:
+            vals = [a[k] for a in attrs if a.get(k) is not None]
+            if vals:
+                medias.append(f"{k} {round(sum(vals) / len(vals))}")
+        if medias:
+            partes.append('Medias del equipo (0-100): ' + ', '.join(medias))
+
+    # ─── Evaluaciones ───────────────────────────────────────────────────────
+    #  Es lo que más se le pregunta y lo que antes no se le pasaba en absoluto.
+    try:
+        resultados = ev.enriquecer(ev.resultados_equipo(uid, 120), uid)
+    except Exception as e:
+        logger.warning('IA: no pude leer las evaluaciones: %s', e)
+        resultados = []
+
+    if resultados:
+        partes.append(f"Evaluaciones registradas: {len(resultados)}")
+        medias = ev.medias_por_categoria(resultados) or {}
+        sueltas = [f"{k} {v}" for k, v in medias.items() if v is not None]
+        if sueltas:
+            partes.append('Puntaje medio por familia: ' + ', '.join(sueltas))
+        lineas = []
+        for r in resultados[:14]:
+            fecha = r['_fecha'].strftime('%d/%m/%Y') if r.get('_fecha') else 'sin fecha'
+            valor = r.get('_valor')
+            marca = f"{valor:g}" if isinstance(valor, (int, float)) else (valor or '?')
+            nivel_r = (r.get('_nivel_meta') or {}).get('etiqueta')
+            lineas.append(
+                f"{fecha}, {r.get('jugador_nombre') or 'jugador'}, "
+                f"{r.get('test_nombre') or r.get('test_clave')}: {marca} {r.get('_unidad') or ''}".rstrip()
+                + (f" ({nivel_r})" if nivel_r else '')
+                + (f", puntaje {r['puntaje']}" if r.get('puntaje') is not None else ''))
+        partes += _lista('Ultimas evaluaciones:', lineas, 14)
+    else:
+        partes.append('Evaluaciones registradas: 0 (todavia no ha tomado ninguna prueba)')
+
+    # ─── Entrenamientos ─────────────────────────────────────────────────────
+    planes = db.rows('fut_training_plans', 'ia planes', coach_id=uid,
+                     _order='creado', _desc=True, _limit=12) or []
+    partes.append(f"Planes de entrenamiento creados: {len(planes)}")
+    partes += _lista('Planes:', [
+        f"{p.get('nombre')}: {p.get('tipo') or 'sin tipo'}"
+        + (f"/{p['subtipo']}" if p.get('subtipo') else '')
+        + (f", {p['duracion_min']} min" if p.get('duracion_min') else '')
+        + (f", intensidad {p['intensidad']}" if p.get('intensidad') else '')
+        for p in planes], 8)
+
+    # ─── Agenda ─────────────────────────────────────────────────────────────
+    #  Los eventos pasados importan tanto como los próximos: «cuántos entrenos
+    #  llevamos este mes» es justo lo que se pregunta, y antes solo veía el
+    #  futuro, así que un equipo con historial parecía recién creado.
+    hoy = db.hoy_iso()
+    todos = db.eventos_equipo(uid) or []
+    proximos = [e for e in todos if (e.get('fecha') or '') >= hoy]
+    pasados = sorted([e for e in todos if (e.get('fecha') or '') < hoy],
+                     key=lambda x: x.get('fecha') or '', reverse=True)
+    partes.append(f"Agenda: {len(proximos)} eventos por delante, {len(pasados)} ya celebrados")
+    partes += _lista('Proximos eventos:', [
+        f"{e.get('fecha')} {e.get('hora') or ''}, {e.get('tipo') or 'evento'}: "
+        f"{e.get('titulo') or 'sin titulo'}".replace('  ', ' ')
+        for e in proximos], 8)
+    partes += _lista('Ultimos eventos celebrados:', [
+        f"{e.get('fecha')}, {e.get('tipo') or 'evento'}: {e.get('titulo') or 'sin titulo'}"
+        for e in pasados], 6)
+
+    # ─── Parte médico ───────────────────────────────────────────────────────
+    lesiones = [x for x in (db.rows('fut_injuries', 'ia lesiones', coach_id=uid) or [])
+                if (x.get('estado') or '') not in ('alta', 'recuperado')]
+    partes += _lista(f'Partes medicos abiertos ({len(lesiones)}):', [
+        f"{x.get('zona') or 'zona sin indicar'}, {x.get('tipo') or 'lesion'}"
+        f", {x.get('gravedad') or 'gravedad sin indicar'}"
+        + (f", desde {x['fecha']}" if x.get('fecha') else '')
+        for x in lesiones], 8)
+
     return "\n".join(partes)
 
 
@@ -178,15 +323,21 @@ def _respaldo(user, pregunta):
     nombre = (getattr(user, 'name', '') or '').split(' ')[0] or 'crack'
 
     if es_coach:
-        jugadores = db.jugadores_del_entrenador(user.id)
-        eventos = db.eventos_equipo(user.id, desde=db.hoy_iso())
+        #  Por equipo_id y contando a los apuntados a mano: por user.id un
+        #  asistente veia un equipo vacio, y sin los manuales el respaldo decia
+        #  «no tienes jugadores» a quien tiene la plantilla llena de ellos.
+        uid = db.equipo_id(user.id)
+        jugadores = db.jugadores_del_entrenador(uid)
+        manuales = db.rows('fut_manual_players', 'respaldo manuales',
+                           coach_id=uid, activo=True) or []
+        total = len(jugadores) + len(manuales)
+        eventos = db.eventos_equipo(uid, desde=db.hoy_iso())
         lineas = [f"{nombre}, esto es lo que veo hoy en tu equipo:", ""]
-        lineas.append(f"· Plantilla: {len(jugadores)} jugador"
-                      f"{'es' if len(jugadores) != 1 else ''} registrado"
-                      f"{'s' if len(jugadores) != 1 else ''}.")
+        lineas.append(f"· Plantilla: {total} jugador{'es' if total != 1 else ''}"
+                      + (f" ({len(manuales)} sin cuenta)" if manuales else ''))
         lineas.append(f"· Agenda: {len(eventos)} evento"
                       f"{'s' if len(eventos) != 1 else ''} por delante.")
-        if not jugadores:
+        if not total:
             lineas += ["", "El primer paso es sumar jugadores: comparte tu código de equipo "
                            "desde la pantalla de Inicio y que se registren con él."]
         elif not eventos:
