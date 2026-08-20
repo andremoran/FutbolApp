@@ -563,7 +563,6 @@ def c_evaluaciones():
         tab_activa='equipo', hide_tabbar=True,
         jugadores=jugadores, manuales=manuales,
         resultados=resultados[:20],
-        n_total=len(todos),
         este_mes=este_mes, evaluados=evaluados, puntaje_medio=puntaje_medio,
         pendientes=pendientes,
         categorias=cat.CATEGORIAS,
@@ -588,10 +587,7 @@ def c_eval_catalogo():
         return fuera
 
     uid = db.equipo_id(current_user.id)
-    categoria = request.args.get('c') or ''
     todas = catalogo_completo(uid)
-    if categoria:
-        todas = [t for t in todas if t['categoria'] == categoria]
 
     # Cuántas veces se ha usado cada prueba, para ordenar por lo que de verdad usa.
     usos = {}
@@ -600,16 +596,61 @@ def c_eval_catalogo():
     for t in todas:
         t['_usos'] = usos.get(t['clave'], 0)
 
-    por_categoria = {}
+    #  El filtrado y la búsqueda van en el navegador, no aquí: son 58 pruebas y
+    #  recargar la página por cada letra tecleada se nota. El `?c=` se sigue
+    #  aceptando para que los enlaces de fuera sigan cayendo en su pestaña.
+    conteos = {}
     for t in todas:
-        por_categoria.setdefault(t['categoria'], []).append(t)
+        conteos[t['categoria']] = conteos.get(t['categoria'], 0) + 1
 
     return render_template('c_eval_catalogo.html',
                            tab_activa='equipo', hide_tabbar=True,
                            categorias=cat.CATEGORIAS,
-                           por_categoria=por_categoria,
-                           filtro=categoria,
-                           n_pruebas=len(catalogo_completo(uid)))
+                           pruebas=todas,
+                           conteos=conteos,
+                           filtro=request.args.get('c') or '',
+                           n_pruebas=len(todas),
+                           n_avaladas=sum(1 for t in todas if t.get('avalado')))
+
+
+@bp.route('/coach/evaluaciones/ficha/<clave>')
+@login_required
+def c_eval_ficha(clave):
+    """La ficha de una prueba: cómo se toma y contra qué se compara.
+
+    La ruta `/test/<clave>` ya la ocupa el ranking, así que esta va por
+    `/ficha/`.
+    """
+    fuera = _coach_o_fuera()
+    if fuera:
+        return fuera
+
+    uid = db.equipo_id(current_user.id)
+    t = prueba(clave, uid)
+    if not t:
+        abort(404)
+
+    edad, nivel = contexto_equipo(uid)
+
+    # Una tabla de rangos por cada campo puntuable. El principal va primero,
+    # que es el que manda en el ranking y el que mueve la ficha del jugador.
+    tablas = []
+    for campo in cat.campos_con_baremo(t):
+        filas = cat.tabla_baremos(clave, campo['clave'], edad, nivel)
+        if filas:
+            tablas.append({'campo': campo, 'filas': filas,
+                           'menor_mejor': campo.get('direccion') == cat.MENOR})
+
+    usos = sum(1 for r in resultados_equipo(uid, 400) if r.get('test_clave') == clave)
+
+    return render_template('c_eval_ficha.html',
+                           tab_activa='equipo', hide_tabbar=True,
+                           test=t, tablas=tablas, usos=usos,
+                           contexto_edad=edad, contexto_nivel=nivel,
+                           etiqueta_edad=dict(cat.CATEGORIAS_EDAD).get(edad, 'General'),
+                           etiqueta_nivel=next((e for c, e, _ in cat.NIVELES_COMPETITIVOS
+                                                if c == nivel), 'General'),
+                           categoria_meta=cat.CATEGORIA_META.get(t['categoria'], {}))
 
 
 @bp.route('/coach/evaluaciones/aplicar/<clave>')
@@ -767,6 +808,118 @@ def c_eval_nueva():
                            tab_activa='equipo', hide_tabbar=True,
                            categorias=cat.CATEGORIAS,
                            propias=pruebas_propias(current_user.id))
+
+
+def _recordatorio_protocolo(texto, tope=400):
+    """El protocolo recortado para el paso 3, cortando por final de frase.
+
+    En el asistente el protocolo es un recordatorio —el completo está en la
+    ficha—, pero cortarlo a pelo por el carácter 400 dejaba a veinte pruebas
+    terminando a mitad de palabra. Se corta en el último punto que quepa, y si
+    no hay ninguno, en el último espacio.
+    """
+    texto = (texto or '').strip()
+    if len(texto) <= tope:
+        return texto
+    recorte = texto[:tope]
+    punto = recorte.rfind('. ')
+    if punto > tope * 0.5:
+        return recorte[:punto + 1]
+    espacio = recorte.rfind(' ')
+    return (recorte[:espacio] if espacio > 0 else recorte).rstrip(' ,;:') + '…'
+
+
+@bp.route('/coach/evaluaciones/asistente')
+@login_required
+def c_eval_asistente():
+    """Evaluar a UN jugador, guiado: jugador → prueba → marcas.
+
+    Convive con `c_eval_aplicar`, que va al revés —prueba primero y luego toda
+    la plantilla de una sentada—. No sobra ninguno: el asistente es para el día
+    que mides a uno, y el otro para la tarde de tests con el equipo entero.
+
+    Los tres pasos van en una sola página y se cambian sin recargar. Partirlo
+    en tres peticiones obligaría a arrastrar el estado por la URL o por la
+    sesión, y son dos listas que caben de sobra en la primera carga.
+    """
+    fuera = _coach_o_fuera()
+    if fuera:
+        return fuera
+
+    uid = db.equipo_id(current_user.id)
+    edad, nivel = contexto_equipo(uid)
+
+    #  Lo que el paso 3 necesita de cada prueba para dibujar sus casillas. Se
+    #  manda todo de una porque la prueba se elige en el navegador.
+    pruebas = catalogo_completo(uid)
+    detalle = {}
+    for t in pruebas:
+        detalle[t['clave']] = {
+            'nombre': t['nombre'],
+            'categoria': t['categoria'],
+            'protocolo': _recordatorio_protocolo(t.get('protocolo')),
+            'campos': [{'clave': c['clave'], 'etiqueta': c['etiqueta'],
+                        'unidad': c.get('unidad') or '',
+                        'decimales': c.get('decimales', 2),
+                        'min': c.get('min'), 'max': c.get('max'),
+                        'ejemplo': c.get('ejemplo') or ''}
+                       for c in (t.get('campos') or [])],
+            #  El listón de la categoría del equipo, para que el entrenador vea
+            #  contra qué se compara antes de anotar y no después.
+            'baremos': [{'etiqueta': c['etiqueta'],
+                         'resumen': cat.resumen_baremo(t['clave'], c['clave'], edad, nivel)}
+                        for c in (t.get('campos') or [])
+                        if cat.resumen_baremo(t['clave'], c['clave'], edad, nivel)],
+        }
+
+    return render_template('c_eval_asistente.html',
+                           tab_activa='equipo', hide_tabbar=True,
+                           jugadores=db.jugadores_del_entrenador(uid),
+                           manuales=db.rows('fut_manual_players', 'manuales',
+                                            coach_id=uid, activo=True) or [],
+                           pruebas=pruebas, detalle=detalle,
+                           contexto_edad=edad, contexto_nivel=nivel,
+                           etiqueta_edad=dict(cat.CATEGORIAS_EDAD).get(edad, 'General'),
+                           etiqueta_nivel=next((e for c, e, _ in cat.NIVELES_COMPETITIVOS
+                                                if c == nivel), 'General'),
+                           es_pro=roles.es_pro(current_user),
+                           hoy=db.hoy_iso())
+
+
+@bp.route('/coach/evaluaciones/rankings')
+@login_required
+def c_eval_rankings():
+    """Las pruebas que ya tienen marcas, para entrar al ranking de cada una.
+
+    El ranking es siempre de UNA prueba —no tiene sentido ordenar juntos un
+    sprint y un Yo-Yo—, así que hace falta este paso intermedio para elegirla.
+    """
+    fuera = _coach_o_fuera()
+    if fuera:
+        return fuera
+
+    uid = db.equipo_id(current_user.id)
+    conteo, ultima = {}, {}
+    for r in resultados_equipo(uid, 400):
+        clave = r.get('test_clave')
+        if not clave:
+            continue
+        conteo[clave] = conteo.get(clave, 0) + 1
+        fecha = db.parse_fecha(r.get('fecha'))
+        if fecha and (clave not in ultima or fecha > ultima[clave]):
+            ultima[clave] = fecha
+
+    filas = []
+    for clave, n in conteo.items():
+        t = prueba(clave, uid)
+        if not t:
+            continue
+        filas.append({'test': t, 'n': n, 'ultima': ultima.get(clave)})
+    filas.sort(key=lambda f: (-f['n'], f['test']['nombre']))
+
+    return render_template('c_eval_rankings.html',
+                           tab_activa='equipo', hide_tabbar=True,
+                           filas=filas, es_pro=roles.es_pro(current_user))
 
 
 @bp.route('/coach/evolucion')

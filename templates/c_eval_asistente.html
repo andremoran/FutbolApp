@@ -1,0 +1,445 @@
+{% extends '_shell.html' %}
+{% block title %}Nueva evaluación · ProFoot{% endblock %}
+
+{# Evaluar a un jugador en tres pasos: a quién, qué prueba y qué marcó. Los
+   tres viven en esta misma página y se cambian sin recargar, así que volver
+   atrás a corregir el jugador no pierde lo ya escrito. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_evaluaciones') }}" aria-label="Salir">
+  <i data-ico="x" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Medición</div>{% endblock %}
+{% block hero_title %}Nueva evaluación{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle" id="as-sub">Elige el jugador</div>
+{% endblock %}
+
+{% block head %}
+<style>
+  /* ── Indicador 1-2-3 ── */
+  .as-pasos {
+    display: flex; align-items: center; justify-content: center;
+    gap: 0; margin: 16px 16px 18px;
+  }
+  .as-paso {
+    width: 30px; height: 30px; flex: none; border-radius: 50%;
+    display: grid; place-items: center;
+    font-size: 13px; font-weight: 800;
+    background: var(--border-soft); color: var(--text-muted);
+    transition: background .2s, color .2s;
+  }
+  .as-paso.on   { background: var(--primary); color: #fff; }
+  .as-paso.hecho { background: var(--primary-soft); color: var(--primary); }
+  .as-linea { width: 54px; height: 2px; background: var(--border); }
+  .as-linea.hecho { background: var(--primary); }
+
+  .as-pantalla { display: none; }
+  .as-pantalla.on { display: block; }
+
+  /* ── Fila elegible (jugador o prueba) ── */
+  .as-op {
+    display: flex; align-items: center; gap: 12px; width: 100%;
+    margin: 0 0 8px; padding: 13px; border-radius: var(--r-lg);
+    background: var(--surface); border: 1px solid var(--border);
+    color: inherit; text-align: left; font-family: inherit; cursor: pointer;
+  }
+  .as-op.sel { border-color: var(--primary); background: var(--primary-faint); }
+  .as-op__n { font-size: 14px; font-weight: 700; }
+  .as-op__s { font-size: 12px; color: var(--text-sec); margin-top: 2px; }
+  .as-op__tick { color: var(--primary); opacity: 0; flex: none; }
+  .as-op.sel .as-op__tick { opacity: 1; }
+  .as-lista { margin: 0 16px; }
+
+  .as-fam {
+    font-size: 9.5px; font-weight: 800; letter-spacing: .6px;
+    text-transform: uppercase; flex: none;
+  }
+
+  /* ── Barra de botones, pegada abajo ── */
+  .as-pie {
+    position: sticky; bottom: 0; z-index: 5;
+    display: flex; gap: 10px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    background: linear-gradient(to top, var(--bg) 72%, transparent);
+  }
+  .as-pie .pf-btn { flex: 1; }
+
+  .as-buscar { position: relative; margin: 0 16px 12px; }
+  .as-buscar > i {
+    position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
+    color: var(--text-muted); pointer-events: none;
+  }
+  .as-buscar input { padding-left: 38px; }
+
+  .as-resumen {
+    display: flex; align-items: center; gap: 10px;
+    margin: 0 16px 14px; padding: 11px 13px; border-radius: var(--r-md);
+    background: var(--primary-faint); border: 1px solid var(--primary-soft);
+    font-size: 12.5px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{% set todos_jugadores = (jugadores|length) + (manuales|length) %}
+{% if not todos_jugadores %}
+
+<div class="pf-card">
+  <div class="pf-empty">
+    <div class="pf-empty__icon">👥</div>
+    <div class="pf-empty__title">Todavía no tienes jugadores</div>
+    <div class="pf-empty__text">
+      Pásales tu código de equipo o apúntalos a mano si aún no tienen cuenta.
+    </div>
+    <a class="pf-btn pf-btn--primary pf-mt-16"
+       href="{{ url_for('futbol.c_manuales') }}">Apuntar jugadores</a>
+  </div>
+</div>
+
+{% else %}
+
+<div class="as-pasos">
+  <div class="as-paso on" id="as-p1">1</div>
+  <div class="as-linea" id="as-l1"></div>
+  <div class="as-paso" id="as-p2">2</div>
+  <div class="as-linea" id="as-l2"></div>
+  <div class="as-paso" id="as-p3">3</div>
+</div>
+
+{# ══════════ PASO 1 · EL JUGADOR ══════════ #}
+<section class="as-pantalla on" id="as-1">
+  <div class="as-buscar">
+    <i data-ico="search" class="pf-ico--sm"></i>
+    <input class="pf-input" id="as-q-jug" type="search" autocomplete="off"
+           aria-label="Buscar un jugador" placeholder="Buscar jugador…">
+  </div>
+
+  <div class="as-lista" id="as-jugadores">
+    {% for j in jugadores %}
+    <button class="as-op" type="button" data-jug="{{ j.id }}" data-manual="0"
+            data-nombre="{{ j.name }}"
+            data-buscar="{{ ((j.name or '') ~ ' ' ~ ((j.fut or {}).get('posicion') or ''))|lower }}">
+      <div class="pf-avatar pf-avatar--sm">
+        {%- if j.profile_photo %}<img src="{{ j.profile_photo }}" alt="">
+        {%- else %}{{ (j.name or '?')[:1]|upper }}{% endif -%}
+      </div>
+      <div class="pf-grow">
+        <div class="as-op__n">{{ j.name }}</div>
+        <div class="as-op__s">
+          {%- if (j.fut or {}).get('dorsal') %}#{{ j.fut.dorsal }} · {% endif -%}
+          {{ (j.fut or {}).get('posicion') or 'Sin posición' }}
+        </div>
+      </div>
+      <i data-ico="check-circle" class="pf-ico--sm as-op__tick"></i>
+    </button>
+    {% endfor %}
+
+    {% for m in manuales %}
+    <button class="as-op" type="button" data-jug="{{ m.id }}" data-manual="1"
+            data-nombre="{{ m.nombre }}"
+            data-buscar="{{ ((m.nombre or '') ~ ' ' ~ (m.posicion or ''))|lower }}">
+      <div class="pf-avatar pf-avatar--sm"
+           style="background:var(--purple-bg);color:var(--purple)">
+        {{ (m.nombre or '?')[:1]|upper }}
+      </div>
+      <div class="pf-grow">
+        <div class="as-op__n">{{ m.nombre }}</div>
+        <div class="as-op__s">
+          {%- if m.dorsal %}#{{ m.dorsal }} · {% endif -%}
+          {{ m.posicion or 'Sin posición' }} · Sin cuenta
+        </div>
+      </div>
+      <i data-ico="check-circle" class="pf-ico--sm as-op__tick"></i>
+    </button>
+    {% endfor %}
+  </div>
+  <p class="pf-center" id="as-nada-jug"
+     style="display:none;font-size:12.5px;color:var(--text-muted);padding:10px">
+    Ningún jugador con ese nombre.
+  </p>
+</section>
+
+{# ══════════ PASO 2 · LA PRUEBA ══════════ #}
+<section class="as-pantalla" id="as-2">
+  <div class="as-resumen" id="as-eco-1"></div>
+
+  <div class="as-buscar">
+    <i data-ico="search" class="pf-ico--sm"></i>
+    <input class="pf-input" id="as-q-test" type="search" autocomplete="off"
+           aria-label="Buscar una prueba" placeholder="Buscar prueba…">
+  </div>
+
+  {% set colores = {'fisico': '#ef4444', 'tecnico': '#3b82f6', 'mental': '#8b5cf6'} %}
+  {% set etiquetas = {'fisico': 'Físico', 'tecnico': 'Técnico', 'mental': 'Mental'} %}
+
+  <div class="as-lista" id="as-pruebas">
+    {% for t in pruebas %}
+    <button class="as-op" type="button" data-test="{{ t.clave }}"
+            data-buscar="{{ (t.nombre ~ ' ' ~ (t.descripcion or '') ~ ' ' ~ (etiquetas.get(t.categoria) or ''))|lower }}">
+      <div class="pf-grow">
+        <div class="as-op__n">{{ t.nombre }}</div>
+        <div class="as-op__s">
+          <span class="as-fam" style="color:{{ colores.get(t.categoria, '#64748b') }}">
+            {{ etiquetas.get(t.categoria, t.categoria)|upper }}
+          </span>
+          {%- if t.avalado %} · Avalada{% endif -%}
+          {%- if t._propia %} · Propia{% endif -%}
+        </div>
+      </div>
+      <i data-ico="check-circle" class="pf-ico--sm as-op__tick"></i>
+    </button>
+    {% endfor %}
+  </div>
+  <p class="pf-center" id="as-nada-test"
+     style="display:none;font-size:12.5px;color:var(--text-muted);padding:10px">
+    Ninguna prueba con ese nombre.
+  </p>
+</section>
+
+{# ══════════ PASO 3 · LAS MARCAS ══════════ #}
+<section class="as-pantalla" id="as-3">
+  <div class="as-resumen" id="as-eco-2"></div>
+
+  <div class="pf-card" id="as-protocolo" style="display:none">
+    <div class="pf-row" style="gap:9px;align-items:flex-start">
+      <i data-ico="info" class="pf-ico--sm" style="color:var(--primary);flex:none"></i>
+      <p style="margin:0;font-size:12.5px;line-height:1.65;color:var(--text-sec)"
+         id="as-protocolo-txt"></p>
+    </div>
+  </div>
+
+  <div class="pf-card">
+    <label class="pf-label" for="as-fecha">Fecha de la prueba</label>
+    <input class="pf-input" id="as-fecha" type="date" value="{{ hoy }}">
+
+    <div class="pf-mt-12" id="as-campos"></div>
+
+    <label class="pf-label pf-mt-12" for="as-notas">Notas (opcional)</label>
+    <textarea class="pf-textarea" id="as-notas" rows="2"
+              placeholder="Viento en contra, jugador con molestias…"></textarea>
+  </div>
+
+  {% if es_pro %}
+  <div class="pf-card" id="as-baremos" style="display:none">
+    <div class="pf-label">El listón de tu categoría</div>
+    <div id="as-baremos-txt"></div>
+  </div>
+  {% else %}
+  <div class="pf-card">
+    <div class="pf-alerta pf-alerta--info">
+      <i data-ico="lock" class="pf-ico--xs"></i>
+      <span>Con el plan Pro cada marca sale ya comparada con el baremo
+        internacional de tu categoría.</span>
+    </div>
+  </div>
+  {% endif %}
+
+  <p class="pf-center" style="font-size:11.5px;color:var(--text-muted);
+            margin:0 26px 4px;line-height:1.6">
+    Comparado con <b>{{ etiqueta_edad }}</b> · <b>{{ etiqueta_nivel }}</b>.
+    <a href="{{ url_for('futbol.c_evaluaciones') }}"
+       style="color:var(--primary);font-weight:600">Cambiar</a>
+  </p>
+</section>
+
+{# ══════════ BOTONES ══════════ #}
+<div class="as-pie">
+  <button class="pf-btn pf-btn--ghost" type="button" id="as-atras"
+          style="display:none">
+    <i data-ico="arrow-left" class="pf-ico--sm"></i> Atrás
+  </button>
+  <button class="pf-btn pf-btn--primary" type="button" id="as-siguiente" disabled>
+    Siguiente <i data-ico="arrow-right" class="pf-ico--sm"></i>
+  </button>
+  <button class="pf-btn pf-btn--primary" type="button" id="as-guardar"
+          style="display:none">
+    <i data-ico="save" class="pf-ico--sm"></i> Guardar
+  </button>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if (jugadores|length) + (manuales|length) %}
+<script>
+(function () {
+  const DETALLE = {{ detalle|tojson }};
+
+  let paso = 1;
+  let jugador = null;   // {id, manual, nombre}
+  let test = null;      // clave
+
+  const $ = id => document.getElementById(id);
+  const sub = $('as-sub');
+
+  // ─── Navegación entre pasos ───────────────────────────────────────────
+  const TITULOS = ['Elige el jugador', 'Elige la prueba', 'Anota la marca'];
+
+  function pintar() {
+    for (let n = 1; n <= 3; n++) {
+      $('as-' + n).classList.toggle('on', n === paso);
+      const bolita = $('as-p' + n);
+      bolita.classList.toggle('on', n === paso);
+      bolita.classList.toggle('hecho', n < paso);
+      if (n < 3) $('as-l' + n).classList.toggle('hecho', n <= paso - 1);
+    }
+    sub.textContent = TITULOS[paso - 1];
+    $('as-atras').style.display = paso === 1 ? 'none' : '';
+    $('as-siguiente').style.display = paso === 3 ? 'none' : '';
+    $('as-guardar').style.display = paso === 3 ? '' : 'none';
+    $('as-siguiente').disabled = (paso === 1 && !jugador) || (paso === 2 && !test);
+    // Al cambiar de paso se vuelve arriba: si no, el paso 2 aparece a media
+    // altura porque hereda el scroll de la lista de jugadores.
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }
+
+  $('as-atras').onclick = () => { if (paso > 1) { paso--; pintar(); } };
+  $('as-siguiente').onclick = () => {
+    if (paso === 2) prepararPaso3();
+    if (paso < 3) { paso++; pintar(); }
+  };
+
+  // ─── Elegir en una lista ──────────────────────────────────────────────
+  function elegible(lista, alElegir) {
+    lista.addEventListener('click', ev => {
+      const op = ev.target.closest('.as-op');
+      if (!op) return;
+      lista.querySelectorAll('.as-op').forEach(o => o.classList.remove('sel'));
+      op.classList.add('sel');
+      alElegir(op);
+      $('as-siguiente').disabled = false;
+    });
+  }
+
+  function eco(caja, texto) {
+    caja.innerHTML = '<i data-ico="user" class="pf-ico--sm"></i><span>' + texto + '</span>';
+    if (window.PF && PF.icons) PF.icons(caja);
+  }
+
+  elegible($('as-jugadores'), op => {
+    jugador = { id: op.dataset.jug, manual: op.dataset.manual === '1',
+                nombre: op.dataset.nombre };
+    // Se rellena aquí y no al llegar al paso 3: si no, el paso 2 enseña la
+    // caja verde vacía.
+    eco($('as-eco-1'), '<b>' + jugador.nombre + '</b>');
+  });
+  elegible($('as-pruebas'), op => { test = op.dataset.test; });
+
+  // ─── Buscadores ───────────────────────────────────────────────────────
+  const SIN_TILDES = /[\u0300-\u036f]/g;
+  const plano = s => s.normalize('NFD').replace(SIN_TILDES, '');
+
+  function buscador(input, lista, cartel) {
+    input.addEventListener('input', () => {
+      const texto = plano(input.value.trim().toLowerCase());
+      let visibles = 0;
+      lista.querySelectorAll('.as-op').forEach(op => {
+        const ok = !texto || plano(op.dataset.buscar).includes(texto);
+        op.style.display = ok ? '' : 'none';
+        if (ok) visibles++;
+      });
+      cartel.style.display = visibles ? 'none' : '';
+    });
+  }
+  buscador($('as-q-jug'), $('as-jugadores'), $('as-nada-jug'));
+  buscador($('as-q-test'), $('as-pruebas'), $('as-nada-test'));
+
+  // ─── Paso 3: casillas de la prueba elegida ────────────────────────────
+  function prepararPaso3() {
+    const d = DETALLE[test];
+    if (!d) return;
+
+    eco($('as-eco-2'), '<b>' + jugador.nombre + '</b> · ' + d.nombre);
+
+    const prot = $('as-protocolo');
+    if (d.protocolo) {
+      $('as-protocolo-txt').textContent = d.protocolo;
+      prot.style.display = '';
+    } else {
+      prot.style.display = 'none';
+    }
+
+    const caja = $('as-campos');
+    caja.innerHTML = '';
+    d.campos.forEach(c => {
+      const paso_ = c.decimales === 0 ? '1' : (c.decimales === 1 ? '0.1' : '0.01');
+      const env = document.createElement('div');
+      env.style.marginBottom = '10px';
+      const et = document.createElement('label');
+      et.className = 'pf-label';
+      et.setAttribute('for', 'as-c-' + c.clave);
+      et.textContent = c.etiqueta + (c.unidad ? ' (' + c.unidad + ')' : '');
+      const inp = document.createElement('input');
+      inp.className = 'pf-input';
+      inp.id = 'as-c-' + c.clave;
+      inp.type = 'number';
+      inp.inputMode = 'decimal';
+      inp.step = paso_;
+      inp.dataset.campo = c.clave;
+      if (c.min !== null && c.min !== undefined) inp.min = c.min;
+      if (c.max !== null && c.max !== undefined) inp.max = c.max;
+      inp.placeholder = c.ejemplo || '';
+      env.append(et, inp);
+      caja.append(env);
+    });
+
+    const bar = $('as-baremos');
+    if (bar) {
+      if (d.baremos && d.baremos.length) {
+        $('as-baremos-txt').innerHTML = d.baremos.map(b =>
+          '<div class="pf-baremo"><b>' + b.etiqueta + ':</b> ' + b.resumen + '</div>'
+        ).join('');
+        bar.style.display = '';
+      } else {
+        bar.style.display = 'none';
+      }
+    }
+
+    // Los iconos de lo recién creado no existían al cargar la página. Se
+    // limita al paso 3: PF.icons sustituye el nodo entero por su SVG, así que
+    // pasarle el documento se cargaría los iconos ya pintados de los otros
+    // pasos y dejaría las listas sin sus marcas de elegido.
+    if (window.PF && PF.icons) PF.icons($('as-3'));
+  }
+
+  // ─── Guardar ──────────────────────────────────────────────────────────
+  $('as-guardar').onclick = function () {
+    const boton = this;
+    const valores = {};
+    let hayAlguno = false;
+    $('as-campos').querySelectorAll('input[data-campo]').forEach(inp => {
+      const v = inp.value.trim();
+      if (v !== '') { valores[inp.dataset.campo] = v; hayAlguno = true; }
+    });
+    if (!hayAlguno) { PF.toast('Anota al menos una marca.', 'error'); return; }
+
+    boton.disabled = true;
+    boton.innerHTML = 'Guardando…';
+    PF.api('/api/eval/resultado', {
+      test: test,
+      resultados: [{
+        player_id: jugador.id,
+        manual: jugador.manual,
+        valores: valores,
+        fecha: $('as-fecha').value,
+        notas: $('as-notas').value.trim(),
+      }],
+    }).then(j => {
+      (j.avisos || []).forEach(a => PF.toast(a, 'error'));
+      PF.toast('Marca guardada.', 'success');
+      setTimeout(() => { location.href = j.redirect; }, 900);
+    }).catch(e => {
+      PF.toast(e.message, 'error');
+      boton.disabled = false;
+      boton.innerHTML = 'Guardar';
+    });
+  };
+
+  pintar();
+})();
+</script>
+{% endif %}
+{% endblock %}

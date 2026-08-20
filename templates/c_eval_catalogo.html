@@ -1,9 +1,13 @@
 {% extends '_shell.html' %}
-{% block title %}Catálogo de pruebas · ProFoot{% endblock %}
+{% block title %}Biblioteca de pruebas · ProFoot{% endblock %}
 
-{# Las pruebas estándar publicadas, agrupadas por familia. Cada una lleva su
-   fuente: si el entrenador va a decirle a un padre que su hijo está en el
-   percentil de un juvenil, tiene que poder decir de dónde sale el número. #}
+{# La biblioteca: todas las pruebas que se pueden tomar, con buscador y filtro
+   por familia. Las «avaladas» son las que traen protocolo y bibliografía
+   publicados —si el entrenador va a decirle a un padre en qué percentil está
+   su hijo, tiene que poder decir de dónde sale el número.
+
+   El filtro va en el navegador: son decenas de pruebas y recargar por cada
+   letra tecleada se nota. #}
 
 {% block hero_back %}
 <a class="pf-hero__btn" href="{{ url_for('futbol.c_evaluaciones') }}" aria-label="Volver">
@@ -11,95 +15,140 @@
 </a>
 {% endblock %}
 {% block hero_label %}<div class="pf-hero__label">Medición</div>{% endblock %}
-{% block hero_title %}Catálogo{% endblock %}
+{% block hero_title %}Biblioteca de pruebas{% endblock %}
 {% block hero_subtitle %}
-<div class="pf-hero__subtitle">{{ n_pruebas }} pruebas con baremo internacional</div>
+<div class="pf-hero__subtitle">
+  {{ n_pruebas }} pruebas
+  {%- if n_avaladas %} · {{ n_avaladas }} avaladas{% endif %}
+</div>
+{% endblock %}
+
+{% block head %}
+<style>
+  /* ── Buscador ── */
+  .bi-buscar { position: relative; margin: 16px 16px 12px; }
+  .bi-buscar > i {
+    position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
+    color: var(--text-muted); pointer-events: none;
+  }
+  .bi-buscar input { padding-left: 38px; }
+
+  /* ── Rejilla de tarjetas ──
+     Una columna en el móvil y dos en cuanto hay sitio: la app las apila, pero
+     en un portátil dejar 800 px en blanco a la derecha no ayuda a nadie. */
+  .bi-rejilla {
+    display: grid; grid-template-columns: 1fr; gap: 10px; margin: 0 16px;
+  }
+  @media (min-width: 720px) {
+    .bi-rejilla { grid-template-columns: 1fr 1fr; }
+  }
+
+  .bi-card {
+    display: block; padding: 14px; border-radius: var(--r-lg);
+    background: var(--surface); border: 1px solid var(--border);
+    color: inherit; text-decoration: none;
+  }
+  .bi-card__top {
+    display: flex; align-items: center; gap: 6px; margin-bottom: 7px;
+    flex-wrap: wrap;
+  }
+  .bi-card__fam {
+    font-size: 10px; font-weight: 800; letter-spacing: .7px; text-transform: uppercase;
+  }
+  .bi-card__aval {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 9px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase;
+    color: var(--text-sec); background: var(--border-soft);
+    padding: 2px 7px; border-radius: 100px;
+  }
+  .bi-card__n { font-size: 15px; font-weight: 700; line-height: 1.35; margin-bottom: 5px; }
+  .bi-card__d { font-size: 12.5px; line-height: 1.55; color: var(--text-sec); }
+  .bi-card__o {
+    font-size: 11.5px; line-height: 1.5; color: var(--text-muted); margin-top: 5px;
+    /* Dos líneas y a otra cosa: la tarjeta es un índice, no la ficha. */
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .bi-card__pie {
+    display: flex; align-items: center; gap: 8px; margin-top: 9px;
+    font-size: 11px; color: var(--text-muted);
+  }
+
+  .bi-nada { display: none; }
+  .bi-nada.on { display: block; }
+</style>
 {% endblock %}
 
 {% block content %}
 
-<div class="pf-segs pf-mt-16">
-  <a class="pf-seg {{ 'on' if not filtro }}" href="{{ url_for('futbol.c_eval_catalogo') }}">
-    Todas
-  </a>
+<div class="bi-buscar">
+  <i data-ico="search" class="pf-ico--sm"></i>
+  <input class="pf-input" id="bi-q" type="search" autocomplete="off"
+         aria-label="Buscar una prueba"
+         placeholder="Buscar por nombre, capacidad o familia…">
+</div>
+
+<div class="pf-segs">
+  <button class="pf-seg {{ 'on' if not filtro }}" type="button" data-fam="">
+    Todas <span style="opacity:.7">({{ n_pruebas }})</span>
+  </button>
   {% for clave, etiqueta, emoji, desc in categorias %}
-    <a class="pf-seg {{ 'on' if filtro == clave }}"
-       href="{{ url_for('futbol.c_eval_catalogo', c=clave) }}">{{ emoji }} {{ etiqueta }}</a>
+    {% if conteos.get(clave) %}
+    <button class="pf-seg {{ 'on' if filtro == clave }}" type="button" data-fam="{{ clave }}">
+      {{ emoji }} {{ etiqueta }} <span style="opacity:.7">({{ conteos.get(clave) }})</span>
+    </button>
+    {% endif %}
+  {% endfor %}
+  {% if n_avaladas %}
+  <button class="pf-seg" type="button" data-fam="__avaladas">
+    📖 Avaladas <span style="opacity:.7">({{ n_avaladas }})</span>
+  </button>
+  {% endif %}
+</div>
+
+<p style="margin:4px 16px 12px;font-size:11.5px;color:var(--text-muted)" id="bi-cuenta"></p>
+
+{% set colores = {'fisico': '#ef4444', 'tecnico': '#3b82f6', 'mental': '#8b5cf6'} %}
+{% set etiquetas = {'fisico': 'Físico', 'tecnico': 'Técnico', 'mental': 'Mental'} %}
+
+<div class="bi-rejilla" id="bi-rejilla">
+  {% for t in pruebas %}
+  <a class="bi-card" href="{{ url_for('futbol.c_eval_ficha', clave=t.clave) }}"
+     data-fam="{{ t.categoria }}"
+     data-aval="{{ '1' if t.avalado else '' }}"
+     data-buscar="{{ (t.nombre ~ ' ' ~ (t.descripcion or '') ~ ' ' ~ (t.objetivo or '') ~ ' ' ~ (etiquetas.get(t.categoria) or '') ~ ' ' ~ (t.subcategoria or ''))|lower }}">
+    <div class="bi-card__top">
+      <span class="bi-card__fam" style="color:{{ colores.get(t.categoria, '#64748b') }}">
+        {{ etiquetas.get(t.categoria, t.categoria)|upper }}
+      </span>
+      {% if t.avalado %}
+      <span class="bi-card__aval"><i data-ico="book-open" class="pf-ico--xs"></i> Avalada</span>
+      {% endif %}
+      {% if t._propia %}<span class="pf-pill pf-pill--purple">Propia</span>{% endif %}
+    </div>
+
+    <div class="bi-card__n">{{ t.nombre }}</div>
+    {% if t.descripcion %}<div class="bi-card__d">{{ t.descripcion }}</div>{% endif %}
+    {% if t.objetivo %}<div class="bi-card__o">{{ t.objetivo }}</div>{% endif %}
+
+    <div class="bi-card__pie">
+      {% if t.campos %}
+        <span>📐 {{ t.campos|length }} dato{{ '' if t.campos|length == 1 else 's' }}</span>
+      {% endif %}
+      {% if t.baremos %}<span>· con baremo</span>{% endif %}
+      {% if t._usos %}<span>· usada {{ t._usos }} vez{{ '' if t._usos == 1 else 'es' }}</span>{% endif %}
+    </div>
+  </a>
   {% endfor %}
 </div>
 
-{% for clave, etiqueta, emoji, desc in categorias %}
-  {% set lista = por_categoria.get(clave) %}
-  {% if lista %}
-  <div class="pf-card">
-    <div class="pf-card__head">
-      <h2 class="pf-card__title">{{ emoji }} {{ etiqueta }}</h2>
-      <span class="pf-pill pf-pill--muted">{{ lista|length }}</span>
-    </div>
-    <p style="margin:0 0 6px;font-size:12px;color:var(--text-muted)">{{ desc }}</p>
-
-    {% for t in lista %}
-    <details style="border-top:1px solid var(--border-soft);padding:11px 0">
-      <summary style="display:flex;align-items:center;gap:10px;cursor:pointer;
-                      list-style:none;-webkit-tap-highlight-color:transparent">
-        <div class="pf-grow">
-          <div class="pf-jug__n">
-            {{ t.nombre }}
-            {% if t._propia %}<span class="pf-pill pf-pill--purple">propia</span>{% endif %}
-          </div>
-          <div class="pf-jug__s">
-            {{ t.subcategoria }}
-            {%- if t._usos %} · usada {{ t._usos }} vez{{ '' if t._usos == 1 else 'es' }}{% endif %}
-          </div>
-        </div>
-        <i data-ico="chevron-down" class="pf-ico--sm pf-item__chev"></i>
-      </summary>
-
-      <div style="padding:10px 0 4px">
-        <p style="margin:0 0 8px;font-size:13px;line-height:1.6">{{ t.descripcion }}</p>
-
-        {% if t.protocolo %}
-        <div style="background:var(--border-soft);border-radius:var(--r-md);padding:11px 13px;
-                    font-size:12.5px;line-height:1.65;color:var(--text-sec)">
-          <b style="color:var(--text)">Cómo se toma.</b> {{ t.protocolo }}
-        </div>
-        {% endif %}
-
-        {% if t.formula %}
-        <p style="margin:8px 0 0;font-size:11.5px;color:var(--text-muted)">
-          <b>Fórmula:</b> {{ t.formula }}
-        </p>
-        {% endif %}
-
-        <p style="margin:8px 0 0;font-size:11px;color:var(--text-muted);line-height:1.55">
-          {% for c in t.campos %}
-            <span style="display:inline-block;margin-right:10px">
-              📐 {{ c.etiqueta }}{% if c.unidad %} ({{ c.unidad }}){% endif %}
-            </span>
-          {% endfor %}
-        </p>
-        <p style="margin:6px 0 0;font-size:10.5px;color:var(--text-muted);font-style:italic">
-          {{ t.fuente }}
-        </p>
-
-        <div class="pf-row pf-mt-12" style="gap:8px">
-          <a class="pf-btn pf-btn--primary pf-grow"
-             href="{{ url_for('futbol.c_eval_aplicar', clave=t.clave) }}">
-            <i data-ico="plus" class="pf-ico--sm"></i> Tomar
-          </a>
-          {% if t._usos %}
-          <a class="pf-btn pf-btn--ghost pf-grow"
-             href="{{ url_for('futbol.c_eval_ranking', clave=t.clave) }}">
-            <i data-ico="award" class="pf-ico--sm"></i> Ranking
-          </a>
-          {% endif %}
-        </div>
-      </div>
-    </details>
-    {% endfor %}
+<div class="pf-card bi-nada" id="bi-nada">
+  <div class="pf-empty">
+    <div class="pf-empty__icon">🔍</div>
+    <div class="pf-empty__title">Ninguna prueba coincide</div>
+    <div class="pf-empty__text">Prueba con otra palabra o quita el filtro de familia.</div>
   </div>
-  {% endif %}
-{% endfor %}
+</div>
 
 <div class="pf-card">
   <a class="pf-item" href="{{ url_for('futbol.c_eval_nueva') }}">
@@ -109,7 +158,7 @@
         Crear una prueba propia
         {% if not fut_es_pro %}<span class="pf-pro">Pro</span>{% endif %}
       </div>
-      <div class="pf-item__sub">Si mides algo que no está en el catálogo</div>
+      <div class="pf-item__sub">Si mides algo que no está en la biblioteca</div>
     </div>
     <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
   </a>
@@ -118,9 +167,60 @@
 <p class="pf-center" style="font-size:11.5px;color:var(--text-muted);
           padding:6px 26px 30px;line-height:1.65">
   Los baremos vienen de estudios publicados (Cooper, Bangsbo, Haugen, Léger,
-  EUROFIT y otros). Se ajustan a la categoría y al nivel que configures en
+  Buchheit, EUROFIT y otros). Se ajustan a la categoría y al nivel que
+  configures en
   <a href="{{ url_for('futbol.c_evaluaciones') }}"
      style="color:var(--primary);font-weight:600">Evaluaciones</a>.
 </p>
 
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const q       = document.getElementById('bi-q');
+  const cuenta  = document.getElementById('bi-cuenta');
+  const nada    = document.getElementById('bi-nada');
+  const tarjetas = Array.from(document.querySelectorAll('#bi-rejilla .bi-card'));
+  const chips   = Array.from(document.querySelectorAll('.pf-seg[data-fam]'));
+  let familia = chips.find(c => c.classList.contains('on'))?.dataset.fam || '';
+
+  // Sin acentos: quien teclea "tecnico" espera encontrar "Técnico". El rango
+  // va escapado a propósito — son marcas combinantes y escritas literales se
+  // pierden en cuanto el archivo pasa por algo que no respete el UTF-8.
+  const SIN_TILDES = /[\u0300-\u036f]/g;
+  const plano = s => s.normalize('NFD').replace(SIN_TILDES, '');
+
+  function filtrar() {
+    const texto = plano(q.value.trim().toLowerCase());
+    let visibles = 0;
+
+    for (const card of tarjetas) {
+      const okFam = !familia
+        || (familia === '__avaladas' ? card.dataset.aval === '1'
+                                     : card.dataset.fam === familia);
+      const okTexto = !texto || plano(card.dataset.buscar).includes(texto);
+      const ok = okFam && okTexto;
+      card.style.display = ok ? '' : 'none';
+      if (ok) visibles++;
+    }
+
+    nada.classList.toggle('on', visibles === 0);
+    cuenta.textContent = visibles === tarjetas.length
+      ? ''
+      : 'Mostrando ' + visibles + ' de ' + tarjetas.length;
+  }
+
+  q.addEventListener('input', filtrar);
+  for (const chip of chips) {
+    chip.addEventListener('click', function () {
+      chips.forEach(c => c.classList.remove('on'));
+      this.classList.add('on');
+      familia = this.dataset.fam;
+      filtrar();
+    });
+  }
+  filtrar();
+})();
+</script>
 {% endblock %}

@@ -1,0 +1,204 @@
+{% extends '_shell.html' %}
+{% block title %}{{ test.nombre }} · ProFoot{% endblock %}
+
+{# La ficha de una prueba, como el detalle de la biblioteca en la app: primero
+   cómo se toma y con qué, y al final contra qué se compara la marca. El orden
+   importa —el entrenador llega aquí antes de salir al campo, no después. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_eval_catalogo') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}
+<div class="pf-hero__label">
+  {{ categoria_meta.etiqueta or 'Prueba' }} · {{ 'Prueba propia' if test._propia else 'Prueba' }}
+</div>
+{% endblock %}
+{% block hero_title %}{{ test.nombre }}{% endblock %}
+{% block hero_subtitle %}
+{% if test.descripcion %}
+<div class="pf-hero__subtitle">{{ test.descripcion }}</div>
+{% endif %}
+{% endblock %}
+
+{% block head %}
+<style>
+  /* ── Bloque de texto con su rótulo, como en la ficha de la app ── */
+  .fi-bloque { margin: 0 16px 18px; }
+  .fi-rotulo {
+    font-size: 11px; font-weight: 800; letter-spacing: .8px;
+    text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;
+  }
+  .fi-texto { font-size: 13.5px; line-height: 1.7; color: var(--text); margin: 0; }
+  .fi-texto--sec { color: var(--text-sec); font-size: 13px; }
+
+  /* ── Tabla de rangos ──
+     Rueda en horizontal en el móvil en vez de encoger las columnas: cuatro
+     números de cuatro cifras no caben en 360 px y apretarlos los vuelve
+     ilegibles justo cuando hay que compararlos. */
+  .fi-tabla-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -2px; }
+  .fi-tabla { width: 100%; border-collapse: collapse; min-width: 420px; }
+  .fi-tabla th, .fi-tabla td { padding: 9px 8px; text-align: right; }
+  .fi-tabla th {
+    font-size: 10px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase;
+    color: var(--text-muted); border-bottom: 1px solid var(--border);
+  }
+  .fi-tabla th:first-child, .fi-tabla td:first-child { text-align: left; }
+  .fi-tabla td { font-size: 13px; font-weight: 700; border-bottom: 1px solid var(--border-soft); }
+  .fi-tabla tr:last-child td { border-bottom: none; }
+  .fi-tabla__n { font-size: 12.5px; font-weight: 700; }
+  .fi-tabla__e { font-size: 10.5px; color: var(--text-muted); font-weight: 600; }
+  .fi-tabla td.fi-elite { color: var(--primary); }
+  /* La fila del contexto del equipo, resaltada */
+  .fi-tabla tr.fi-actual td { background: var(--primary-faint); }
+  .fi-tabla tr.fi-actual td:first-child { box-shadow: inset 3px 0 0 var(--primary); }
+
+  .fi-marca {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 9.5px; font-weight: 800; letter-spacing: .4px;
+    text-transform: uppercase; color: var(--primary);
+    background: var(--primary-soft); padding: 2px 7px; border-radius: 100px;
+    margin-left: 6px; vertical-align: middle;
+  }
+  .fi-campo-tit { font-size: 13px; font-weight: 700; margin: 0 0 2px; }
+  .fi-campo-sub { font-size: 11.5px; color: var(--text-muted); margin: 0 0 10px; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ══════════ CÓMO SE TOMA ══════════ #}
+{% for rotulo, valor, sec in [
+    ('Objetivo', test.objetivo, false),
+    ('Material necesario', test.material, true),
+    ('Protocolo detallado', test.protocolo_detallado or test.protocolo, true),
+    ('Variables medidas', test.variables, true)] %}
+  {% if valor %}
+  <div class="fi-bloque">
+    <div class="fi-rotulo">{{ rotulo }}</div>
+    <p class="fi-texto {{ 'fi-texto--sec' if sec }}">{{ valor }}</p>
+  </div>
+  {% endif %}
+{% endfor %}
+
+{# Las pruebas que no son de la biblioteca no traen «variables medidas», pero
+   sus campos dicen lo mismo: qué se anota y en qué unidad. #}
+{% if not test.variables and test.campos %}
+<div class="fi-bloque">
+  <div class="fi-rotulo">Qué se anota</div>
+  <p class="fi-texto fi-texto--sec">
+    {% for c in test.campos %}{{ c.etiqueta }}{% if c.unidad %} ({{ c.unidad }}){% endif %}{{ ', ' if not loop.last }}{% endfor %}.
+  </p>
+</div>
+{% endif %}
+
+{% if test.normativa %}
+<div class="fi-bloque">
+  <div class="fi-rotulo">Valores normativos</div>
+  <p class="fi-texto">{{ test.normativa }}</p>
+</div>
+{% endif %}
+
+{# ══════════ CONTRA QUÉ SE COMPARA ══════════ #}
+{% if tablas %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Rangos esperados por nivel</h2>
+  </div>
+  <p style="margin:0 0 4px;font-size:12px;color:var(--text-sec);line-height:1.6">
+    Tu equipo está configurado como <b>{{ etiqueta_edad }} · {{ etiqueta_nivel }}</b>,
+    así que la marca se interpreta con la fila resaltada.
+    <a href="{{ url_for('futbol.c_evaluaciones') }}"
+       style="color:var(--primary);font-weight:600">Cambiar</a>
+  </p>
+
+  {% for tabla in tablas %}
+  <div style="margin-top:16px">
+    {% if tablas|length > 1 %}
+    <p class="fi-campo-tit">
+      {{ tabla.campo.etiqueta }}{% if tabla.campo.unidad %} ({{ tabla.campo.unidad }}){% endif %}
+    </p>
+    {% endif %}
+    <p class="fi-campo-sub">
+      {% if tabla.menor_mejor %}Cuanto más bajo el valor, mejor.
+      {% else %}Cuanto más alto el valor, mejor.{% endif %}
+      {% if tablas|length == 1 and tabla.campo.unidad %}Medido en {{ tabla.campo.unidad }}.{% endif %}
+    </p>
+
+    <div class="fi-tabla-wrap">
+      <table class="fi-tabla">
+        <thead>
+          <tr>
+            <th>Nivel · Edad</th>
+            <th>Élite</th><th>Bueno</th><th>Prom.</th><th>Débil</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for f in tabla.filas %}
+          <tr class="{{ 'fi-actual' if f.actual }}">
+            <td>
+              <div class="fi-tabla__n">{{ f.nivel }}</div>
+              <div class="fi-tabla__e">
+                {{ f.edad }}{% if f.actual %}<span class="fi-marca">Tu equipo</span>{% endif %}
+              </div>
+            </td>
+            {% for corte in f.cortes %}
+            <td class="{{ 'fi-elite' if loop.first }}">
+              {{ '≤' if tabla.menor_mejor else '≥' }}&nbsp;{{ '%g'|format(corte) }}
+            </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="pf-card">
+  <div class="pf-empty">
+    <div class="pf-empty__icon">📐</div>
+    <div class="pf-empty__title">Sin baremo</div>
+    <div class="pf-empty__text">
+      Esta prueba se guarda con su marca, pero todavía no tiene un listón contra
+      el que compararla, así que sale sin nivel ni puntaje.
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ══════════ DE DÓNDE SALE ══════════ #}
+{% if test.bibliografia or test.fuente %}
+<div class="fi-bloque">
+  <div class="fi-rotulo">Fuente</div>
+  <p class="fi-texto fi-texto--sec">{{ test.bibliografia or test.fuente }}</p>
+</div>
+{% endif %}
+
+{# ══════════ QUÉ HACER CON ELLA ══════════ #}
+<div style="margin:0 16px 10px">
+  <a class="pf-btn pf-btn--primary pf-btn--block"
+     href="{{ url_for('futbol.c_eval_aplicar', clave=test.clave) }}">
+    <i data-ico="plus" class="pf-ico--sm"></i> Cargar resultado de esta prueba
+  </a>
+</div>
+
+{% if usos %}
+<div style="margin:0 16px 10px">
+  <a class="pf-btn pf-btn--ghost pf-btn--block"
+     href="{{ url_for('futbol.c_eval_ranking', clave=test.clave) }}">
+    <i data-ico="award" class="pf-ico--sm"></i>
+    Ranking del equipo
+    <span style="color:var(--text-sec);font-weight:500">
+      · {{ usos }} marca{{ '' if usos == 1 else 's' }}
+    </span>
+    {% if not fut_es_pro %}<span class="pf-pro">Pro</span>{% endif %}
+  </a>
+</div>
+{% endif %}
+
+<div style="height:24px"></div>
+
+{% endblock %}

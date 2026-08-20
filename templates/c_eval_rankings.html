@@ -1,0 +1,75 @@
+{% extends '_shell.html' %}
+{% block title %}Rankings por prueba · ProFoot{% endblock %}
+
+{# El ranking siempre es de UNA prueba: ordenar juntos un sprint y un Yo-Yo no
+   significa nada. Así que primero se elige cuál, y solo salen las que ya
+   tienen marcas — las demás darían una tabla vacía. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_evaluaciones') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Medición</div>{% endblock %}
+{% block hero_title %}Ranking por prueba{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {% if filas %}{{ filas|length }} prueba{{ '' if filas|length == 1 else 's' }} con marcas
+  {% else %}Todavía sin marcas{% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+
+{% if filas %}
+
+{% set colores = {'fisico': '#ef4444', 'tecnico': '#3b82f6', 'mental': '#8b5cf6'} %}
+{% set etiquetas = {'fisico': 'Físico', 'tecnico': 'Técnico', 'mental': 'Mental'} %}
+
+<div class="pf-card">
+  <p style="margin:0 0 10px;font-size:12.5px;color:var(--text-sec);line-height:1.6">
+    Ordenadas por las que más usas.
+    {%- if not es_pro %} El ranking es una función Pro.{% endif %}
+  </p>
+
+  {% for f in filas %}
+  <a class="pf-item" href="{{ url_for('futbol.c_eval_ranking', clave=f.test.clave) }}">
+    <div class="pf-item__icon"
+         style="color:{{ colores.get(f.test.categoria, '#64748b') }}">🏆</div>
+    <div class="pf-item__body">
+      <div class="pf-item__title">
+        {{ f.test.nombre }}
+        {% if not es_pro %}<span class="pf-pro">Pro</span>{% endif %}
+      </div>
+      <div class="pf-item__sub">
+        <span style="color:{{ colores.get(f.test.categoria, '#64748b') }};font-weight:700">
+          {{ etiquetas.get(f.test.categoria, f.test.categoria) }}
+        </span>
+        · {{ f.n }} marca{{ '' if f.n == 1 else 's' }}
+        {%- if f.ultima %} · última el {{ f.ultima.strftime('%d/%m/%Y') }}{% endif %}
+      </div>
+    </div>
+    <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+  </a>
+  {% endfor %}
+</div>
+
+{% else %}
+
+<div class="pf-card">
+  <div class="pf-empty">
+    <div class="pf-empty__icon">🏆</div>
+    <div class="pf-empty__title">Sin marcas todavía</div>
+    <div class="pf-empty__text">
+      En cuanto tomes una prueba a dos o más jugadores, aquí sale su ranking.
+    </div>
+    <a class="pf-btn pf-btn--primary pf-mt-16"
+       href="{{ url_for('futbol.c_eval_asistente') }}">Tomar una prueba</a>
+  </div>
+</div>
+
+{% endif %}
+
+<div style="height:24px"></div>
+
+{% endblock %}

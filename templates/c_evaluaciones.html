@@ -12,10 +12,9 @@
 {% block hero_label %}<div class="pf-hero__label">Medición</div>{% endblock %}
 {% block hero_title %}Evaluaciones{% endblock %}
 {% block hero_subtitle %}
-<div class="pf-hero__subtitle">
-  {{ n_total }} evaluación{{ '' if n_total == 1 else 'es' }} ·
-  {{ jugadores|length + manuales|length }} jugador{{ '' if (jugadores|length + manuales|length) == 1 else 'es' }}
-</div>
+{# Las cifras van justo debajo en sus tres tarjetas, así que aquí se dice qué
+   hace el módulo y no se repiten. #}
+<div class="pf-hero__subtitle">Cada marca, comparada con su baremo</div>
 {% endblock %}
 
 {% block head %}
@@ -120,11 +119,14 @@
 </div>
 
 {# ══════════ TOMAR UNA PRUEBA ══════════ #}
-<a class="ev-cta" href="{{ url_for('futbol.c_eval_catalogo') }}">
+{# El botón grande va al asistente, que evalúa a UN jugador guiado. Tomarle la
+   misma prueba a la plantilla entera sigue estando en la biblioteca → ficha →
+   «Cargar resultado»: son dos faenas distintas y ninguna sustituye a la otra. #}
+<a class="ev-cta" href="{{ url_for('futbol.c_eval_asistente') }}">
   <div class="ev-cta__ico"><i data-ico="plus" class="pf-ico--lg"></i></div>
   <div class="pf-grow">
     <div class="ev-cta__t">Nueva evaluación</div>
-    <div class="ev-cta__s">Elige la prueba → los jugadores → las marcas</div>
+    <div class="ev-cta__s">Elige jugador → prueba → marcas</div>
   </div>
   <i data-ico="arrow-right" class="pf-ico--sm"></i>
 </a>
@@ -132,6 +134,15 @@
 <a class="ev-sec" href="{{ url_for('futbol.c_eval_catalogo') }}">
   <i data-ico="layers" class="pf-ico--sm"></i>
   <span class="ev-sec__t">Ver las {{ n_pruebas }} pruebas</span>
+  <i data-ico="chevron-right" class="pf-ico--sm" style="color:var(--text-sec)"></i>
+</a>
+
+<a class="ev-sec" href="{{ url_for('futbol.c_eval_rankings') }}">
+  <i data-ico="award" class="pf-ico--sm"></i>
+  <span class="ev-sec__t">
+    Ranking del equipo por prueba
+    {% if not fut_es_pro %}<span class="pf-pro">Pro</span>{% endif %}
+  </span>
   <i data-ico="chevron-right" class="pf-ico--sm" style="color:var(--text-sec)"></i>
 </a>
 
@@ -151,7 +162,7 @@
       Crear mi propia prueba
       {% if not fut_es_pro %}<span class="pf-pro">Pro</span>{% endif %}
     </div>
-    <div class="ev-propia__s">La que uses y no esté en el catálogo</div>
+    <div class="ev-propia__s">Una evaluación a la medida de tu metodología</div>
   </div>
   <i data-ico="chevron-right" class="pf-ico--sm"></i>
 </a>
@@ -264,6 +275,8 @@
         Empieza por un sprint de 30 m o un Cooper: se toman en una sesión y
         dan la foto física del equipo.
       </div>
+      <a class="pf-btn pf-btn--primary pf-mt-16"
+         href="{{ url_for('futbol.c_eval_asistente') }}">Tomar la primera</a>
     </div>
   </div>
 {% endif %}
