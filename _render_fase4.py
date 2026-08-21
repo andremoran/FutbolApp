@@ -105,11 +105,10 @@ with app.test_request_context('/coach/evaluaciones'):
             categorias=cat.CATEGORIAS, contexto_edad=EDAD, contexto_nivel=NIVEL,
             etiqueta_edad=dict(cat.CATEGORIAS_EDAD).get(EDAD),
             etiqueta_nivel=et_nivel(NIVEL),
-            edades=cat.CATEGORIAS_EDAD, niveles=cat.NIVELES_COMPETITIVOS,
-            descripciones_nivel={c: d for c, _, d in cat.NIVELES_COMPETITIVOS},
             n_pruebas=len(cat.CATALOGO), destacadas=[])
         print('Home                      %d KB' % (len(html) / 1024))
         for texto in ('Cada marca, comparada con su baremo',
+                      'Nivel del equipo',
                       'Elige jugador → prueba → marcas',
                       'Ranking del equipo por prueba',
                       'Ver las %d pruebas' % len(cat.CATALOGO)):

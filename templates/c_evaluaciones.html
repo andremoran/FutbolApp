@@ -168,40 +168,29 @@
 </a>
 
 {# ══════════ CONTRA QUÉ SE COMPARA ══════════ #}
-<div class="pf-card">
-  <div class="pf-card__head">
-    <h2 class="pf-card__title">Nivel del equipo</h2>
-    {% if not fut_es_pro %}<span class="pf-pro">Pro</span>{% endif %}
-  </div>
-  <p style="margin:0 0 12px;font-size:12.5px;color:var(--text-sec);line-height:1.6">
-    Un Cooper de 2.400 m es excelente en sub-14 y flojo en profesional. Dinos
-    con quién comparar a tu equipo y cada marca sale ya interpretada.
-  </p>
+{# Aquí había un SEGUNDO formulario para la categoría y el nivel, con dos
+   desplegables. Se retira: ya se editan en «Nivel del equipo»
+   (`c_equipo_editar`), que es la pantalla hecha para eso —con la descripción
+   de cada nivel y el aviso de contra qué baremo se va a comparar—.
+   Dos sitios para el mismo ajuste es pedir que uno se quede viejo y que nadie
+   sepa cuál manda. Aquí solo se enseña lo que hay y se enlaza allí. #}
+<a class="ev-sec" href="{{ url_for('futbol.c_equipo_editar') }}">
+  <i data-ico="target" class="pf-ico--sm"></i>
+  <span class="ev-sec__t">
+    Nivel del equipo
+    {%- if etiqueta_edad or etiqueta_nivel %}
+    <span style="color:var(--text-sec);font-weight:500">
+      · {{ [etiqueta_edad, etiqueta_nivel]|select|join(' · ') }}
+    </span>
+    {%- endif %}
+  </span>
+  <i data-ico="chevron-right" class="pf-ico--sm" style="color:var(--text-sec)"></i>
+</a>
 
-  <div class="pf-row" style="gap:10px">
-    <div class="pf-grow">
-      <label class="pf-label" for="ctx-edad">Categoría</label>
-      <select class="pf-select" id="ctx-edad">
-        {% for clave, etiqueta in edades %}
-          <option value="{{ clave }}" {{ 'selected' if clave == contexto_edad }}>{{ etiqueta }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="pf-grow">
-      <label class="pf-label" for="ctx-nivel">Nivel</label>
-      <select class="pf-select" id="ctx-nivel">
-        {% for clave, etiqueta, desc in niveles %}
-          <option value="{{ clave }}" {{ 'selected' if clave == contexto_nivel }}>{{ etiqueta }}</option>
-        {% endfor %}
-      </select>
-    </div>
-  </div>
-  <p id="ctx-desc" style="margin:8px 0 0;font-size:11.5px;color:var(--text-muted)"></p>
-
-  <button class="pf-btn pf-btn--secondary pf-btn--block pf-mt-12" type="button" id="btn-ctx">
-    <i data-ico="save" class="pf-ico--sm"></i> Guardar
-  </button>
-</div>
+<p style="margin:2px 16px 18px;font-size:11.5px;color:var(--text-muted);line-height:1.6">
+  Un Cooper de 2.400 m es excelente en sub-14 y flojo en profesional: contra
+  esto se interpreta cada marca.
+</p>
 
 {# ══════════ A QUIÉN LE TOCA ══════════ #}
 {% if pendientes %}
@@ -293,32 +282,4 @@
 
 <div style="height:24px"></div>
 
-{% endblock %}
-
-{% block scripts %}
-<script>
-const DESC = {{ descripciones_nivel|tojson }};
-
-function pintarDesc() {
-  const n = document.getElementById('ctx-nivel').value;
-  document.getElementById('ctx-desc').textContent = DESC[n] || '';
-}
-document.getElementById('ctx-nivel').addEventListener('change', pintarDesc);
-pintarDesc();
-
-document.getElementById('btn-ctx').onclick = function () {
-  const b = this;
-  b.disabled = true;
-  PF.api('/api/eval/contexto', {
-    categoria_edad: document.getElementById('ctx-edad').value,
-    nivel: document.getElementById('ctx-nivel').value,
-  }).then(j => {
-    PF.toast(j.mensaje, 'success');
-    b.disabled = false;
-  }).catch(e => {
-    PF.toast(e.message, 'error');
-    b.disabled = false;
-  });
-};
-</script>
 {% endblock %}

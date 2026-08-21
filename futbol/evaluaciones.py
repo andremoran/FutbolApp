@@ -569,9 +569,9 @@ def c_evaluaciones():
         contexto_edad=edad, contexto_nivel=nivel,
         etiqueta_edad=dict(cat.CATEGORIAS_EDAD).get(edad, 'General'),
         etiqueta_nivel=dict((c, e) for c, e, _ in cat.NIVELES_COMPETITIVOS).get(nivel, 'General'),
-        edades=cat.CATEGORIAS_EDAD, niveles=cat.NIVELES_COMPETITIVOS,
-        # Jinja no admite `dict((k, v) for ...)`: la tabla se arma aquí.
-        descripciones_nivel={c: d for c, _, d in cat.NIVELES_COMPETITIVOS},
+        # Las listas de categorias y niveles ya no van: el ajuste se edita solo
+        # en «Nivel del equipo» (c_equipo_editar). Aqui solo se enseñan las
+        # etiquetas de lo que hay configurado.
         n_pruebas=len(catalogo_completo(uid)),
         # Las seis del MVP que más se usan, en su orden del catálogo.
         destacadas=[cat.test(c) for c in
