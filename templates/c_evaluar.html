@@ -129,6 +129,20 @@
   {% if actualizado %}
   <p class="ev-hero__ia">Última actualización: {{ actualizado.strftime('%d/%m/%Y') }}</p>
   {% endif %}
+
+  {# Lo demás del jugador. Desde aquí no se llegaba: para corregirle el dorsal
+     o mirarle las alergias había que volver a Equipo y buscarlo otra vez. #}
+  <div class="pf-row pf-mt-12" style="gap:8px">
+    <a class="pf-btn pf-btn--ghost pf-grow"
+       href="{{ url_for('futbol.c_medico_jugador', pid=jugador.id) }}">
+      <i data-ico="heart" class="pf-ico--sm"></i> Ficha médica
+    </a>
+    <a class="pf-btn pf-btn--ghost pf-grow"
+       href="{{ url_for('futbol.c_manuales', editar=jugador.id) if es_manual
+                else url_for('futbol.c_jugador', pid=jugador.id) }}">
+      <i data-ico="user" class="pf-ico--sm"></i> Datos del jugador
+    </a>
+  </div>
 </div>
 
 {# ══════════ LOS 18 ATRIBUTOS ══════════ #}

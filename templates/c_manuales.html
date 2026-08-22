@@ -49,31 +49,41 @@
 <div class="pf-card">
   <div class="pf-card__head">
     <span class="pf-item__icon"><i data-ico="user" class="pf-ico--sm"></i></span>
-    <h2 class="pf-card__title">Datos Básicos</h2>
+    <h2 class="pf-card__title">{{ 'Datos de ' ~ editando.nombre if editando else 'Datos Básicos' }}</h2>
   </div>
   <p class="cm-hint">
+    {%- if editando %}
+    Corrige lo que haga falta. Su Perfil Dinámico, su histórico y su ficha
+    médica no se tocan.
+    {%- else %}
     Para los que no tienen correo o todavía no se han registrado. Cuentan en
     la plantilla, se les evalúa y entran en la lista de asistencia.
+    {%- endif %}
   </p>
 
   <div class="pf-field">
     <label class="pf-label" for="m-nombre">Nombre completo *</label>
-    <input class="pf-input" id="m-nombre" maxlength="100" placeholder="Nombre y apellido">
+    <input class="pf-input" id="m-nombre" maxlength="100" placeholder="Nombre y apellido"
+           value="{{ editando.nombre or '' }}">
   </div>
 
   <div class="pf-row pf-mt-12" style="gap:10px">
     <div class="pf-grow">
-      <label class="pf-label" for="m-anio">Año de nacimiento *</label>
-      <input class="pf-input" id="m-anio" type="number" min="1950" max="2025" placeholder="2011">
+      <label class="pf-label" for="m-nacimiento">Fecha de nacimiento *</label>
+      <input class="pf-input" id="m-nacimiento" type="date" min="1950-01-01"
+             value="{{ editando.fecha_nacimiento or '' }}">
     </div>
     <div style="width:88px;flex:none">
       <label class="pf-label" for="m-dorsal">Dorsal</label>
-      <input class="pf-input" id="m-dorsal" type="number" min="1" max="99">
+      <input class="pf-input" id="m-dorsal" type="number" min="1" max="99"
+             value="{{ editando.dorsal or '' }}">
     </div>
   </div>
-  <p class="pf-mt-8" style="margin:0 0 12px;font-size:11.5px;color:var(--text-muted);line-height:1.55">
-    El año de nacimiento importa: es lo que decide con qué baremo se comparan
-    sus evaluaciones.
+  <p class="pf-mt-8" style="margin:0 0 12px;font-size:11.5px;color:var(--text-muted);line-height:1.55"
+     id="m-edad-nota">
+    La fecha importa: de ella sale la edad, y la edad decide con qué baremo se
+    comparan sus evaluaciones. Con el día y el mes cambia de categoría el día
+    que cumple años, no el 1 de enero.
   </p>
 
   <div class="pf-row" style="gap:10px">
@@ -81,7 +91,7 @@
       <label class="pf-label" for="m-posicion">Posición Principal *</label>
       <select class="pf-select" id="m-posicion">
         <option value="">—</option>
-        {% for p in posiciones %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
+        {% for p in posiciones %}<option value="{{ p }}" {{ 'selected' if p == editando.posicion }}>{{ p }}</option>{% endfor %}
       </select>
     </div>
     <div class="pf-grow">
@@ -98,23 +108,44 @@
       <label class="pf-label" for="m-pie">Pie hábil</label>
       <select class="pf-select" id="m-pie">
         <option value="">—</option>
-        <option value="Derecho">Derecho</option>
-        <option value="Izquierdo">Izquierdo</option>
-        <option value="Ambidiestro">Ambidiestro</option>
+        <option value="Derecho" {{ 'selected' if editando.pie_habil == 'Derecho' }}>Derecho</option>
+        <option value="Izquierdo" {{ 'selected' if editando.pie_habil == 'Izquierdo' }}>Izquierdo</option>
+        <option value="Ambidiestro" {{ 'selected' if editando.pie_habil == 'Ambidiestro' }}>Ambidiestro</option>
       </select>
     </div>
     <div class="pf-grow">
       <label class="pf-label" for="m-telefono">Teléfono</label>
-      <input class="pf-input" id="m-telefono" maxlength="30" inputmode="tel">
+      <input class="pf-input" id="m-telefono" maxlength="30" inputmode="tel"
+             value="{{ editando.telefono or '' }}">
     </div>
   </div>
 
   <div class="pf-field pf-mt-12">
     <label class="pf-label" for="m-tutor">Representante</label>
-    <input class="pf-input" id="m-tutor" maxlength="120" placeholder="Nombre del padre o madre">
+    <input class="pf-input" id="m-tutor" maxlength="120" placeholder="Nombre del padre o madre"
+           value="{{ editando.tutor or '' }}">
   </div>
 </div>
 
+{% if editando %}
+{# Al EDITAR solo se tocan los datos de identidad. Los 18 atributos se llevan
+   en «Evaluación» —donde el control va de 1 a 100— y lo medico en su propia
+   ficha. Si se enseñaran aqui, los selectores arrancarian en 5 y guardar
+   pondria a 50 todo el Perfil Dinamico del jugador, borrandolo. #}
+<div class="pf-card">
+  <div class="pf-alerta pf-alerta--info" style="margin:0">
+    <i data-ico="info" class="pf-ico--xs"></i>
+    <span>
+      Aquí se corrigen sus datos. Sus valoraciones se cambian en
+      <a href="{{ url_for('futbol.c_evaluar', pid=editando.id) }}"
+         style="color:var(--primary);font-weight:600">Evaluación</a>
+      y lo médico en su
+      <a href="{{ url_for('futbol.c_medico_jugador', pid=editando.id) }}"
+         style="color:var(--primary);font-weight:600">ficha médica</a>.
+    </span>
+  </div>
+</div>
+{% else %}
 {# ══════════ 2. DATOS TÉCNICOS ══════════ #}
 <div class="pf-card">
   <div class="cm-head">
@@ -347,10 +378,16 @@
   </details>
 </div>
 
+{% endif %}
 <div style="padding:0 16px 30px;display:flex;gap:10px">
-  <a class="pf-btn pf-btn--secondary" style="flex:1" href="{{ url_for('futbol.c_equipo') }}">Cancelar</a>
-  <button class="pf-btn pf-btn--primary" style="flex:2" type="button" id="btn-crear">
-    <i data-ico="user-plus" class="pf-ico--sm"></i> Guardar Jugador
+  <a class="pf-btn pf-btn--secondary" style="flex:1"
+     href="{{ url_for('futbol.c_evaluar', pid=editando.id) if editando else url_for('futbol.c_equipo') }}">
+    {{ 'Volver' if editando else 'Cancelar' }}
+  </a>
+  <button class="pf-btn pf-btn--primary" style="flex:2" type="button" id="btn-crear"
+          {% if editando %}data-editar="{{ editando.id }}"{% endif %}>
+    <i data-ico="{{ 'save' if editando else 'user-plus' }}" class="pf-ico--sm"></i>
+    {{ 'Guardar cambios' if editando else 'Guardar Jugador' }}
   </button>
 </div>
 
@@ -373,7 +410,7 @@
       </div>
       <div class="pf-jug__s">
         {{ m.posicion or 'Sin posición' }}
-        {%- if m.anio_nacimiento %} · {{ m.anio_nacimiento }}{% endif %}
+        {%- if m._edad %} · {{ m._edad }} años{% elif m.anio_nacimiento %} · {{ m.anio_nacimiento }}{% endif %}
         {%- if m._evals %} · {{ m._evals }} evaluación{{ '' if m._evals == 1 else 'es' }}{% endif %}
       </div>
     </div>
@@ -442,6 +479,30 @@
   excluyentes(aptoBox, 'data-apto');
   excluyentes(fatigaBox, 'data-fatiga');
 
+  // La edad se enseña al vuelo: es lo que de verdad decide la categoria, y
+  // asi el entrenador ve al instante si la fecha que puso es la que queria.
+  (function () {
+    var campo = document.getElementById('m-nacimiento');
+    var nota = document.getElementById('m-edad-nota');
+    if (!campo || !nota) return;
+    var original = nota.textContent;
+    function pintar() {
+      if (!campo.value) { nota.textContent = original; return; }
+      var f = new Date(campo.value + 'T00:00:00');
+      var h = new Date();
+      var edad = h.getFullYear() - f.getFullYear();
+      // Se descuenta el cumpleaños que todavia no ha llegado.
+      var m = h.getMonth() - f.getMonth();
+      if (m < 0 || (m === 0 && h.getDate() < f.getDate())) edad--;
+      if (isNaN(edad) || edad < 0 || edad > 99) { nota.textContent = original; return; }
+      nota.textContent = 'Tiene ' + edad + ' años. Con eso se elige su baremo, '
+        + 'y sube de categoria solo el dia que cumpla.';
+    }
+    campo.addEventListener('change', pintar);
+    campo.addEventListener('input', pintar);
+    pintar();
+  })();
+
   document.getElementById('btn-crear').onclick = function () {
     var boton = this;
     var v = id => document.getElementById(id).value;
@@ -454,13 +515,20 @@
     // PF.leerRatings() trae los 18 atributos + "valoracion" (que no es un
     // atributo del Perfil Dinámico: va aparte, a fut_manual_players).
     var ratings = PF.leerRatings();
-    var valoracion = ratings.valoracion;
+    var valoracion = ratings.valoracion;   // 1-10, va tal cual a fut_manual_players
     delete ratings.valoracion;
+
+    // Los 18 atributos se guardan en escala 1-100, que es la que usa la
+    // pantalla de evaluacion (`c_evaluar`, un range de 1 a 100) sobre estas
+    // MISMAS columnas. Este formulario los pide con el selector de 1 a 10, asi
+    // que hay que multiplicar: sin esto un jugador recien creado nacia con los
+    // atributos a una decima parte y en su evaluacion salia casi a cero.
+    Object.keys(ratings).forEach(function (k) { ratings[k] = ratings[k] * 10; });
 
     var datos = Object.assign({
       nombre: nombre, dorsal: v('m-dorsal'), posicion: v('m-posicion'),
       posicion_secundaria: v('m-posicion2'),
-      anio_nacimiento: v('m-anio'), pie_habil: v('m-pie'),
+      fecha_nacimiento: v('m-nacimiento'), pie_habil: v('m-pie'),
       tutor: v('m-tutor'), telefono: v('m-telefono'),
       fortalezas: v('m-fortalezas'), debilidades: v('m-debilidades'),
       evolucion_tecnica: v('m-evoltec'), lesiones_historial: v('m-lesiones'),
@@ -484,6 +552,19 @@
         cirugias: v('m-cirugias'), notas_medico: v('m-notas-medico'),
       },
     }, ratings);
+
+    // Editando solo se mandan los datos de identidad: los selectores de
+    // atributos arrancan en 5 y enviarlos pondria a 50 todo su Perfil
+    // Dinamico. Lo mismo con la ficha medica, que tiene su propia pantalla.
+    var editar = boton.dataset.editar;
+    if (editar) {
+      datos = {
+        id: editar,
+        nombre: datos.nombre, dorsal: datos.dorsal, posicion: datos.posicion,
+        fecha_nacimiento: datos.fecha_nacimiento, pie_habil: datos.pie_habil,
+        tutor: datos.tutor, telefono: datos.telefono,
+      };
+    }
 
     boton.disabled = true;
     PF.api('/api/manual', datos).then(function (j) {

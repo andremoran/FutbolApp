@@ -139,9 +139,24 @@ def c_manuales():
     for m in lista:
         m['_evals'] = conteo.get(str(m['id']), 0)
         m['_alta'] = db.parse_fecha(m.get('creado'))
+        #  Se calcula al pintar, no se guarda: una edad guardada envejece mal.
+        m['_edad'] = db.edad_de(m.get('fecha_nacimiento'), m.get('anio_nacimiento'))
+
+    #  Con `?editar=<id>` el mismo formulario sirve para MODIFICAR a uno que ya
+    #  existe. La API (`POST /api/manual`) ya sabia actualizar cuando le llega
+    #  un `id`, pero ninguna pantalla se lo mandaba: los datos de un jugador
+    #  sin cuenta no se podian corregir desde el web, solo archivarlo y volver
+    #  a crearlo —perdiendo su Perfil Dinamico y su historico—.
+    editando = None
+    mid = request.args.get('editar')
+    if mid:
+        editando = db.one('fut_manual_players', 'editar manual', id=mid, coach_id=uid)
+        if not editando:
+            abort(404)
 
     return render_template('c_manuales.html',
                            tab_activa='equipo', hide_tabbar=True,
+                           editando=editando,
                            manuales=activos,
                            archivados=[m for m in lista if not m.get('activo')],
                            posiciones=POSICIONES,
@@ -196,8 +211,27 @@ def _limpiar_ficha_medica(medico):
     return limpio
 
 
+_COLUMNA_FECHA = None
+
+
+def _hay_fecha_nacimiento():
+    """¿Está aplicada la migración de la fecha de nacimiento? Se mira una vez."""
+    global _COLUMNA_FECHA
+    if _COLUMNA_FECHA is None:
+        try:
+            db.sb().table('fut_manual_players').select('fecha_nacimiento').limit(1).execute()
+            _COLUMNA_FECHA = True
+        except Exception:
+            logger.warning('Falta la columna fecha_nacimiento: aplica '
+                           'sql/schema_v7_fecha_nacimiento.sql. Se guarda solo el año.')
+            _COLUMNA_FECHA = False
+    return _COLUMNA_FECHA
+
+
 @bp.route('/api/manual', methods=['POST'])
 @login_required
+
+
 def api_manual():
     error = _guardia_coach()
     if error:
@@ -228,6 +262,24 @@ def api_manual():
                 datos[campo] = tipo(v)
             except (TypeError, ValueError):
                 pass
+
+    #  Va DESPUES del bucle a proposito: la fecha completa manda sobre el año
+    #  suelto, y si se pusiera antes el bucle lo sobrescribiria con lo que
+    #  mandara el cliente. El año se deriva de la fecha para que lo que ya lo
+    #  lee —solicitudes, ficha del jugador, registro— siga funcionando sin
+    #  tocarlo. Si solo llega el año, se guarda el año y ya.
+    fecha = (d.get('fecha_nacimiento') or '').strip()[:10]
+    if fecha:
+        anio = db.anio_de(fecha)
+        if anio:
+            datos['anio_nacimiento'] = anio
+        #  La columna la añade `sql/schema_v7_fecha_nacimiento.sql`. Si el
+        #  codigo llegara a produccion antes que el SQL, mandarla haria fallar
+        #  el guardado entero y no se podrian dar de alta jugadores. Se
+        #  comprueba una vez y, mientras no este, se guarda solo el año — que
+        #  es exactamente lo que se hacia antes.
+        if _hay_fecha_nacimiento():
+            datos['fecha_nacimiento'] = fecha
 
     # Perfil Dinámico (18 atributos + estado): mismos campos que evaluar a un
     # jugador con cuenta, ver futbol/db.py:guardar_atributos. No son columnas
