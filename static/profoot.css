@@ -795,3 +795,97 @@ img, svg { max-width: 100%; }
 
 /* ─── Rejilla 2×2 (Datos Competitivos) ─────────────────────────────────── */
 .pf-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* ─── Observaciones: sesión, dictado y lectura de la IA ─────────────────── */
+/*  El bloque de dictar vive dentro de la tarjeta de la observación, así que
+    va con fondo tenue en vez de tarjeta propia: son notas de la misma cosa,
+    no una sección aparte.                                                   */
+.ob-sesion {
+  display: flex; gap: 10px; align-items: flex-start;
+  margin-top: 12px; padding: 10px 12px;
+  background: rgba(16,185,129,0.08);
+  border: 1px solid rgba(16,185,129,0.22);
+  border-radius: var(--r-md);
+  font-size: 13px; line-height: 1.5;
+}
+.ob-sesion__ico { color: var(--primary); flex: none; margin-top: 1px; }
+.ob-sesion__sub { display: block; color: var(--text-sec); font-size: 12px; margin-top: 2px; }
+
+.ob-voz {
+  margin-top: 14px; padding: 12px;
+  background: var(--bg-soft, rgba(15,23,42,0.03));
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-md);
+}
+.ob-voz[data-bloqueado] { opacity: .72; }
+.ob-voz__cab { margin-bottom: 10px; }
+.ob-voz__t {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 14px; font-weight: 700;
+}
+.ob-voz__s { display: block; font-size: 12px; color: var(--text-sec); margin-top: 3px; }
+.ob-voz__reloj {
+  font-variant-numeric: tabular-nums; font-weight: 700; font-size: 14px;
+  color: var(--danger, #dc2626);
+}
+
+/*  Grabando: el botón late para que se vea desde lejos, con el móvil en la
+    mano y a pie de campo.                                                   */
+#ob-rec.is-rec {
+  background: var(--danger, #dc2626); color: #fff; border-color: transparent;
+  animation: ob-late 1.4s ease-in-out infinite;
+}
+@keyframes ob-late {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220,38,38,0.45); }
+  50%      { box-shadow: 0 0 0 7px rgba(220,38,38,0); }
+}
+
+.ob-notas:not(:empty) { margin-top: 10px; display: grid; gap: 8px; }
+.ob-nota {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; background: #fff;
+  border: 1px solid var(--border-soft); border-radius: var(--r-md);
+  font-size: 13px;
+}
+.ob-nota__n { font-weight: 700; flex: none; }
+.ob-nota__d { color: var(--text-sec); font-size: 12px; flex: none; }
+.ob-nota__a { height: 30px; flex: 1; min-width: 0; }
+.ob-nota__x {
+  flex: none; color: var(--text-muted); position: relative;
+  width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
+}
+.ob-nota__x::after { content: ''; position: absolute; inset: -7px; }
+
+.ob-ia {
+  margin: 4px 0 14px; padding: 12px;
+  background: rgba(139,92,246,0.07);
+  border: 1px solid rgba(139,92,246,0.22);
+  border-radius: var(--r-md);
+}
+.ob-ia__cab {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 13px; font-weight: 700; color: var(--purple);
+  margin-bottom: 7px;
+}
+.ob-ia__x {
+  margin-left: auto; color: var(--text-muted); position: relative;
+  width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+}
+.ob-ia__x::after { content: ''; position: absolute; inset: -8px; }
+.ob-ia__txt { font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
+.ob-ia__det { margin-top: 9px; }
+.ob-ia__det summary {
+  font-size: 12px; color: var(--text-sec); cursor: pointer;
+  padding: 4px 0;
+}
+.ob-ia__tr {
+  font-size: 12.5px; line-height: 1.55; color: var(--text-sec);
+  white-space: pre-wrap; margin-top: 6px;
+  padding-left: 10px; border-left: 2px solid rgba(139,92,246,0.3);
+}
+
+.ob-item__ia {
+  display: flex; gap: 7px; margin-top: 8px; padding-top: 8px;
+  border-top: 1px dashed var(--border-soft);
+  font-size: 12.5px; line-height: 1.55; color: var(--purple);
+}

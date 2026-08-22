@@ -10,8 +10,11 @@ import logging
 from datetime import datetime, timezone
 from functools import wraps
 
-from flask import abort, jsonify, redirect, render_template, url_for
+from flask import abort, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+
+import roles
+from roles import solo_pro
 
 from . import bp, db
 
@@ -167,6 +170,27 @@ def c_partido(mid):
 
 
 # ═══════════════════════ OBSERVACIONES DE ENTRENAMIENTO ═══════════════════════
+def _evento_del_coach(eid, uid):
+    """El evento, solo si es de este equipo. None si no lo es o no existe.
+
+    Se comprueba SIEMPRE contra el equipo y no contra quien mira: un asistente
+    entra a la ficha del entreno del principal, y si aqui se filtrara por
+    current_user.id la observacion se le quedaria colgando sin sesion.
+    """
+    if not eid:
+        return None
+    return db.one('fut_events', 'evento de la observacion', id=eid, coach_id=uid)
+
+
+def _titulo_de_sesion(ev):
+    """«Presion alta · jue 21/08» — para encabezar la observacion."""
+    if not ev:
+        return ''
+    f = db.parse_fecha(ev.get('fecha'))
+    return '%s%s' % (ev.get('titulo') or 'Sesion',
+                     ' · ' + f.strftime('%d/%m/%Y') if f else '')
+
+
 @bp.route('/coach/observaciones')
 @solo_entrenador
 def c_observaciones():
@@ -178,11 +202,24 @@ def c_observaciones():
         o['_fecha'] = db.parse_fecha(o.get('fecha'))
         o['_jugador'] = jugadores.get(o.get('player_id'), {}).get('name')
 
+    #  Al entrar desde la ficha de un entreno, la pantalla tiene que saber de
+    #  cual. Antes el enlace ya mandaba ?evento=<id> pero aqui se ignoraba, y
+    #  ademas la columna event_id no existia: la observacion quedaba suelta y
+    #  la ficha del entreno nunca llegaba a decir que ya habia una.
+    evento = _evento_del_coach(request.args.get('evento'), uid)
+    ya = None
+    if evento:
+        ya = next((o for o in lista if o.get('event_id') == evento['id']), None)
+
     return render_template('c_observaciones.html',
                            tab_activa='agenda', hide_tabbar=True,
                            observaciones=lista,
                            jugadores=list(jugadores.values()),
-                           hoy=db.hoy_iso())
+                           hoy=db.hoy_iso(),
+                           evento=evento,
+                           titulo_sesion=_titulo_de_sesion(evento),
+                           observacion_previa=ya,
+                           es_pro=roles.es_pro(current_user))
 
 
 @bp.route('/api/observacion', methods=['POST'])
@@ -205,17 +242,144 @@ def api_observacion():
         if str(destino) not in mios:
             return jsonify({'error': 'Ese jugador no es de tu plantilla.'}), 403
 
-    fila = db.insert('fut_observaciones', {
-        'coach_id': db.equipo_id(current_user.id),
+    uid = db.equipo_id(current_user.id)
+
+    #  El entreno del que sale. Se valida contra el equipo: con un id de otro
+    #  la observacion se guardaria colgada de una sesion ajena.
+    evento = _evento_del_coach(d.get('event_id'), uid)
+    if d.get('event_id') and not evento:
+        return jsonify({'error': 'Ese entrenamiento no es de tu equipo.'}), 403
+
+    datos = {
+        'coach_id': uid,
         'player_id': destino,
-        'fecha': d.get('fecha') or db.hoy_iso(),
+        'event_id': evento['id'] if evento else None,
+        'fecha': (evento or {}).get('fecha') or d.get('fecha') or db.hoy_iso(),
         'titulo': (d.get('titulo') or 'Sesión')[:120],
         'texto': texto[:4000],
+        'transcripcion': (d.get('transcripcion') or '').strip()[:6000] or None,
+        'analisis_ia': (d.get('analisis_ia') or '').strip()[:4000] or None,
+        'audio_segundos': _entero(d.get('audio_segundos')),
         'creado': _ahora(),
-    }, 'observacion')
+    }
+
+    #  Editar la que ya hay en vez de amontonar otra: una sesion tiene UNA
+    #  observacion, y al volver a entrar desde la ficha del entreno lo que se
+    #  espera es seguir la de antes.
+    previa = d.get('id')
+    if previa:
+        filas = db.update('fut_observaciones', datos, 'observacion editada',
+                          id=previa, coach_id=uid)
+        if not filas:
+            return jsonify({'error': 'Esa observación no es tuya o ya no existe.'}), 404
+        return jsonify({'ok': True, 'id': previa})
+
+    fila = db.insert('fut_observaciones', datos, 'observacion')
     if not fila:
         return jsonify({'error': 'No se pudo guardar.'}), 500
-    return jsonify({'ok': True})
+    return jsonify({'ok': True, 'id': fila['id']})
+
+
+# ═══════════════════════ NOTAS DE VOZ ═══════════════════════
+@bp.route('/api/observacion/voz', methods=['POST'])
+@login_required
+@solo_pro('ia')
+def api_observacion_voz():
+    """Recibe las notas dictadas, las transcribe y las lee como entrenador.
+
+    No guarda nada: devuelve el texto para que el entrenador lo vea, lo
+    corrija si hace falta y decida. Guardar por su cuenta lo que ha entendido
+    una maquina, sin que el coach lo haya leido, es justo lo que no se quiere
+    en una ficha de la que despues cuelgan evaluaciones.
+    """
+    from .api import api_guard, cuerpo
+    from .ia import FORMATOS_AUDIO, MAX_AUDIO_MB, analizar_notas_de_voz
+
+    err = api_guard(solo_coach=True)
+    if err:
+        return err
+
+    d = cuerpo()
+    notas = d.get('audios') or []
+    if not isinstance(notas, list) or not notas:
+        return jsonify({'error': 'No llegó ninguna nota de voz.'}), 400
+    if len(notas) > 8:
+        return jsonify({'error': 'Máximo 8 notas de voz a la vez.'}), 400
+
+    audios, total = [], 0
+    for n in notas:
+        if not isinstance(n, dict):
+            continue
+        mime = (n.get('mime') or 'audio/webm').split(';')[0].strip().lower()
+        datos = (n.get('datos') or '').strip()
+        if not datos:
+            continue
+        if mime not in FORMATOS_AUDIO:
+            return jsonify({'error': 'Ese formato de audio no vale (%s).' % mime}), 400
+        #  base64 abulta un tercio mas que el binario.
+        total += len(datos) * 3 // 4
+        audios.append((mime, datos))
+
+    if not audios:
+        return jsonify({'error': 'Las notas llegaron vacías.'}), 400
+    if total > MAX_AUDIO_MB * 1024 * 1024:
+        return jsonify({'error': 'Son demasiados minutos de audio. Graba notas '
+                                 'más cortas y súbelas por tandas.'}), 413
+
+    uid = db.equipo_id(current_user.id)
+    evento = _evento_del_coach(d.get('event_id'), uid)
+    contexto = _contexto_de_sesion(evento, uid)
+
+    transcripcion, analisis = analizar_notas_de_voz(audios, contexto)
+    if not transcripcion and not analisis:
+        return jsonify({'error': 'La IA no pudo con el audio. Vuelve a '
+                                 'intentarlo en un momento.'}), 503
+
+    return jsonify({'ok': True,
+                    'transcripcion': transcripcion or '',
+                    'analisis': analisis or '',
+                    'titulo': _titulo_de_sesion(evento) or None})
+
+
+def _contexto_de_sesion(evento, uid):
+    """Cuatro datos de la sesion para que la IA sepa de que le hablan.
+
+    Sin esto la lectura sale generica: con el tipo de entreno, la duracion y
+    quien falto, la IA puede atar lo que dice el audio a lo que ya se sabe.
+    """
+    if not evento:
+        return ''
+    from . import calendario as cal
+
+    trozos = ['Entreno del %s' % (evento.get('fecha') or 'sin fecha')]
+    if evento.get('titulo'):
+        trozos.append('"%s"' % evento['titulo'])
+    if evento.get('tipo_entreno'):
+        meta = cal.ENTRENO_META.get(evento['tipo_entreno'], {})
+        trozos.append((meta.get('etiqueta') or evento['tipo_entreno']).lower())
+    if evento.get('duracion_min'):
+        trozos.append('%s min' % evento['duracion_min'])
+    if evento.get('intensidad'):
+        trozos.append('intensidad %s' % evento['intensidad'])
+
+    marcas = db.asistencia_de([evento['id']]) or []
+    if marcas:
+        faltaron = [m for m in marcas if m.get('estado') in ('ausente', 'justificado')]
+        tarde = [m for m in marcas if m.get('estado') == 'tarde']
+        trozos.append('%d jugadores en la lista' % len(marcas))
+        if faltaron:
+            trozos.append('%d no vinieron' % len(faltaron))
+        if tarde:
+            trozos.append('%d llegaron tarde' % len(tarde))
+    return ', '.join(trozos) + '.'
+
+
+def _entero(v):
+    try:
+        n = int(v)
+    except (TypeError, ValueError):
+        return None
+    return n if 0 < n < 60 * 60 * 4 else None
 
 
 @bp.route('/api/observacion/<oid>', methods=['DELETE'])

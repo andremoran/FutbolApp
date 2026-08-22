@@ -397,7 +397,7 @@ def _seccion_asistencia(por_jugador, fichas):
     return salida
 
 
-def _seccion_entrenamientos(uid, n_plantilla, fichas):
+def _seccion_entrenamientos(uid, n_plantilla, fichas, eventos=None):
     """Los entrenamientos con TODO lo que los describe, y la semana evaluada.
 
     Antes esto eran tres líneas —cuántos planes, cuántos eventos por delante y
@@ -414,7 +414,9 @@ def _seccion_entrenamientos(uid, n_plantilla, fichas):
 
     partes = []
     hoy = db.hoy_iso()
-    eventos = db.eventos_equipo(uid) or []
+    #  Los trae quien llama para no pedirlos otra vez: la pantalla de la IA
+    #  tiene presupuesto de segundos y esta consulta la usan dos secciones.
+    eventos = db.eventos_equipo(uid) or [] if eventos is None else eventos
     for e in eventos:
         e['_fecha'] = db.parse_fecha(e.get('fecha'))
 
@@ -517,6 +519,47 @@ def _seccion_entrenamientos(uid, n_plantilla, fichas):
     return partes
 
 
+def _seccion_observaciones(uid, eventos):
+    """Lo que el entrenador anoto o dicto despues de cada sesion.
+
+    Es la unica parte del contexto escrita por el propio entrenador con sus
+    palabras, y hasta ahora no llegaba a la IA: se guardaba en la ficha y ahi
+    se quedaba. Sin esto la IA solo veia numeros —minutos, carga, asistencia—
+    y no sabia que el rondo no funciono ni que a Carlos se le vio cansado, que
+    es justo lo que decide la sesion siguiente.
+
+    Se ata cada observacion a su entreno cuando lo tiene, para que la IA pueda
+    decir «el dia que hiciste fuerza pasó esto» y no leerlo todo suelto.
+    """
+    obs = db.rows('fut_observaciones', 'ia observaciones', coach_id=uid,
+                  _order='fecha', _desc=True, _limit=12) or []
+    if not obs:
+        return ['Observaciones del entrenador: todavia no ha anotado ninguna '
+                'sesion, asi que de lo que pasa en el campo no hay nada escrito.']
+
+    por_id = {e['id']: e for e in eventos if e.get('id')}
+    lineas = []
+    for o in obs:
+        ev = por_id.get(o.get('event_id'))
+        cabeza = o.get('fecha') or 'sin fecha'
+        if ev:
+            cabeza += ' (%s)' % (ev.get('titulo') or 'entreno')
+        trozos = ['%s: %s' % (cabeza, (o.get('titulo') or 'sesion'))]
+        if o.get('texto'):
+            trozos.append('nota del entrenador: %s' % str(o['texto'])[:600])
+        #  El analisis de la IA sobre lo dictado va marcado como tal: no es lo
+        #  mismo que lo dijera el entrenador a que lo dedujera una maquina.
+        if o.get('analisis_ia'):
+            trozos.append('lectura previa de la IA sobre esa sesion: %s'
+                          % str(o['analisis_ia'])[:400])
+        lineas.append(' | '.join(trozos))
+
+    dictadas = len([o for o in obs if o.get('transcripcion')])
+    cabecera = 'Observaciones del entrenador (%d, de la mas reciente a la mas antigua%s):' % (
+        len(obs), ', %d dictadas por voz' % dictadas if dictadas else '')
+    return _lista(cabecera, lineas, 12)
+
+
 def _contexto_entrenador(user):
     """Todo lo que el entrenador tiene cargado, para que la IA no responda a ciegas.
 
@@ -597,7 +640,10 @@ def _contexto_entrenador(user):
         partes.append('Evaluaciones registradas: 0 (todavia no ha tomado ninguna prueba)')
 
     # ─── Entrenamientos y la semana ─────────────────────────────────────────
-    partes += _seccion_entrenamientos(uid, len(jugadores) + len(manuales), fichas)
+    eventos = db.eventos_equipo(uid) or []
+    partes += _seccion_entrenamientos(uid, len(jugadores) + len(manuales), fichas,
+                                      eventos)
+    partes += _seccion_observaciones(uid, eventos)
 
     # ─── Parte médico ───────────────────────────────────────────────────────
     lesiones = [x for x in (db.rows('fut_injuries', 'ia lesiones', coach_id=uid) or [])
@@ -637,15 +683,31 @@ def _prompt(user, pregunta):
 
 def _gemini(prompt):
     """Llama a Gemini en su nivel gratuito. Devuelve None si no hay clave o falla."""
+    return _gemini_partes([{'text': prompt}])
+
+
+def _gemini_partes(partes, max_tokens=700, temperatura=0.7, limpiar=True,
+                   presupuesto=None, timeout_req=20):
+    """El mismo cliente, pero admitiendo audio ademas de texto.
+
+    Gemini acepta el audio dentro de la propia peticion (`inline_data`), asi
+    que las notas de voz del entrenador se transcriben y se analizan de una
+    sola vez, con la misma clave y el mismo presupuesto. No hace falta montar
+    un servicio de transcripcion aparte.
+
+    `limpiar` quita asteriscos y demas marcas de markdown: vale para lo que se
+    le ensena al usuario, pero no cuando la respuesta lleva separadores que hay
+    que reconocer despues.
+    """
     api_key = (os.environ.get('GEMINI_API_KEY') or '').strip()
     if not api_key:
         return None
 
     payload = {
-        'contents': [{'parts': [{'text': prompt}]}],
+        'contents': [{'parts': partes}],
         'generationConfig': {
-            'temperature': 0.7,
-            'maxOutputTokens': 700,
+            'temperature': temperatura,
+            'maxOutputTokens': max_tokens,
             # Los modelos 2.5 "piensan" y esos tokens cuentan → apagado.
             'thinkingConfig': {'thinkingBudget': 0},
         },
@@ -655,7 +717,7 @@ def _gemini(prompt):
     # podía tardar minutos y morir contra el límite de la función (Vercel) o del
     # worker (gunicorn). Antes de agotarlo se corta y responde el respaldo.
     import time
-    limite = time.monotonic() + PRESUPUESTO_S
+    limite = time.monotonic() + (presupuesto or PRESUPUESTO_S)
 
     for modelo in MODELOS:
         restante = limite - time.monotonic()
@@ -665,23 +727,127 @@ def _gemini(prompt):
 
         url = f'https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent?key={api_key}'
         try:
-            r = requests.post(url, json=payload, timeout=min(20, restante))
+            r = requests.post(url, json=payload,
+                              timeout=min(timeout_req, restante))
             if r.status_code == 429 and (limite - time.monotonic()) > 8:
                 time.sleep(2)
-                r = requests.post(url, json=payload,
-                                  timeout=min(20, max(4, limite - time.monotonic())))
+                r = requests.post(
+                    url, json=payload,
+                    timeout=min(timeout_req, max(4, limite - time.monotonic())))
             if r.status_code == 429:
                 logger.info('IA: cuota por minuto en %s, pruebo el siguiente', modelo)
                 continue
             r.raise_for_status()
             texto = r.json()['candidates'][0]['content']['parts'][0]['text']
-            texto = re.sub(r'[*_`#]+', '', texto or '').strip()
+            if limpiar:
+                texto = re.sub(r'[*_`#]+', '', texto or '')
+            texto = (texto or '').strip()
             if texto:
                 return texto
         except Exception as e:
             logger.warning('IA %s falló: %s', modelo, e)
             continue
     return None
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  NOTAS DE VOZ DEL ENTRENAMIENTO
+# ═══════════════════════════════════════════════════════════════════════════
+#  A pie de campo no se escribe. El entrenador dicta lo que ve y de ahi sale
+#  la observacion de la sesion. Gemini hace las dos cosas en una sola llamada:
+#  pasa el audio a texto y despues lo lee como entrenador. Se le piden
+#  separadas con marcas para guardar cada cosa en su sitio: lo dictado tal
+#  cual, y la lectura aparte.
+
+MARCA_T = 'TRANSCRIPCION:'
+MARCA_A = 'ANALISIS:'
+
+#  Tope por peticion. Gemini admite bastante mas, pero una nota a pie de campo
+#  son segundos: sin tope, un audio largo se come el presupuesto de la
+#  pantalla entera y agota la cuota gratuita en dos usos.
+MAX_AUDIO_MB = 8
+
+#  Segundos para transcribir y analizar. Es una accion con su propia espera en
+#  pantalla, no el chat, asi que puede permitirse mas que los 30 de aquel.
+PRESUPUESTO_VOZ_S = int(os.getenv('IA_VOZ_PRESUPUESTO_S', '55'))
+FORMATOS_AUDIO = ('audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg',
+                  'audio/wav', 'audio/aac', 'audio/flac', 'audio/x-m4a')
+
+INSTRUCCION_VOZ = """Eres el segundo entrenador. Lo que te llega son notas de voz que el entrenador principal ha dictado durante o justo despues del entrenamiento, sobre la marcha y sin pensar en la redaccion.
+
+Haz DOS cosas, en este orden y con estas marcas exactas:
+
+TRANSCRIPCION:
+Lo que dice, transcrito en espanol. Fiel: no resumas, no le corrijas la forma
+de hablar y no te inventes lo que no se entienda (pon [no se entiende]). Si
+hay varias notas, separalas con un salto de linea.
+
+ANALISIS:
+Tu lectura como entrenador, de 4 a 8 lineas, sin markdown ni asteriscos:
+- Que ha funcionado y que no en la sesion.
+- Jugadores nombrados y que se dice de cada uno.
+- Senales de carga, fatiga o molestias, si las menciona.
+- Que conviene corregir o repetir en la proxima sesion.
+
+Habla SOLO de lo que esta en el audio. Si algo no se menciona, no lo rellenes:
+vale mas una lectura corta que una inventada. Si te habla de dolor o de una
+lesion, recomienda pasar por el fisio y no diagnostiques."""
+
+
+def analizar_notas_de_voz(audios, contexto=''):
+    """Transcribe las notas dictadas y saca de ellas la lectura de la sesion.
+
+    `audios` es una lista de (mime, datos_en_base64). Van todas en la misma
+    peticion a proposito: el entrenador suele dictar a trozos —uno por
+    ejercicio, otro por un jugador— y leerlos juntos permite relacionarlos,
+    que es justo lo que se pierde analizandolos por separado.
+
+    Devuelve (transcripcion, analisis). Si no hay clave o Gemini no contesta,
+    devuelve (None, None) y quien llama decide: lo que el entrenador escribio
+    a mano se guarda igual, que es lo que no se puede perder.
+    """
+    if not audios:
+        return None, None
+
+    instruccion = INSTRUCCION_VOZ
+    if contexto:
+        instruccion += chr(10) + chr(10) + 'DE QUE SESION SE TRATA:' + chr(10) + contexto
+
+    partes = [{'text': instruccion}]
+    for mime, datos in audios:
+        partes.append({'inline_data': {'mime_type': mime, 'data': datos}})
+
+    #  Sin limpiar: las marcas hay que poder reconocerlas despues.
+    #  Margen propio: subir el audio y transcribirlo tarda mucho mas que
+    #  contestar a una pregunta escrita. Con los 20 s del chat, el primer
+    #  modelo se pasaba de tiempo siempre y se perdia el intento.
+    salida = _gemini_partes(partes, max_tokens=1400, temperatura=0.4,
+                            limpiar=False, presupuesto=PRESUPUESTO_VOZ_S,
+                            timeout_req=PRESUPUESTO_VOZ_S)
+    if not salida:
+        return None, None
+    return _partir_respuesta(salida)
+
+
+def _partir_respuesta(salida):
+    """Separa la transcripcion del analisis por las marcas que se pidieron.
+
+    Si el modelo se salta el formato —pasa— se devuelve todo como analisis en
+    vez de tirarlo: es mas util una respuesta mal repartida que ninguna.
+    """
+    limpio = re.sub(r'[*_`#]+', '', salida or '')
+    arriba = limpio.upper()
+    it, ia = arriba.find(MARCA_T), arriba.find(MARCA_A)
+
+    if it == -1 and ia == -1:
+        return None, limpio.strip()
+    if ia == -1:
+        return limpio[it + len(MARCA_T):].strip(), None
+    if it == -1 or it > ia:
+        return None, limpio[ia + len(MARCA_A):].strip()
+
+    return (limpio[it + len(MARCA_T):ia].strip(),
+            limpio[ia + len(MARCA_A):].strip())
 
 
 def _respaldo(user, pregunta):

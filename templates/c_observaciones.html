@@ -2,30 +2,58 @@
 {% block title %}Observaciones · ProFoot{% endblock %}
 
 {# screens/TrainingObservationScreen.tsx (versión escrita).
-   Notas del entrenador tras cada sesión: del grupo o de un jugador concreto. #}
+   Notas del entrenador tras cada sesión: del grupo o de un jugador concreto.
+
+   Si se entra desde la ficha de un entreno (?evento=<id>) la observación queda
+   atada a esa sesión y, si ya había una, se sigue editando esa en vez de
+   empezar otra. A pie de campo no se escribe, así que también se puede dictar:
+   la IA transcribe y deja su lectura de la sesión. #}
 
 {% block hero_back %}
-<a class="pf-hero__btn" href="{{ url_for('futbol.c_calendario') }}" aria-label="Volver">
+<a class="pf-hero__btn"
+   href="{% if evento %}{{ url_for('futbol.c_evento', eid=evento.id) }}{% else %}{{ url_for('futbol.c_calendario') }}{% endif %}"
+   aria-label="Volver">
   <i data-ico="arrow-left" class="pf-ico--sm"></i>
 </a>
 {% endblock %}
-{% block hero_label %}<div class="pf-hero__label">Después del entreno</div>{% endblock %}
+{% block hero_label %}
+<div class="pf-hero__label">{% if evento %}{{ titulo_sesion }}{% else %}Después del entreno{% endif %}</div>
+{% endblock %}
 {% block hero_title %}Observaciones{% endblock %}
 
 {% block content %}
 
 <div class="pf-card">
-  <div class="pf-card__head"><h2 class="pf-card__title">Nueva observación</h2></div>
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">
+      {% if observacion_previa %}Observación de la sesión{% else %}Nueva observación{% endif %}
+    </h2>
+  </div>
+
+  {% if evento %}
+  <div class="ob-sesion">
+    <span class="ob-sesion__ico"><i data-ico="calendar" class="pf-ico--sm"></i></span>
+    <span>
+      <b>{{ evento.titulo or 'Sesión' }}</b>
+      <span class="ob-sesion__sub">
+        Queda guardada dentro de este entrenamiento{% if observacion_previa %}, y estás editando la que ya había{% endif %}.
+      </span>
+    </span>
+  </div>
+  {% endif %}
 
   <div class="pf-row pf-mt-12" style="gap:10px">
     <div class="pf-grow">
       <label class="pf-label" for="ob-titulo">Título</label>
       <input class="pf-input" id="ob-titulo" type="text" maxlength="120"
-             placeholder="Ej. Sesión de presión alta">
+             placeholder="Ej. Sesión de presión alta"
+             value="{{ observacion_previa.titulo if observacion_previa else (evento.titulo if evento else '') }}">
     </div>
     <div style="width:140px;flex:none">
       <label class="pf-label" for="ob-fecha">Fecha</label>
-      <input class="pf-input" id="ob-fecha" type="date" value="{{ hoy }}">
+      <input class="pf-input" id="ob-fecha" type="date"
+             value="{{ observacion_previa.fecha if observacion_previa else (evento.fecha if evento else hoy) }}"
+             {% if evento %}readonly{% endif %}>
     </div>
   </div>
 
@@ -34,18 +62,65 @@
     <select class="pf-select" id="ob-jugador">
       <option value="">Todo el grupo</option>
       {% for j in jugadores %}
-      <option value="{{ j.id }}">{{ j.name }}</option>
+      <option value="{{ j.id }}"
+        {% if observacion_previa and observacion_previa.player_id == j.id %}selected{% endif %}>{{ j.name }}</option>
       {% endfor %}
     </select>
   </div>
 
+  {# ─── Dictar ─────────────────────────────────────────────────────────── #}
+  <div class="ob-voz" id="ob-voz" {% if not es_pro %}data-bloqueado="1"{% endif %}>
+    <div class="ob-voz__cab">
+      <span class="ob-voz__t">
+        <i data-ico="mic" class="pf-ico--sm"></i>
+        Dictar las notas{% if not es_pro %} 🔒{% endif %}
+      </span>
+      <span class="ob-voz__s" id="ob-voz-estado">
+        {% if es_pro %}Habla y la IA lo transcribe y te lo resume.
+        {% else %}Grabar y que la IA lo analice es del plan Pro.{% endif %}
+      </span>
+    </div>
+
+    <div class="pf-row" style="gap:8px;align-items:center">
+      <button class="pf-btn pf-btn--secondary" type="button" id="ob-rec">
+        <i data-ico="mic" class="pf-ico--sm"></i> <span id="ob-rec-txt">Grabar nota</span>
+      </button>
+      <span class="ob-voz__reloj" id="ob-reloj" hidden>0:00</span>
+      <span class="pf-grow"></span>
+      <button class="pf-btn pf-btn--primary" type="button" id="ob-analizar" hidden>
+        <i data-ico="cpu" class="pf-ico--sm"></i> Analizar
+      </button>
+    </div>
+
+    <div id="ob-notas" class="ob-notas"></div>
+  </div>
+
   <div class="pf-field">
+    <label class="pf-label" for="ob-texto">Tus notas</label>
     <textarea class="pf-textarea" id="ob-texto" rows="5" maxlength="4000"
-              placeholder="Qué funcionó, qué no, quién destacó, qué corregir la próxima sesión…"></textarea>
+              placeholder="Qué funcionó, qué no, quién destacó, qué corregir la próxima sesión…">{{ observacion_previa.texto if observacion_previa else '' }}</textarea>
+  </div>
+
+  {# Lo que devuelve la IA. Se enseña para que el entrenador lo lea ANTES de
+     guardar: nada de meter en la ficha lo que ha entendido una máquina sin
+     que él lo haya visto. #}
+  <div class="ob-ia" id="ob-ia" {% if not observacion_previa or not observacion_previa.analisis_ia %}hidden{% endif %}>
+    <div class="ob-ia__cab">
+      <i data-ico="cpu" class="pf-ico--sm"></i> Lectura de la IA
+      <button type="button" class="ob-ia__x" id="ob-ia-quitar" aria-label="Descartar">
+        <i data-ico="x" class="pf-ico--sm"></i>
+      </button>
+    </div>
+    <div class="ob-ia__txt" id="ob-ia-txt">{{ observacion_previa.analisis_ia if observacion_previa else '' }}</div>
+    <details class="ob-ia__det" {% if not observacion_previa or not observacion_previa.transcripcion %}hidden{% endif %}>
+      <summary>Ver lo que dictaste</summary>
+      <div class="ob-ia__tr" id="ob-ia-tr">{{ observacion_previa.transcripcion if observacion_previa else '' }}</div>
+    </details>
   </div>
 
   <button class="pf-btn pf-btn--primary pf-btn--block" type="button" id="btn-obs">
-    <i data-ico="save" class="pf-ico--sm"></i> Guardar observación
+    <i data-ico="save" class="pf-ico--sm"></i>
+    <span id="btn-obs-txt">{% if observacion_previa %}Guardar cambios{% else %}Guardar observación{% endif %}</span>
   </button>
 </div>
 
@@ -58,16 +133,23 @@
   {% for o in observaciones %}
   <div class="pf-item" data-obs="{{ o.id }}" style="align-items:flex-start">
     <span class="pf-item__icon" style="background:rgba(139,92,246,.12);color:var(--purple)">
-      <i data-ico="file-text" class="pf-ico--sm"></i>
+      <i data-ico="{{ 'mic' if o.transcripcion else 'file-text' }}" class="pf-ico--sm"></i>
     </span>
     <span class="pf-item__body">
       <span class="pf-item__title">{{ o.titulo }}</span>
       <span class="pf-item__sub">
         {%- if o._fecha %}{{ o._fecha.strftime('%d/%m/%Y') }}{% endif -%}
         · {{ o._jugador or 'Todo el grupo' }}
+        {%- if o.event_id %} · del entreno{% endif -%}
       </span>
       <span style="display:block;font-size:13px;color:var(--text-sec);line-height:1.55;
                    margin-top:5px;white-space:pre-wrap">{{ o.texto }}</span>
+      {% if o.analisis_ia %}
+      <span class="ob-item__ia">
+        <i data-ico="cpu" class="pf-ico--sm"></i>
+        <span style="white-space:pre-wrap">{{ o.analisis_ia }}</span>
+      </span>
+      {% endif %}
     </span>
     <button type="button" class="pf-item__chev ob-del" data-id="{{ o.id }}"
             aria-label="Eliminar" style="color:var(--text-muted)">
@@ -93,18 +175,192 @@
 {% block scripts %}
 <script>
 (function () {
-  document.getElementById('btn-obs').addEventListener('click', function () {
-    var texto = document.getElementById('ob-texto').value.trim();
-    if (!texto) { document.getElementById('ob-texto').focus(); return; }
+  var EVENTO   = {{ (evento.id | tojson) if evento else 'null' }};
+  var PREVIA   = {{ (observacion_previa.id | tojson) if observacion_previa else 'null' }};
+  var ES_PRO   = {{ 'true' if es_pro else 'false' }};
+  var URL_VOZ  = '{{ url_for("futbol.api_observacion_voz") }}';
+  var URL_OBS  = '{{ url_for("futbol.api_observacion") }}';
 
-    PF.api('{{ url_for("futbol.api_observacion") }}', {
-      titulo: document.getElementById('ob-titulo').value.trim() || 'Sesión',
-      fecha: document.getElementById('ob-fecha').value,
-      player_id: document.getElementById('ob-jugador').value || null,
-      texto: texto
+  var $ = function (id) { return document.getElementById(id); };
+
+  /* ─── Grabadora ─────────────────────────────────────────────────────────
+     Se graba con MediaRecorder y se manda el audio tal cual a Gemini, que
+     transcribe y analiza en la misma llamada. No se usa el reconocimiento de
+     voz del navegador porque solo lo trae Chrome y deja fuera a media
+     plantilla, y porque lo que interesa no es el texto suelto sino la lectura
+     de la sesión, que necesita el audio de todas formas.                   */
+  var notas = [];        /* {mime, datos, segundos, url} */
+  var rec = null, trozos = [], t0 = 0, reloj = null;
+
+  function seg(n) { return Math.floor(n / 60) + ':' + ('0' + (n % 60)).slice(-2); }
+
+  function estado(txt) { $('ob-voz-estado').textContent = txt; }
+
+  function pintarNotas() {
+    var c = $('ob-notas');
+    c.innerHTML = '';
+    notas.forEach(function (n, i) {
+      var fila = document.createElement('div');
+      fila.className = 'ob-nota';
+      fila.innerHTML =
+        '<i data-ico="mic" class="pf-ico--sm"></i>' +
+        '<span class="ob-nota__n">Nota ' + (i + 1) + '</span>' +
+        '<span class="ob-nota__d">' + seg(n.segundos) + '</span>';
+      var audio = document.createElement('audio');
+      audio.controls = true; audio.src = n.url; audio.className = 'ob-nota__a';
+      fila.appendChild(audio);
+      var x = document.createElement('button');
+      x.type = 'button'; x.className = 'ob-nota__x'; x.setAttribute('aria-label', 'Quitar nota');
+      x.innerHTML = '<i data-ico="trash-2" class="pf-ico--sm"></i>';
+      x.addEventListener('click', function () {
+        URL.revokeObjectURL(n.url);
+        notas.splice(i, 1); pintarNotas();
+      });
+      fila.appendChild(x);
+      c.appendChild(fila);
+    });
+    $('ob-analizar').hidden = notas.length === 0;
+    if (window.PF && PF.icons) PF.icons(c);
+  }
+
+  function pararReloj() {
+    if (reloj) { clearInterval(reloj); reloj = null; }
+    $('ob-reloj').hidden = true;
+  }
+
+  function empezar() {
+    if (!navigator.mediaDevices || !window.MediaRecorder) {
+      PF.toast('Este navegador no deja grabar. Escribe la nota a mano.', 'error');
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+      /* webm/opus donde se pueda: pesa ~10 veces menos que el wav y el envío
+         a la IA es lo que más tarda de todo esto. */
+      var tipos = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
+      var mime = tipos.filter(function (t) {
+        return window.MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t);
+      })[0] || '';
+
+      rec = mime ? new MediaRecorder(stream, { mimeType: mime, audioBitsPerSecond: 32000 })
+                 : new MediaRecorder(stream);
+      trozos = [];
+      rec.ondataavailable = function (e) { if (e.data && e.data.size) trozos.push(e.data); };
+      rec.onstop = function () {
+        stream.getTracks().forEach(function (t) { t.stop(); });
+        var dur = Math.max(1, Math.round((Date.now() - t0) / 1000));
+        var blob = new Blob(trozos, { type: (rec.mimeType || 'audio/webm').split(';')[0] });
+        var lector = new FileReader();
+        lector.onloadend = function () {
+          notas.push({
+            mime: blob.type || 'audio/webm',
+            datos: String(lector.result).split(',')[1],
+            segundos: dur,
+            url: URL.createObjectURL(blob)
+          });
+          pintarNotas();
+          estado(notas.length + (notas.length === 1 ? ' nota grabada.' : ' notas grabadas.') +
+                 ' Dale a Analizar cuando termines.');
+        };
+        lector.readAsDataURL(blob);
+      };
+      rec.start();
+      t0 = Date.now();
+      $('ob-rec').classList.add('is-rec');
+      $('ob-rec-txt').textContent = 'Parar';
+      $('ob-reloj').hidden = false;
+      estado('Grabando… habla con normalidad.');
+      reloj = setInterval(function () {
+        var s = Math.round((Date.now() - t0) / 1000);
+        $('ob-reloj').textContent = seg(s);
+        if (s >= 180) parar();            /* 3 min por nota, de sobra */
+      }, 250);
+    }).catch(function () {
+      PF.toast('No me dejaste usar el micrófono.', 'error');
+    });
+  }
+
+  function parar() {
+    if (rec && rec.state !== 'inactive') rec.stop();
+    rec = null;
+    pararReloj();
+    $('ob-rec').classList.remove('is-rec');
+    $('ob-rec-txt').textContent = 'Grabar otra';
+  }
+
+  $('ob-rec').addEventListener('click', function () {
+    if (!ES_PRO) { PF.toast('Dictar notas es del plan Pro.', 'error'); return; }
+    if (rec) parar(); else empezar();
+  });
+
+  /* ─── Analizar ──────────────────────────────────────────────────────── */
+  $('ob-analizar').addEventListener('click', function () {
+    if (!notas.length) return;
+    var b = this;
+    b.disabled = true;
+    estado('Transcribiendo y leyendo la sesión… esto tarda unos segundos.');
+
+    PF.api(URL_VOZ, {
+      event_id: EVENTO,
+      audios: notas.map(function (n) { return { mime: n.mime, datos: n.datos }; })
     })
-      .then(function () { location.reload(); })
-      .catch(function (e) { PF.toast(e.message, 'error'); });
+      .then(function (r) {
+        $('ob-ia').hidden = false;
+        $('ob-ia-txt').textContent = r.analisis || '';
+        $('ob-ia-tr').textContent = r.transcripcion || '';
+        document.querySelector('.ob-ia__det').hidden = !r.transcripcion;
+
+        /* Lo dictado se vuelca en el cuadro de texto para que lo pueda
+           corregir. Si ya había escrito algo, se añade debajo en vez de
+           pisárselo. */
+        var ta = $('ob-texto');
+        if (r.transcripcion) {
+          ta.value = ta.value.trim()
+            ? ta.value.trim() + '\n\n' + r.transcripcion
+            : r.transcripcion;
+        }
+        if (!$('ob-titulo').value.trim() && r.titulo) $('ob-titulo').value = r.titulo;
+        estado('Listo. Repasa el texto y guarda.');
+      })
+      .catch(function (e) {
+        estado('No se pudo analizar.');
+        PF.toast(e.message, 'error');
+      })
+      .then(function () { b.disabled = false; });
+  });
+
+  $('ob-ia-quitar').addEventListener('click', function () {
+    $('ob-ia').hidden = true;
+    $('ob-ia-txt').textContent = '';
+    $('ob-ia-tr').textContent = '';
+  });
+
+  /* ─── Guardar ───────────────────────────────────────────────────────── */
+  $('btn-obs').addEventListener('click', function () {
+    var texto = $('ob-texto').value.trim();
+    if (!texto) { $('ob-texto').focus(); PF.toast('Escribe o dicta la observación.', 'error'); return; }
+
+    var b = this;
+    b.disabled = true;
+    PF.api(URL_OBS, {
+      id: PREVIA,
+      event_id: EVENTO,
+      titulo: $('ob-titulo').value.trim() || 'Sesión',
+      fecha: $('ob-fecha').value,
+      player_id: $('ob-jugador').value || null,
+      texto: texto,
+      transcripcion: $('ob-ia').hidden ? '' : $('ob-ia-tr').textContent,
+      analisis_ia: $('ob-ia').hidden ? '' : $('ob-ia-txt').textContent,
+      audio_segundos: notas.reduce(function (a, n) { return a + n.segundos; }, 0) || null
+    })
+      .then(function () {
+        PF.toast('Observación guardada');
+        setTimeout(function () {
+          location.href = EVENTO
+            ? '{{ url_for("futbol.c_evento", eid="__E__") }}'.replace('__E__', EVENTO)
+            : location.pathname;
+        }, 700);
+      })
+      .catch(function (e) { b.disabled = false; PF.toast(e.message, 'error'); });
   });
 
   document.querySelectorAll('.ob-del').forEach(function (b) {
