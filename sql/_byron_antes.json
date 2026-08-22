@@ -1,0 +1,31 @@
+{
+ "usuario": {
+  "id": "387f64f4-54b0-4cb2-b5b3-8471ff835835",
+  "nombre": "Byron Velasco",
+  "correo": "byronvelasco1357@gmail.com",
+  "password": "scrypt$16384$8$1$b1138a2b688bf23e6c2f30f855e5d9e4$4bb115636d2008c46f802131c60c44628792ef37610789a1c91e6815da0b30e9",
+  "rol": "especialista",
+  "telefono": "+593995015849",
+  "foto": null,
+  "genero": "male",
+  "anio_nacimiento": null,
+  "estatura": null,
+  "peso": null,
+  "codigo_equipo": "JREBKH",
+  "club": "Senior",
+  "activo": false,
+  "plan": "basico",
+  "suscripcion_id": null,
+  "suscripcion_estado": null,
+  "suscripcion_desde": null,
+  "creado": "2026-08-10T19:43:23.713939+00:00",
+  "tier": "free",
+  "es_admin": true,
+  "pro_hasta": null,
+  "pro_origen": null,
+  "codigo_promo": null,
+  "ultimo_acceso": null,
+  "bloqueado": false
+ },
+ "equipo": null
+}
