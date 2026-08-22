@@ -238,8 +238,58 @@ def auditar_escrituras_mudas():
                   % (clave[0], n.lineno, clave[1], n.func.attr))
 
 
+
+
+def auditar_html_donde_va_json():
+    """Que a una llamada de /api/ nunca le llegue una pantalla en HTML.
+
+    `fetch` sigue los redirect el solo. Si el servidor contesta 302 a una ruta
+    de /api/, la llamada acaba recibiendo un 200 con HTML: no se puede leer
+    como JSON, el ayudante se queda con {} y —como el 200 cuenta como exito—
+    da la operacion por buena. Asi es como el panel de admin llego a decir
+    «Listo» con la sesion caducada, y como un 404 en la API no se notaba.
+
+    Se prueba de verdad, levantando la app y llamando, porque el fallo no esta
+    en ninguna linea concreta sino en como responden los guardias y los
+    manejadores de error cuando nadie los mira.
+    """
+    import app as aplicacion
+
+    casos = [
+        ('sin sesion',      'POST', '/api/ia',              401),
+        ('sin sesion admin','POST', '/admin/api/ajustes',   401),
+        ('ruta inventada',  'POST', '/api/no_existe_nada',  404),
+        ('ruta inventada',  'GET',  '/admin/api/tampoco',   404),
+    ]
+    with aplicacion.app.test_client() as c:
+        for que, metodo, url, esperado in casos:
+            r = c.open(url, method=metodo, json={} if metodo == 'POST' else None)
+            tipo = (r.headers.get('Content-Type') or '').split(';')[0]
+            if r.status_code in (301, 302):
+                aviso('html donde va json',
+                      '%s en %s responde %d y redirige a %s. Un fetch seguiria '
+                      'ese salto y se quedaria con {} creyendo que todo fue bien.'
+                      % (que, url, r.status_code, r.headers.get('Location')))
+            elif tipo != 'application/json':
+                aviso('html donde va json',
+                      '%s en %s responde %s en vez de JSON.' % (que, url, tipo))
+            elif r.status_code != esperado:
+                aviso('html donde va json',
+                      '%s en %s responde %d, se esperaba %d.'
+                      % (que, url, r.status_code, esperado))
+
+        #  Y al reves: una pantalla normal TIENE que seguir redirigiendo.
+        r = c.get('/calendario')
+        if r.status_code not in (301, 302):
+            aviso('html donde va json',
+                  'una pantalla normal (/calendario) ya no redirige al login: '
+                  'responde %d. El arreglo de la API se ha comido las paginas.'
+                  % r.status_code)
+
+
 for comprobacion in (auditar_dueno, auditar_manuales, auditar_una_fila,
-                     auditar_dos_duenyos, auditar_escrituras_mudas):
+                     auditar_dos_duenyos, auditar_escrituras_mudas,
+                     auditar_html_donde_va_json):
     comprobacion()
 
 print('Auditoría de los patrones conocidos')

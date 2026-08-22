@@ -214,14 +214,9 @@ def puede(usuario, permiso):
 
 # ─── Guardias de ruta ───────────────────────────────────────────────────────
 def _es_llamada_api():
-    """Si quien llama espera JSON y no una pantalla.
-
-    `startswith('/api/')` no valia: las rutas de admin son /admin/api/... y se
-    quedaban fuera, asi que a un `fetch` le llegaba HTML donde esperaba JSON.
-    Es el mismo fallo que ya hubo en los manejadores de error de app.py, y por
-    eso ahora hay UN solo sitio donde se decide.
-    """
-    return '/api/' in request.path or request.is_json
+    """Lo decide app.py, que es el unico sitio donde vive esta regla."""
+    from app import es_llamada_api
+    return es_llamada_api()
 
 
 def _sin_sesion():

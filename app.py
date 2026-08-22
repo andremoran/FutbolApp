@@ -63,6 +63,16 @@ login_manager.login_message = 'Entra para continuar.'
 login_manager.login_message_category = 'info'
 
 
+def es_llamada_api():
+    """Si quien llama espera JSON y no una pantalla.
+
+    `startswith('/api/')` no vale: las rutas de admin son /admin/api/... y se
+    quedaban fuera. Esta decision llego a estar escrita de tres formas en dos
+    archivos, asi que ahora se toma aqui y solo aqui; roles.py tira de esta.
+    """
+    return '/api/' in request.path or request.is_json
+
+
 @login_manager.unauthorized_handler
 def _sin_sesion():
     """Sesion caducada: a /api/ se le responde JSON, no la pantalla de entrar.
@@ -74,10 +84,8 @@ def _sin_sesion():
     en el panel de admin llegaba a decir «Listo» y recargar, y en la app la
     pantalla se quedaba vacia. Nunca se decia que lo caducado era la sesion.
 
-    Igual que en el manejador del 500, la comprobacion es `in` y no
-    `startswith`, porque las rutas de admin son /admin/api/...
     """
-    if '/api/' in request.path:
+    if es_llamada_api():
         return jsonify({'error': 'Tu sesión caducó. Entra otra vez para seguir.',
                         'login': True, 'url': url_for('auth.entrar')}), 401
     if login_manager.login_message:
@@ -190,6 +198,14 @@ def salud():
 
 @app.errorhandler(404)
 def _404(_e):
+    #  A una llamada de /api/ hay que decirle que esa direccion no existe. El
+    #  redirect a la portada lo seguia el propio `fetch`, que recibia un 200
+    #  con HTML, no lo podia leer como JSON y se quedaba con {} — y como el
+    #  200 cuenta como exito, la llamada se daba por buena. Una ruta mal
+    #  escrita o retirada no se notaba: la pantalla no mostraba nada y no
+    #  aparecia ni un error por ningun lado.
+    if es_llamada_api():
+        return jsonify({'error': 'Esa dirección no existe.'}), 404
     if current_user.is_authenticated:
         return redirect(url_for('futbol.home'))
     return redirect(url_for('auth.entrar'))
@@ -203,9 +219,7 @@ def _500(e):
     #  viera un fallo de sintaxis en vez de lo que paso. Solo `api.py` tenia su
     #  propia red (@api); los otros seis modulos, con 29 endpoints de
     #  escritura, caian aqui.
-    #  `startswith` no bastaba: las de admin son /admin/api/... y se quedaban
-    #  fuera, recibiendo el HTML igual.
-    if '/api/' in request.path:
+    if es_llamada_api():
         return jsonify({'error': 'No se pudo completar la accion. '
                                  'Vuelve a intentarlo.'}), 500
     from flask import render_template
