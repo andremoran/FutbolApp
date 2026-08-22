@@ -60,15 +60,22 @@ def contexto_de(jugador, coach_id=None):
     """El contexto de UN jugador.
 
     El del equipo manda, porque el entrenador lo eligió a conciencia. Solo si
-    no lo configuró se deduce del año de nacimiento: un sub-15 metido en un
-    grupo sin categoría se compara al menos con su edad y no con adultos.
+    no lo configuró se deduce de su nacimiento: un sub-15 metido en un grupo
+    sin categoría se compara al menos con su edad y no con adultos.
+
+    Con la FECHA completa la categoría es exacta y cambia sola el día que el
+    jugador cumple años. Con solo el año —lo único que se sabía antes— cambiaba
+    de golpe cada 1 de enero, y a un chico de diciembre lo subía de categoría
+    once meses antes de tiempo.
     """
     edad, nivel = ('general', 'general')
     if coach_id:
         edad, nivel = contexto_equipo(coach_id)
 
     if edad == 'general':
-        edad = cat.categoria_por_edad((jugador or {}).get('anio_nacimiento'))
+        edad = cat.categoria_por_edad(
+            (jugador or {}).get('anio_nacimiento'),
+            fecha_nacimiento=(jugador or {}).get('fecha_nacimiento'))
     if nivel == 'general' and edad != 'general':
         nivel = cat.nivel_sugerido(edad)
     return edad, nivel
@@ -1113,7 +1120,8 @@ def api_eval_guardar():
                 errores.append('Un jugador apuntado a mano ya no está en tu equipo.')
                 continue
             jugador = {'id': None, 'nombre': m['nombre'],
-                       'anio_nacimiento': m.get('anio_nacimiento')}
+                       'anio_nacimiento': m.get('anio_nacimiento'),
+                       'fecha_nacimiento': m.get('fecha_nacimiento')}
             manual_id = m['id']
         else:
             j = jugadores.get(pid)

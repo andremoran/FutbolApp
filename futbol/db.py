@@ -718,6 +718,47 @@ def hoy_iso():
     return date.today().isoformat()
 
 
+def edad_de(fecha_nacimiento=None, anio_nacimiento=None, hoy=None):
+    """La edad de un jugador, exacta si se sabe el dia.
+
+    Con la fecha completa se descuenta el cumpleaños que aun no ha llegado, que
+    es la diferencia entre tener 15 y tener 16. No es cosmetico: la edad decide
+    la categoria contra la que se comparan sus pruebas
+    (`tests_catalogo.categoria_por_edad`), asi que equivocarse un año le cambia
+    el baremo entero.
+
+    Sin fecha se cae al año a secas, que es lo unico que se guardaba antes: da
+    la edad que cumple ESTE año, no la que tiene hoy.
+    """
+    hoy = hoy or date.today()
+    f = parse_fecha(fecha_nacimiento)
+    if f:
+        #  Resta un año si todavia no ha sido su cumpleaños.
+        return max(0, hoy.year - f.year - ((hoy.month, hoy.day) < (f.month, f.day)))
+    if anio_nacimiento:
+        try:
+            return max(0, hoy.year - int(anio_nacimiento))
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def anio_de(fecha_nacimiento=None, anio_nacimiento=None):
+    """El año de nacimiento, saliendo de la fecha si la hay.
+
+    Se sigue guardando aparte porque media app lo lee —solicitudes, la ficha
+    del jugador, el registro— y porque de los jugadores antiguos es lo unico
+    que se sabe.
+    """
+    f = parse_fecha(fecha_nacimiento)
+    if f:
+        return f.year
+    try:
+        return int(anio_nacimiento) if anio_nacimiento else None
+    except (TypeError, ValueError):
+        return None
+
+
 def parse_fecha(s, por_defecto=None):
     """Acepta 'YYYY-MM-DD' o ISO completo; devuelve date o `por_defecto`."""
     if not s:

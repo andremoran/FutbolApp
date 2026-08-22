@@ -2178,16 +2178,37 @@ def campos_con_baremo(t):
     return [c for c in (t.get('campos') or []) if c['clave'] in baremos]
 
 
-def categoria_por_edad(anio_nacimiento, hoy=None):
-    """Traduce el año de nacimiento a la categoría con la que se compara."""
-    if not anio_nacimiento:
-        return 'general'
+def categoria_por_edad(anio_nacimiento, hoy=None, fecha_nacimiento=None):
+    """La categoría con la que se compara un jugador.
+
+    Acepta la FECHA completa —y entonces la edad es exacta, con el cumpleaños
+    descontado— o solo el año, que es lo único que se guardaba antes. Con el
+    año a secas un chico nacido en diciembre figura un año mayor de lo que es
+    desde el 1 de enero, y eso lo mueve de categoría entera.
+    """
     from datetime import date
-    año = (hoy or date.today()).year
-    try:
-        edad = año - int(anio_nacimiento)
-    except (TypeError, ValueError):
-        return 'general'
+    hoy = hoy or date.today()
+
+    f = None
+    if fecha_nacimiento:
+        try:
+            from datetime import datetime
+            f = datetime.fromisoformat(str(fecha_nacimiento)[:19]).date()
+        except (TypeError, ValueError):
+            try:
+                from datetime import datetime
+                f = datetime.strptime(str(fecha_nacimiento)[:10], '%Y-%m-%d').date()
+            except (TypeError, ValueError):
+                f = None
+    if f:
+        edad = max(0, hoy.year - f.year - ((hoy.month, hoy.day) < (f.month, f.day)))
+    else:
+        if not anio_nacimiento:
+            return 'general'
+        try:
+            edad = hoy.year - int(anio_nacimiento)
+        except (TypeError, ValueError):
+            return 'general'
     if edad >= 20:
         return 'adulto'
     if edad >= 19:
