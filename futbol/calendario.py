@@ -781,6 +781,8 @@ def api_pasar_lista():
                for a in asistencia_evento(eid)}
 
     n = 0
+
+    fallidos = []
     for m in (d.get('marcas') or []):
         pid = str(m.get('player_id') or '')
         estado = m.get('estado')
@@ -800,16 +802,31 @@ def api_pasar_lista():
             'registrado_por': current_user.id,
             'actualizado': _ahora(),
         }
+        #  Se cuenta lo que DE VERDAD se guardó. Antes se sumaba siempre, asi
+        #  que cuando el insert fallaba —y fallaba con todos los jugadores sin
+        #  cuenta, porque `player_id` era NOT NULL— la pantalla respondia
+        #  «Lista guardada: 19 jugador(es)» sin haber guardado ninguna. Un
+        #  fallo silencioso es peor que uno ruidoso: el entrenador se iba
+        #  convencido de tener la asistencia.
         previa = previas.get(pid)
         if previa:
-            db.update('fut_attendance', datos, 'lista up', id=previa['id'])
+            if db.update('fut_attendance', datos, 'lista up', id=previa['id']):
+                n += 1
+            else:
+                fallidos.append(datos['jugador_nombre'] or 'un jugador')
         else:
             datos['creado'] = _ahora()
-            db.insert('fut_attendance', datos, 'lista nueva')
-        n += 1
+            if db.insert('fut_attendance', datos, 'lista nueva'):
+                n += 1
+            else:
+                fallidos.append(datos['jugador_nombre'] or 'un jugador')
 
-    return jsonify({'ok': True, 'n': n,
-                    'mensaje': f'Lista guardada: {n} jugador(es).'})
+    if fallidos and not n:
+        return jsonify({'error': 'No se pudo guardar la lista. Avisa del fallo.'}), 500
+    mensaje = f'Lista guardada: {n} jugador(es).'
+    if fallidos:
+        mensaje += f' No se pudo guardar la de {len(fallidos)}: ' + ', '.join(fallidos[:5])
+    return jsonify({'ok': True, 'n': n, 'fallidos': len(fallidos), 'mensaje': mensaje})
 
 
 @bp.route('/api/plan', methods=['POST'])
