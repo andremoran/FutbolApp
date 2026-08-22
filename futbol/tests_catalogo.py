@@ -240,7 +240,10 @@ _MVP = {
                       'libres. Mide la altura del salto.'),
         'fuente': 'Haugen, Tønnessen & Seiler (2013), IJSPP 8(2):148-156',
         'campos': [
-            _campo('height_cm', 'Altura', 'cm', 20, 80, 1, '42.5', MAYOR),
+            #  Minimo 10 y no 20: el baremo de sub-12 pone el corte flojo en
+            #  17 cm, asi que un nino que saltaba menos de 20 no se podia ni
+            #  registrar — el formulario le rechazaba la marca.
+            _campo('height_cm', 'Altura', 'cm', 10, 80, 1, '42.5', MAYOR),
         ],
         'baremos': {
             'height_cm': {
@@ -1907,6 +1910,23 @@ for _clave, _ficha in tests_biblioteca.BIBLIOTECA.items():
 # Las que tienen protocolo y bibliografía publicados. La biblioteca las muestra
 # aparte y la pantalla les pone la insignia.
 CLAVES_AVALADAS = set(tests_biblioteca.BIBLIOTECA)
+
+# ─── La ficha larga de las 18 restantes ─────────────────────────────────────
+#  El Cooper, la plancha, las dominadas, los perfiles de observación… tenían
+#  una línea de protocolo y nada más: la ficha salía vacía y quien no conocía
+#  la prueba no tenía de dónde agarrarse.
+#
+#  Se fusiona igual que la biblioteca, con setdefault, pero SIN marcarlas como
+#  avaladas: el texto lo escribimos nosotros a partir del protocolo estándar y
+#  la insignia se queda para las que tienen protocolo publicado.
+from . import tests_fichas_propias  # noqa: E402
+
+for _clave, _ficha in tests_fichas_propias.FICHAS_PROPIAS.items():
+    _t = CATALOGO.get(_clave)
+    if not _t:
+        continue
+    for _k, _v in _ficha.items():
+        _t.setdefault(_k, _v)
 
 
 # ═══════════════════════════════════════════════════════════════════════════

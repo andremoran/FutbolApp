@@ -208,6 +208,20 @@
       <p style="margin:0;font-size:12.5px;line-height:1.65;color:var(--text-sec)"
          id="as-protocolo-txt"></p>
     </div>
+
+    {# La ficha entera —objetivo, material, protocolo detallado, variables y
+       de dónde sale— se pide al abrirla y no viene en la página: el texto de
+       las 58 pruebas son 44 KB y aquí se mira una. #}
+    <details class="as-ficha" id="as-ficha">
+      <summary>
+        <i data-ico="book-open" class="pf-ico--sm"></i>
+        <span>Ver la ficha completa de la prueba</span>
+        <i data-ico="chevron-down" class="pf-ico--sm pf-item__chev"></i>
+      </summary>
+      <div id="as-ficha-cuerpo" class="as-ficha__cuerpo">
+        <p class="as-ficha__cargando">Cargando…</p>
+      </div>
+    </details>
   </div>
 
   <div class="pf-card">
@@ -267,6 +281,73 @@
 <script>
 (function () {
   const DETALLE = {{ detalle|tojson }};
+
+  /* ─── La ficha completa de la prueba ─────────────────────────────────
+     Se pide al desplegarla y se guarda por si vuelve a abrirla. No viene en
+     la pagina porque el texto de las 58 pruebas son 44 KB y aqui se mira
+     una sola: en el movil con datos eso se nota.                          */
+  const FICHAS = {};
+  let claveFicha = null;
+
+  function prepararFicha(clave) {
+    claveFicha = clave;
+    const det = $('as-ficha');
+    if (!det) return;
+    det.open = false;
+    $('as-ficha-cuerpo').innerHTML = '<p class="as-ficha__cargando">Cargando…</p>';
+  }
+
+  function pintarFicha(f) {
+    const trozos = [];
+    const bloque = (titulo, texto) => {
+      if (!texto) return;
+      const h = document.createElement('div');
+      h.className = 'as-ficha__b';
+      const t = document.createElement('div');
+      t.className = 'as-ficha__t';
+      t.textContent = titulo;
+      const p = document.createElement('p');
+      p.className = 'as-ficha__p';
+      p.textContent = texto;
+      h.appendChild(t); h.appendChild(p);
+      trozos.push(h);
+    };
+    bloque('Objetivo', f.objetivo);
+    bloque('Material necesario', f.material);
+    bloque('Protocolo detallado', f.protocolo);
+    bloque('Variables medidas', f.variables);
+    bloque('Valores normativos', f.normativa);
+    bloque('De dónde sale', f.bibliografia);
+
+    const cuerpo = $('as-ficha-cuerpo');
+    cuerpo.innerHTML = '';
+    if (!trozos.length) {
+      cuerpo.innerHTML = '<p class="as-ficha__cargando">Esta prueba todavía no ' +
+                         'tiene ficha detallada.</p>';
+      return;
+    }
+    trozos.forEach(function (t) { cuerpo.appendChild(t); });
+    if (f.url) {
+      const a = document.createElement('a');
+      a.className = 'as-ficha__mas';
+      a.href = f.url;
+      a.textContent = 'Ver los rangos por nivel y edad →';
+      cuerpo.appendChild(a);
+    }
+  }
+
+  document.addEventListener('toggle', function (e) {
+    if (!e.target || e.target.id !== 'as-ficha' || !e.target.open) return;
+    if (!claveFicha) return;
+    if (FICHAS[claveFicha]) { pintarFicha(FICHAS[claveFicha]); return; }
+    PF.api('/api/eval/ficha/' + encodeURIComponent(claveFicha))
+      .then(function (r) { FICHAS[claveFicha] = r.ficha; pintarFicha(r.ficha); })
+      .catch(function (err) {
+        $('as-ficha-cuerpo').innerHTML =
+          '<p class="as-ficha__cargando">No se pudo cargar la ficha.</p>';
+        PF.toast(err.message, 'error');
+      });
+  }, true);
 
   let paso = 1;
   let jugador = null;   // {id, manual, nombre}
@@ -357,6 +438,7 @@
     const prot = $('as-protocolo');
     if (d.protocolo) {
       $('as-protocolo-txt').textContent = d.protocolo;
+      prepararFicha(test);
       prot.style.display = '';
     } else {
       prot.style.display = 'none';

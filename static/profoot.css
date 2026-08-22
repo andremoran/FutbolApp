@@ -935,3 +935,36 @@ a.pf-avatar--sm::after   { inset: -6px; }                                   /* 3
 /* Los grandes ya pasan de 44 px: no necesitan zona de más. */
 a.pf-avatar--lg::after,
 a.pf-avatar--xl::after   { inset: 0; }
+
+/* ─── La ficha de la prueba dentro del asistente ─────────────────────────
+   Va plegada: mientras se toma la marca estorba, pero la primera vez que se
+   aplica una prueba hace falta tenerla delante y no en otra pantalla.      */
+.as-ficha { margin-top: 11px; border-top: 1px solid var(--border-soft); padding-top: 10px; }
+.as-ficha > summary {
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  list-style: none; font-size: 13px; font-weight: 700; color: var(--primary);
+}
+.as-ficha > summary::-webkit-details-marker { display: none; }
+.as-ficha > summary > span { flex: 1; }
+.as-ficha[open] > summary .pf-item__chev { transform: rotate(180deg); }
+.as-ficha__cuerpo { margin-top: 10px; }
+.as-ficha__b + .as-ficha__b { margin-top: 11px; }
+.as-ficha__t {
+  font-size: 10.5px; font-weight: 800; letter-spacing: .5px;
+  text-transform: uppercase; color: var(--text-muted); margin-bottom: 3px;
+}
+.as-ficha__p {
+  margin: 0; font-size: 12.5px; line-height: 1.65; color: var(--text-sec);
+}
+.as-ficha__cargando { margin: 0; font-size: 12.5px; color: var(--text-muted); }
+.as-ficha__mas {
+  display: inline-block; margin-top: 12px;
+  font-size: 12.5px; font-weight: 700; color: var(--primary);
+}
+
+/*  La aclaración bajo los valores normativos: en gris y pequeña, porque
+    matiza el dato de arriba sin competir con él.                          */
+.fi-nota {
+  margin: 7px 0 0; font-size: 11.5px; line-height: 1.55;
+  color: var(--text-muted); font-style: italic;
+}

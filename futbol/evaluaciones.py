@@ -627,6 +627,36 @@ def c_eval_catalogo():
                            n_avaladas=sum(1 for t in todas if t.get('avalado')))
 
 
+@bp.route('/api/eval/ficha/<clave>')
+@login_required
+def api_eval_ficha(clave):
+    """La ficha de una prueba, para enseñarla dentro del asistente.
+
+    Se pide suelta y no va en la pagina porque el texto de las 58 pruebas son
+    44 KB, y el entrenador va a mirar UNA. En el movil, con datos, eso importa.
+    """
+    from .api import api_guard
+
+    err = api_guard(solo_coach=True)
+    if err:
+        return err
+
+    t = prueba(clave, db.equipo_id(current_user.id))
+    if not t:
+        return jsonify({'error': 'Esa prueba no existe.'}), 404
+
+    return jsonify({'ok': True, 'ficha': {
+        'nombre': t.get('nombre'),
+        'objetivo': t.get('objetivo') or '',
+        'material': t.get('material') or '',
+        'protocolo': t.get('protocolo_detallado') or t.get('protocolo') or '',
+        'variables': t.get('variables') or '',
+        'normativa': t.get('normativa') or '',
+        'bibliografia': t.get('bibliografia') or t.get('fuente') or '',
+        'url': url_for('futbol.c_eval_ficha', clave=clave),
+    }})
+
+
 @bp.route('/coach/evaluaciones/ficha/<clave>')
 @login_required
 def c_eval_ficha(clave):
