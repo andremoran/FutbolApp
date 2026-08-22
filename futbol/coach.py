@@ -428,32 +428,20 @@ def c_evaluar(pid):
 @bp.route('/coach/agenda')
 @solo_entrenador
 def c_agenda():
-    uid = db.equipo_id(current_user.id)
-    desde = (date.today() - timedelta(days=30)).isoformat()
-    hasta = (date.today() + timedelta(days=90)).isoformat()
-    eventos = db.eventos_equipo(uid, desde, hasta)
+    """Redirige al calendario. Esta pantalla ya no pinta nada propio.
 
-    conteo = {}
-    if eventos:
-        for a in db.asistencia_de([e['id'] for e in eventos]):
-            # 'asiste' es el nombre VIEJO: schema_v2 lo migró a 'presente' y
-            # añadió 'tarde'. Comparando con el viejo, el contador de cada
-            # evento salía siempre en 0 por más lista que se pasara.
-            if a.get('estado') in ('presente', 'tarde'):
-                conteo[a['event_id']] = conteo.get(a['event_id'], 0) + 1
+    Era una lista de eventos con un alta rápida encima. El alta se retiró
+    —duplicaba la del calendario y guardaba peor— y sin ella lo que quedaba
+    eran dos enlaces a otras pestañas y una lista de eventos que el calendario
+    ya enseña, por día y con su ficha. Una pantalla entera para no aportar
+    nada, con su pestaña compitiendo con la de al lado.
 
-    hoy = date.today()
-    for e in eventos:
-        f = db.parse_fecha(e.get('fecha'))
-        e['_fecha'] = f
-        e['_pasado'] = bool(f and f < hoy)
-        e['_confirmados'] = conteo.get(e['id'], 0)
-
-    return render_template('c_agenda.html',
-                           tab_activa='agenda',
-                           proximos=[e for e in eventos if not e['_pasado']],
-                           pasados=list(reversed([e for e in eventos if e['_pasado']]))[:10],
-                           n_jugadores=db.tamano_plantilla(uid))
+    Se deja la ruta redirigiendo en vez de borrarla: la pestaña Agenda apuntaba
+    al calendario desde hace tiempo, pero el enlace seguía en el tablero y en
+    el botón de volver de Observaciones y Partidos, y alguien puede tenerla
+    guardada.
+    """
+    return redirect(url_for('futbol.c_calendario'))
 
 
 #  El detalle del evento vive ahora en futbol/calendario.py (/coach/evento/<id>),

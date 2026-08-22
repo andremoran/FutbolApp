@@ -18,8 +18,9 @@
     </a>
 
     {# La pestaña abre el CALENDARIO, como en la app: ScheduleScreen es la
-       pantalla de la pestaña Agenda. c_agenda (lista + formulario rápido)
-       sigue existiendo y se llega desde la hoja «⋯ Ver más». #}
+       pantalla de la pestaña Agenda. La lista que había antes (c_agenda) se
+       retiró: sin su alta rápida solo repetía lo que el calendario ya enseña.
+       Su ruta sigue viva pero redirige aquí. #}
     <a class="pf-tab {{ 'is-active' if tab == 'agenda' }}" href="{{ url_for('futbol.c_calendario') }}"
        {{ 'aria-current=page' if tab == 'agenda' }}>
       <span class="pf-tab__icon"><i data-ico="calendar"></i></span>

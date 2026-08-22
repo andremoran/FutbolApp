@@ -221,7 +221,7 @@
     {'et': 'Programá un entrenamiento',
      'pista': 'Creá tu primer evento en la agenda',
      'hecho': hay_evento, 'ico': 'calendar',
-     'url': url_for('futbol.c_agenda')}] %}
+     'url': url_for('futbol.c_calendario')}] %}
 {% set hechos = pasos | selectattr('hecho') | list | length %}
 
 {% if hechos < pasos | length %}
