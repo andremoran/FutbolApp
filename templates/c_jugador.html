@@ -107,6 +107,41 @@
   </div>
 </div>
 
+{# ── Lo que ha hecho en partido ──
+   Sale de fut_match_stats, que es lo que el entrenador apunta al terminar el
+   partido desde la agenda. Si no hay nada apuntado la tarjeta no se enseña:
+   cinco ceros no dicen «no ha jugado», dicen «no se ha apuntado». #}
+{% if partidos_jug and partidos_jug.partidos %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">En partido</h2>
+    <span class="pf-card__badge">{{ partidos_jug.partidos }} jugado{{ '' if partidos_jug.partidos == 1 else 's' }}</span>
+  </div>
+  <div class="pj-cifras">
+    {% for ico, valor, etiqueta in [
+        ('award',  partidos_jug.goles,         'Goles'),
+        ('zap',    partidos_jug.asistencias,   'Asistencias'),
+        ('clock',  partidos_jug.minutos,       'Minutos'),
+        ('target', partidos_jug.jugadas_clave, 'Jugadas clave')] %}
+    <div class="pj-cifra">
+      <i data-ico="{{ ico }}" class="pf-ico--lg" style="color:var(--primary)"></i>
+      <div class="pj-cifra__v">{{ valor or 0 }}</div>
+      <div class="pj-cifra__e">{{ etiqueta }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  <p style="font-size:12px;color:var(--text-muted);margin:10px 0 0;line-height:1.5">
+    {{ partidos_jug.titularidades }} de titular
+    {%- if partidos_jug.minutos and partidos_jug.partidos %} ·
+      {{ (partidos_jug.minutos / partidos_jug.partidos)|round|int }} min por partido
+    {%- endif -%}
+    {%- if partidos_jug.tarjetas_a or partidos_jug.tarjetas_r %} ·
+      {{ partidos_jug.tarjetas_a }}🟨 {{ partidos_jug.tarjetas_r }}🟥
+    {%- endif %}
+  </p>
+</div>
+{% endif %}
+
 {# ── Perfil Dinámico: 18 atributos por familia ── #}
 {# TeamPlayersScreen.tsx: overall/potencial + TÉC/FÍS/MEN, aquí con el detalle
    de cada uno de los 18 (ficha_atributos, futbol/db.py). #}

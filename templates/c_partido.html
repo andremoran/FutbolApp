@@ -1,14 +1,19 @@
 {% extends '_shell.html' %}
 {% block title %}{{ partido.rival }} · ProFoot{% endblock %}
 
-{# screens/MatchStatsScreen.tsx: apuntar minutos, goles y asistencias por jugador.
-   Cada campo se guarda solo al salir, para no perder nada a medio llenar. #}
+{# screens/MatchStatsScreen.tsx: apuntar lo que hizo cada uno en el partido.
+   Cada campo se guarda solo al salir, para no perder nada a medio llenar.
+
+   Sale TODA la plantilla, también los que no tienen cuenta: en un equipo de
+   formación casi nadie la tiene y esta pantalla salía vacía. #}
 
 {% set gf = partido.goles_favor|default(0) %}
 {% set gc = partido.goles_contra|default(0) %}
 
 {% block hero_back %}
-<a class="pf-hero__btn" href="{{ url_for('futbol.c_partidos') }}" aria-label="Volver">
+<a class="pf-hero__btn"
+   href="{% if evento_id %}{{ url_for('futbol.c_evento', eid=evento_id) }}{% else %}{{ url_for('futbol.c_partidos') }}{% endif %}"
+   aria-label="Volver">
   <i data-ico="arrow-left" class="pf-ico--sm"></i>
 </a>
 {% endblock %}
@@ -18,8 +23,8 @@
 {% block hero_title %}{{ 'vs' if partido.local else '@' }} {{ partido.rival }}{% endblock %}
 {% block hero_subtitle %}
 <div class="pf-hero__subtitle" style="font-size:20px;font-weight:800">
-  {{ gf }} – {{ gc }}
-  <span style="font-size:13px;font-weight:600;opacity:.85">
+  <span id="marcador">{{ gf }} – {{ gc }}</span>
+  <span style="font-size:13px;font-weight:600;opacity:.85" id="resultado">
     {{ 'Victoria' if gf > gc else ('Derrota' if gf < gc else 'Empate') }}
   </span>
 </div>
@@ -28,52 +33,108 @@
 {% block head %}
 <style>
   .st-tabla { width:100%; }
-  .st-fila { display:flex; align-items:center; gap:8px; padding:10px 0;
+  .st-fila { display:flex; align-items:center; gap:6px; padding:10px 0;
              border-top:1px solid var(--border-soft); }
   .st-fila:first-of-type { border-top:none; }
   .st-nombre { flex:1; min-width:0; font-size:13.5px; font-weight:700;
                white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .st-num { width:52px; flex:none; padding:7px 6px; font-size:13px; text-align:center; }
-  .st-cab { display:flex; gap:8px; padding:0 0 6px; font-size:10px; font-weight:800;
-            letter-spacing:.5px; text-transform:uppercase; color:var(--text-muted); }
-  .st-cab span:first-child { flex:1; }
-  .st-cab span:not(:first-child) { width:52px; text-align:center; flex:none; }
+  .st-dorsal { flex:none; width:22px; text-align:center; font-size:11px;
+               font-weight:800; color:var(--text-muted); }
+  .st-num { width:46px; flex:none; padding:7px 4px; font-size:13px; text-align:center; }
+  .st-cab { display:flex; gap:6px; padding:0 0 6px; font-size:10px; font-weight:800;
+            letter-spacing:.4px; text-transform:uppercase; color:var(--text-muted); }
+  .st-cab .st-h { width:46px; text-align:center; flex:none; }
+  .st-cab .st-hn { flex:1; }
+  .st-cab .st-hd { width:22px; flex:none; }
+  /* El titular es una casilla, no un número: se marca de un toque. */
+  .st-tit { flex:none; width:26px; height:26px; position:relative; display:flex;
+            align-items:center; justify-content:center; border-radius:7px;
+            border:1.5px solid var(--border-soft); color:var(--text-muted);
+            font-size:10px; font-weight:800; cursor:pointer; background:#fff; }
+  .st-tit::after { content:''; position:absolute; inset:-8px; }
+  .st-tit.is-on { background:var(--primary); border-color:var(--primary); color:#fff; }
+  .st-cab .st-ht { width:26px; text-align:center; flex:none; }
+
+  /* En pantalla estrecha la tabla se desplaza sola, sin arrastrar la página. */
+  .st-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .st-scroll > * { min-width:430px; }
+
+  .st-res { display:flex; align-items:center; gap:10px; margin-top:12px; }
+  .st-res__l { font-size:12px; font-weight:700; color:var(--text-sec); }
+  .st-res__i { width:62px; text-align:center; }
+  .st-tot { display:flex; gap:14px; flex-wrap:wrap; margin-top:12px;
+            padding-top:12px; border-top:1px dashed var(--border-soft);
+            font-size:12px; color:var(--text-sec); }
+  .st-tot b { color:var(--text); font-size:14px; }
 </style>
 {% endblock %}
 
 {% block content %}
 
 <div class="pf-card">
-  <div class="pf-card__head"><h2 class="pf-card__title">Estadísticas por jugador</h2></div>
+  <div class="pf-card__head"><h2 class="pf-card__title">Resultado</h2></div>
+  <div class="st-res">
+    <span class="st-res__l">{{ 'Nosotros' if partido.local else partido.rival }}</span>
+    <input class="pf-input st-res__i" id="gf" type="number" inputmode="numeric" min="0"
+           value="{{ gf }}" aria-label="Goles a favor">
+    <span style="font-weight:800">–</span>
+    <input class="pf-input st-res__i" id="gc" type="number" inputmode="numeric" min="0"
+           value="{{ gc }}" aria-label="Goles en contra">
+    <span class="st-res__l">{{ partido.rival if partido.local else 'Nosotros' }}</span>
+  </div>
+</div>
+
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Quién hizo qué</h2></div>
 
   {% if jugadores %}
-  <div class="st-cab pf-mt-12">
-    <span>Jugador</span><span>Min</span><span>Gol</span><span>Asis</span>
-  </div>
+  <div class="st-scroll pf-mt-12">
+    <div>
+      <div class="st-cab">
+        <span class="st-hd"></span>
+        <span class="st-hn">Jugador</span>
+        <span class="st-ht" title="Titular">XI</span>
+        <span class="st-h">Min</span>
+        <span class="st-h">Gol</span>
+        <span class="st-h">Asis</span>
+        <span class="st-h" title="Jugadas clave">Clave</span>
+        <span class="st-h" title="Tarjetas amarillas">🟨</span>
+        <span class="st-h" title="Tarjetas rojas">🟥</span>
+      </div>
 
-  <div class="st-tabla">
-    {% for j in jugadores %}
-    <div class="st-fila">
-      <span class="pf-avatar pf-avatar--sm" style="width:28px;height:28px;font-size:11px">
-        {%- if j.profile_photo %}<img src="{{ j.profile_photo }}" alt="">
-        {%- else %}{{ (j.name or '?')[:1]|upper }}{% endif -%}
-      </span>
-      <span class="st-nombre">{{ j.name }}</span>
-      {% for campo, valor in [('minutos', j._stats.get('minutos')),
-                              ('goles', j._stats.get('goles')),
-                              ('asistencias', j._stats.get('asistencias'))] %}
-      <input class="pf-input st-num st-input" type="number" inputmode="numeric" min="0"
-             data-jugador="{{ j.id }}" data-campo="{{ campo }}"
-             value="{{ valor if valor is not none else '' }}" placeholder="0"
-             aria-label="{{ campo }} de {{ j.name }}">
-      {% endfor %}
+      <div class="st-tabla">
+        {% for j in jugadores %}
+        <div class="st-fila">
+          <span class="st-dorsal">{{ j.dorsal or '–' }}</span>
+          <span class="st-nombre" title="{{ j.nombre }}{% if j.posicion %} · {{ j.posicion }}{% endif %}">
+            {{ j.nombre }}
+          </span>
+          <button type="button" class="st-tit st-input{% if j._stats.get('titular') %} is-on{% endif %}"
+                  data-jugador="{{ j.id }}" data-campo="titular"
+                  aria-label="Titular: {{ j.nombre }}"
+                  aria-pressed="{{ 'true' if j._stats.get('titular') else 'false' }}">XI</button>
+          {% for campo, valor in [('minutos', j._stats.get('minutos')),
+                                  ('goles', j._stats.get('goles')),
+                                  ('asistencias', j._stats.get('asistencias')),
+                                  ('jugadas_clave', j._stats.get('jugadas_clave')),
+                                  ('tarjetas_a', j._stats.get('tarjetas_a')),
+                                  ('tarjetas_r', j._stats.get('tarjetas_r'))] %}
+          <input class="pf-input st-num st-input" type="number" inputmode="numeric" min="0"
+                 data-jugador="{{ j.id }}" data-campo="{{ campo }}"
+                 value="{{ valor if valor is not none else '' }}" placeholder="0"
+                 aria-label="{{ campo|replace('_', ' ') }} de {{ j.nombre }}">
+          {% endfor %}
+        </div>
+        {% endfor %}
+      </div>
     </div>
-    {% endfor %}
   </div>
 
-  <p style="font-size:12px;color:var(--text-muted);margin:14px 0 0;line-height:1.5">
-    Cada número se guarda solo al salir del campo. Lo que apuntes aquí aparece en
-    la pestaña Partidos de cada jugador.
+  <div class="st-tot" id="st-tot"></div>
+
+  <p style="font-size:12px;color:var(--text-muted);margin:12px 0 0;line-height:1.5">
+    Cada número se guarda solo al salir del campo. Los goles, las asistencias y
+    los minutos se suman en la ficha de cada jugador.
   </p>
 
   {% else %}
@@ -89,24 +150,89 @@
 
 {% block scripts %}
 <script>
-document.querySelectorAll('.st-input').forEach(function (input) {
-  var previo = input.value;
-  input.addEventListener('change', function () {
-    if (input.value === previo) return;
+(function () {
+  var URL_STATS = '/api/partido/{{ partido.id }}/stats';
 
-    // Se manda la fila entera del jugador: el endpoint hace upsert.
-    var datos = { player_id: input.dataset.jugador };
-    document.querySelectorAll('[data-jugador="' + input.dataset.jugador + '"]')
-      .forEach(function (i) { datos[i.dataset.campo] = i.value || 0; });
+  /* Manda la fila entera del jugador: el endpoint hace upsert, así que da
+     igual qué campo se haya tocado. */
+  function filaDe(pid) {
+    var datos = { player_id: pid };
+    document.querySelectorAll('[data-jugador="' + pid + '"]').forEach(function (el) {
+      datos[el.dataset.campo] = el.dataset.campo === 'titular'
+        ? el.classList.contains('is-on')
+        : (el.value || 0);
+    });
+    return datos;
+  }
 
-    PF.api('/api/partido/{{ partido.id }}/stats', datos)
-      .then(function () {
-        previo = input.value;
-        input.style.borderColor = 'var(--primary)';
-        setTimeout(function () { input.style.borderColor = ''; }, 900);
-      })
-      .catch(function (e) { PF.toast(e.message, 'error'); input.value = previo; });
+  function avisar(el, ok) {
+    el.style.borderColor = ok ? 'var(--primary)' : 'var(--danger, #dc2626)';
+    setTimeout(function () { el.style.borderColor = ''; }, 900);
+  }
+
+  function totales() {
+    var t = { goles: 0, asistencias: 0, minutos: 0, jugadas_clave: 0, xi: 0 };
+    document.querySelectorAll('.st-input').forEach(function (el) {
+      var c = el.dataset.campo;
+      if (c === 'titular') { if (el.classList.contains('is-on')) t.xi++; return; }
+      if (c in t) t[c] += parseInt(el.value || 0, 10) || 0;
+    });
+    document.getElementById('st-tot').innerHTML =
+      '<span><b>' + t.goles + '</b> goles</span>' +
+      '<span><b>' + t.asistencias + '</b> asistencias</span>' +
+      '<span><b>' + t.jugadas_clave + '</b> jugadas clave</span>' +
+      '<span><b>' + t.minutos + '</b> min repartidos</span>' +
+      '<span><b>' + t.xi + '</b> titulares</span>';
+  }
+
+  document.querySelectorAll('input.st-input').forEach(function (input) {
+    var previo = input.value;
+    input.addEventListener('change', function () {
+      if (input.value === previo) return;
+      PF.api(URL_STATS, filaDe(input.dataset.jugador))
+        .then(function () { previo = input.value; avisar(input, true); totales(); })
+        .catch(function (e) { PF.toast(e.message, 'error'); input.value = previo; });
+    });
   });
-});
+
+  document.querySelectorAll('button.st-tit').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var antes = b.classList.contains('is-on');
+      b.classList.toggle('is-on');
+      b.setAttribute('aria-pressed', String(!antes));
+      PF.api(URL_STATS, filaDe(b.dataset.jugador))
+        .then(totales)
+        .catch(function (e) {
+          PF.toast(e.message, 'error');
+          b.classList.toggle('is-on', antes);
+          b.setAttribute('aria-pressed', String(antes));
+        });
+    });
+  });
+
+  /* El marcador, aparte: es del partido, no de ningún jugador. */
+  ['gf', 'gc'].forEach(function (id) {
+    var el = document.getElementById(id);
+    var previo = el.value;
+    el.addEventListener('change', function () {
+      if (el.value === previo) return;
+      PF.api('/api/partido/{{ partido.id }}', {
+        goles_favor: document.getElementById('gf').value || 0,
+        goles_contra: document.getElementById('gc').value || 0
+      }, 'PATCH')
+        .then(function () {
+          previo = el.value; avisar(el, true);
+          var a = parseInt(document.getElementById('gf').value || 0, 10);
+          var b = parseInt(document.getElementById('gc').value || 0, 10);
+          document.getElementById('marcador').textContent = a + ' – ' + b;
+          document.getElementById('resultado').textContent =
+            a > b ? 'Victoria' : (a < b ? 'Derrota' : 'Empate');
+        })
+        .catch(function (e) { PF.toast(e.message, 'error'); el.value = previo; });
+    });
+  });
+
+  totales();
+})();
 </script>
 {% endblock %}

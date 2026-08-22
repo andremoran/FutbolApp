@@ -167,7 +167,8 @@ def auditar_dos_duenyos():
     #  tabla no podria tener ninguna — y las que admiten los dos tipos siempre
     #  acaban teniendo alguna en cuanto se usa con jugadores sin cuenta.
     for tabla in ('fut_attendance', 'fut_attributes', 'fut_medical',
-                  'fut_eval_results', 'fut_injuries', 'fut_attribute_history'):
+                  'fut_eval_results', 'fut_injuries', 'fut_attribute_history',
+                  'fut_match_stats'):
         try:
             sb.table(tabla).select('id').is_('player_id', 'null').limit(1).execute()
         except Exception as e:

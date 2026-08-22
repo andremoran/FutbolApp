@@ -73,6 +73,21 @@ def de_mi_plantilla(pid):
     return any(str(j['id']) == str(pid) for j in db.jugadores_del_entrenador(equipo))
 
 
+def quien_es_del_equipo(pid):
+    """Dice si es del equipo Y en que columna se guarda lo suyo.
+
+    Devuelve 'player_id', 'manual_player_id', o None si no es de la plantilla.
+    Hace falta porque de un jugador sin cuenta lo suyo no cuelga de player_id,
+    y quien llama no tiene por que andar averiguando de que tipo es cada uno.
+    """
+    if not pid:
+        return None
+    for j in db.plantilla_completa(db.equipo_id(current_user.id)):
+        if str(j['id']) == str(pid):
+            return 'manual_player_id' if j['es_manual'] else 'player_id'
+    return None
+
+
 def ahora():
     return datetime.now(timezone.utc).isoformat()
 
@@ -447,11 +462,47 @@ def api_partido():
         'goles_favor': int(d.get('goles_favor') or 0),
         'goles_contra': int(d.get('goles_contra') or 0),
         'competicion': (d.get('competicion') or '')[:80],
+        'event_id': d.get('event_id') or None,
         'creado': ahora(),
     })
     if not fila:
         return jsonify({'error': 'No se pudo guardar el partido.'}), 500
     return jsonify({'ok': True, 'partido': fila})
+
+
+@bp.route('/api/partido/<mid>', methods=['POST', 'PATCH'])
+@api
+def api_partido_editar(mid):
+    """El marcador, desde la propia hoja del partido.
+
+    Se agenda el partido antes de jugarlo, asi que el resultado no se sabe
+    hasta despues. Sin esto habia que volver a la lista de partidos a
+    corregirlo por otro lado, y el que sale de la agenda nacia siempre 0-0.
+    """
+    if not es_coach():
+        return jsonify({'error': 'Solo el entrenador registra partidos.'}), 403
+    if not db.one('fut_matches', 'partido mio', id=mid,
+                  coach_id=db.equipo_id(current_user.id)):
+        return jsonify({'error': 'Ese partido no es de tu equipo.'}), 404
+
+    d = body()
+    datos = {}
+    for campo in ('goles_favor', 'goles_contra'):
+        if campo in d:
+            try:
+                datos[campo] = max(0, int(d[campo] or 0))
+            except (TypeError, ValueError):
+                datos[campo] = 0
+    for campo, tope in (('rival', 80), ('competicion', 80)):
+        if campo in d:
+            datos[campo] = (d[campo] or '')[:tope]
+    if 'local' in d:
+        datos['local'] = bool(d['local'])
+    if not datos:
+        return jsonify({'error': 'Nada que actualizar.'}), 400
+
+    db.update('fut_matches', datos, 'partido up', id=mid, obligatorio=True)
+    return jsonify({'ok': True})
 
 
 @bp.route('/api/partido/<mid>/stats', methods=['POST'])
@@ -461,22 +512,33 @@ def api_partido_stats(mid):
         return jsonify({'error': 'Solo el entrenador registra estadísticas.'}), 403
     d = body()
     pid = d.get('player_id')
-    if not pid or not de_mi_plantilla(pid):
+    columna = quien_es_del_equipo(pid)
+    if not columna:
         return jsonify({'error': 'Ese jugador no es de tu plantilla.'}), 403
 
-    datos = {'match_id': mid, 'player_id': pid}
-    for campo in ('minutos', 'goles', 'asistencias', 'tarjetas_a', 'tarjetas_r', 'valoracion'):
+    #  Que la hoja sea de este equipo. Sin esto, con un id de partido ajeno se
+    #  podian escribir estadisticas en el partido de otro entrenador.
+    if not db.one('fut_matches', 'partido mio', id=mid,
+                  coach_id=db.equipo_id(current_user.id)):
+        return jsonify({'error': 'Ese partido no es de tu equipo.'}), 403
+
+    datos = {'match_id': mid, columna: pid}
+    for campo in ('minutos', 'goles', 'asistencias', 'jugadas_clave',
+                  'tarjetas_a', 'tarjetas_r', 'valoracion'):
         if campo in d:
             try:
-                datos[campo] = int(d[campo] or 0)
+                datos[campo] = max(0, int(d[campo] or 0))
             except (TypeError, ValueError):
                 datos[campo] = 0
+    if 'titular' in d:
+        datos['titular'] = bool(d['titular'])
 
-    existente = db.one('fut_match_stats', 'stats', match_id=mid, player_id=pid)
+    existente = db.one('fut_match_stats', 'stats', match_id=mid, **{columna: pid})
     if existente:
-        db.update('fut_match_stats', datos, 'stats up', id=existente['id'], obligatorio=True)
+        db.update('fut_match_stats', datos, 'stats up', id=existente['id'],
+                  obligatorio=True)
     else:
-        db.insert('fut_match_stats', datos, obligatorio=True)
+        db.insert('fut_match_stats', datos, 'stats nueva', obligatorio=True)
     return jsonify({'ok': True})
 
 

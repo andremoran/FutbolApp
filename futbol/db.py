@@ -272,6 +272,81 @@ def jugadores_del_entrenador(coach_id):
                   key=lambda j: (j.get('fut', {}).get('dorsal') or 999, j.get('name') or ''))
 
 
+def plantilla_completa(coach_id):
+    """TODOS los del equipo: con cuenta y sin ella, en una sola lista.
+
+    Existe porque `jugadores_del_entrenador` devuelve solo a los que tienen
+    cuenta, y media aplicacion la usaba creyendo que era la plantilla entera.
+    En un equipo de formacion casi nadie se registra: la hoja de estadisticas
+    del partido salia vacia y no se podia apuntar nada de nadie. Es el mismo
+    despiste que ya hubo con la asistencia y con el contexto de la IA, asi que
+    aqui esta el sitio unico donde se junta.
+
+    Cada uno sale con la misma forma, venga de donde venga:
+        id, nombre, dorsal, posicion, es_manual, foto
+    """
+    salida = []
+    for j in jugadores_del_entrenador(coach_id):
+        f = j.get('fut') or {}
+        salida.append({
+            'id': j['id'], 'nombre': j.get('name') or 'Sin nombre',
+            'dorsal': f.get('dorsal'), 'posicion': f.get('posicion'),
+            'es_manual': False, 'foto': j.get('profile_photo'),
+        })
+    for m in rows('fut_manual_players', 'plantilla manual',
+                  coach_id=coach_id, activo=True) or []:
+        salida.append({
+            'id': m['id'], 'nombre': m.get('nombre') or 'Sin nombre',
+            'dorsal': m.get('dorsal'), 'posicion': m.get('posicion'),
+            'es_manual': True, 'foto': m.get('foto'),
+        })
+    return sorted(salida, key=lambda x: (x['dorsal'] or 999, x['nombre']))
+
+
+#  Lo que se suma de los partidos. Se nombran aqui para que la hoja del
+#  partido, el perfil del jugador y la IA cuenten LO MISMO: si cada pantalla
+#  elige sus campos, dos sitios acaban dando cifras distintas del mismo chaval.
+CAMPOS_PARTIDO = ('minutos', 'goles', 'asistencias', 'jugadas_clave',
+                  'tarjetas_a', 'tarjetas_r')
+
+
+def totales_de_partidos(coach_id, ids=None):
+    """Lo acumulado en partidos por cada jugador del equipo.
+
+    Devuelve {id_del_jugador: {partidos, minutos, goles, asistencias, ...}}.
+    La clave es el id del jugador, tenga cuenta o no: quien llama no tiene por
+    que saber en cual de las dos columnas estaba guardado.
+
+    Se hace en dos consultas para todo el equipo, no una por jugador: el
+    perfil y la lista de plantilla los piden de golpe.
+    """
+    partidos = rows('fut_matches', 'partidos del equipo', coach_id=coach_id) or []
+    if not partidos:
+        return {}
+    mids = [p['id'] for p in partidos]
+
+    filas = q(lambda: _sb.table('fut_match_stats').select('*')
+              .in_('match_id', mids).execute().data or [], [], 'stats equipo')
+
+    tot = {}
+    for f in filas:
+        clave = f.get('player_id') or f.get('manual_player_id')
+        if not clave or (ids is not None and clave not in ids):
+            continue
+        t = tot.setdefault(clave, dict(
+            {c: 0 for c in CAMPOS_PARTIDO}, partidos=0, titularidades=0))
+        #  Cuenta como partido jugado si de verdad piso el campo. Una fila a
+        #  cero es «estaba en la lista y no jugo», y sumarla como partido
+        #  jugado le bajaria la media a quien no llego a entrar.
+        if (f.get('minutos') or 0) > 0:
+            t['partidos'] += 1
+        if f.get('titular'):
+            t['titularidades'] += 1
+        for c in CAMPOS_PARTIDO:
+            t[c] += int(f.get(c) or 0)
+    return tot
+
+
 def tamano_plantilla(coach_id):
     """Cuántos jugadores tiene el equipo, con cuenta y sin ella.
 

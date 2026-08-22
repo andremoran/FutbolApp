@@ -521,12 +521,23 @@ def c_evento(eid):
     observacion = db.one('fut_observaciones', 'obs del evento',
                          event_id=eid, coach_id=uid)
 
+    #  Si es un partido y ya tiene hoja, se dice el resultado y cuantos hay
+    #  apuntados: asi se ve desde fuera si queda trabajo por hacer.
+    hoja = None
+    if evento.get('tipo') == 'partido':
+        hoja = db.one('fut_matches', 'hoja del partido', event_id=eid, coach_id=uid)
+        if hoja:
+            filas = db.rows('fut_match_stats', 'n stats', match_id=hoja['id']) or []
+            hoja['_n'] = len([f for f in filas
+                              if any((f.get(c) or 0) for c in db.CAMPOS_PARTIDO)])
+
     return render_template('c_evento.html',
                            tab_activa='agenda', hide_tabbar=True,
                            evento=evento,
                            marcados=len(marcas), fueron=fueron,
                            plantilla=plantilla,
                            observacion=observacion,
+                           hoja=hoja,
                            es_pro=roles.es_pro(current_user))
 
 

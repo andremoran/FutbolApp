@@ -128,6 +128,27 @@
   <i data-ico="chevron-right" class="pf-ico--sm"></i>
 </a>
 
+{# Solo en los partidos: quién marcó, quién asistió, cuánto jugó cada uno.
+   Antes un partido de la agenda no llevaba a ninguna parte: había que ir a
+   apuntarlo por otro lado repitiendo rival y fecha. #}
+{% if evento.tipo == 'partido' %}
+<a class="ev-acc ev-acc--stats" href="{{ url_for('futbol.c_partido_de_evento', eid=evento.id) }}">
+  <span class="ev-acc__ico"><i data-ico="award" class="pf-ico--lg"></i></span>
+  <span class="pf-grow">
+    <span class="ev-acc__t" style="display:block">Estadísticas del partido</span>
+    <span class="ev-acc__s" style="display:block">
+      {% if hoja %}
+        {{ hoja.goles_favor|default(0) }}–{{ hoja.goles_contra|default(0) }}
+        {%- if hoja._n %} · {{ hoja._n }} jugador(es) apuntados{% endif %}
+      {% else %}
+        Goles, asistencias, minutos y jugadas clave de cada uno
+      {% endif %}
+    </span>
+  </span>
+  <i data-ico="chevron-right" class="pf-ico--sm"></i>
+</a>
+{% endif %}
+
 {# ══════════ ESTADO ══════════ #}
 <div class="ev-pie">
   <button class="ev-pie__b ev-pie__b--ok" type="button" onclick="marcar('hecho')">

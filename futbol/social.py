@@ -150,6 +150,39 @@ def c_partidos():
                            hoy=db.hoy_iso())
 
 
+@bp.route('/coach/evento/<eid>/partido')
+@solo_entrenador
+def c_partido_de_evento(eid):
+    """Del partido de la agenda a su hoja de estadisticas.
+
+    Eran dos cosas sin relacion: un partido agendado (fut_events) y un partido
+    con estadisticas (fut_matches). Desde la agenda no habia forma de apuntar
+    quien marco, que es justo lo que se hace al terminar. Aqui se busca la
+    hoja de ese partido y, si todavia no existe, se crea con lo que ya se sabe
+    del evento —rival, fecha, si es local— para no tener que teclearlo otra
+    vez.
+    """
+    uid = db.equipo_id(current_user.id)
+    evento = db.one('fut_events', 'evento del partido', id=eid, coach_id=uid)
+    if not evento:
+        abort(404)
+
+    partido = db.one('fut_matches', 'partido del evento', event_id=eid, coach_id=uid)
+    if not partido:
+        partido = db.insert('fut_matches', {
+            'coach_id': uid,
+            'event_id': eid,
+            'rival': (evento.get('rival') or evento.get('titulo') or 'Rival')[:80],
+            'fecha': evento.get('fecha') or db.hoy_iso(),
+            'local': bool(evento.get('local')),
+            'goles_favor': 0, 'goles_contra': 0,
+            'competicion': (evento.get('competicion') or '')[:80],
+            'creado': _ahora(),
+        }, 'hoja del partido', obligatorio=True)
+
+    return redirect(url_for('futbol.c_partido', mid=partido['id']))
+
+
 @bp.route('/coach/partidos/<mid>')
 @solo_entrenador
 def c_partido(mid):
@@ -159,14 +192,19 @@ def c_partido(mid):
         abort(404)
     partido['_fecha'] = db.parse_fecha(partido.get('fecha'))
 
-    jugadores = db.jugadores_del_entrenador(uid)
-    stats = {s['player_id']: s for s in db.rows('fut_match_stats', 'stats', match_id=mid)}
+    #  TODA la plantilla, no solo los que tienen cuenta. Antes esta pantalla
+    #  salia vacia en cualquier equipo de formacion, que es donde casi nadie
+    #  se registra: no se podia apuntar nada de nadie.
+    jugadores = db.plantilla_completa(uid)
+    filas = db.rows('fut_match_stats', 'stats', match_id=mid) or []
+    stats = {(f.get('player_id') or f.get('manual_player_id')): f for f in filas}
     for j in jugadores:
         j['_stats'] = stats.get(j['id'], {})
 
     return render_template('c_partido.html',
                            tab_activa='agenda', hide_tabbar=True,
-                           partido=partido, jugadores=jugadores)
+                           partido=partido, jugadores=jugadores,
+                           evento_id=partido.get('event_id'))
 
 
 # ═══════════════════════ OBSERVACIONES DE ENTRENAMIENTO ═══════════════════════

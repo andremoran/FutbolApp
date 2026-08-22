@@ -889,3 +889,9 @@ img, svg { max-width: 100%; }
   border-top: 1px dashed var(--border-soft);
   font-size: 12.5px; line-height: 1.55; color: var(--purple);
 }
+
+/*  La acción de estadísticas del partido, en el ámbar de los goles para que se
+    distinga de un vistazo de pasar lista (verde) y la observación (violeta).  */
+.ev-acc--stats .ev-acc__ico {
+  background: rgba(245,158,11,0.14); color: #b45309;
+}

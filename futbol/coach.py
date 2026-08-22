@@ -275,6 +275,25 @@ def c_equipo():
                            codigo=db.codigo_equipo(uid))
 
 
+def _valoracion_media(coach_id, pid, manual):
+    """La media de las valoraciones puestas partido a partido.
+
+    Va aparte de `totales_de_partidos` porque una media no se acumula sumando,
+    y porque los partidos sin valoracion no deben arrastrarla hacia abajo: no
+    puntuar no es puntuar cero.
+    """
+    partidos = db.rows('fut_matches', 'partidos rating', coach_id=coach_id) or []
+    if not partidos:
+        return '—'
+    columna = 'manual_player_id' if manual else 'player_id'
+    filas = db.q(
+        lambda: db.sb().table('fut_match_stats').select('valoracion')
+        .in_('match_id', [p['id'] for p in partidos])
+        .eq(columna, pid).execute().data or [], [], 'valoraciones')
+    notas = [float(f['valoracion']) for f in filas if f.get('valoracion')]
+    return round(sum(notas) / len(notas), 1) if notas else '—'
+
+
 @bp.route('/coach/jugador/<pid>')
 @solo_entrenador
 def c_jugador(pid):
@@ -301,20 +320,28 @@ def c_jugador(pid):
 
     # Las cuatro cifras de PlayerDetailScreen.
     metas = db.rows('fut_goals', 'metas jug', player_id=pid) or []
-    goles = 0
-    partidos = db.rows('fut_matches', 'partidos', coach_id=uid, _limit=60) or []
-    if partidos:
-        marcas = db.q(
-            lambda: db.sb().table('fut_match_stats').select('goles')
-            .in_('match_id', [m['id'] for m in partidos])
-            .eq('player_id', pid).execute().data or [], [], 'goles jugador')
-        goles = sum(int(s.get('goles') or 0) for s in marcas)
+
+    #  Lo de los partidos sale de un solo sitio (db.totales_de_partidos) para
+    #  que la hoja del partido, esta ficha y la IA cuenten lo mismo. Antes
+    #  aqui se sumaban los goles a mano y solo eso: ni asistencias ni minutos,
+    #  que es lo que de verdad dice si un chaval esta jugando o calentando.
+    p = db.totales_de_partidos(uid, ids={pid}).get(pid, {})
 
     cifras = {
         'entrenos': len(db.rows('fut_trainings', 'n entrenos', player_id=pid) or []),
-        'goles': goles,
+        'goles': p.get('goles', 0),
         'metas': len([m for m in metas if m.get('completada')]),
         'racha': db.racha_actual(pid),
+    }
+    partidos_jug = {
+        'partidos': p.get('partidos', 0),
+        'titularidades': p.get('titularidades', 0),
+        'minutos': p.get('minutos', 0),
+        'goles': p.get('goles', 0),
+        'asistencias': p.get('asistencias', 0),
+        'jugadas_clave': p.get('jugadas_clave', 0),
+        'tarjetas_a': p.get('tarjetas_a', 0),
+        'tarjetas_r': p.get('tarjetas_r', 0),
     }
 
     return render_template('c_jugador.html',
@@ -328,6 +355,7 @@ def c_jugador(pid):
                            entrenos=entrenos,
                            evaluaciones=evaluaciones,
                            apuntes=apuntes,
+                           partidos_jug=partidos_jug,
                            cifras=cifras,
                            racha=cifras['racha'])
 
@@ -374,32 +402,34 @@ def c_evaluar(pid):
         delta_overall = historial[-1] - historial[-2]
 
     # ── Stats competitivas ──
-    #  Del que tiene cuenta salen solas de los partidos. El que no la tiene no
-    #  aparece en fut_match_stats, así que se usan las cifras que el entrenador
-    #  cargó al darlo de alta.
-    if manual:
+    #  Ya salen de los partidos apuntados TAMBIEN para el que no tiene cuenta:
+    #  antes esos no cabian en fut_match_stats y habia que quedarse con las
+    #  cifras que el entrenador tecleo al darlo de alta, que nadie volvia a
+    #  tocar nunca. Esas se siguen usando, pero solo mientras no haya ni un
+    #  partido apuntado: son el punto de partida del que llega a mitad de
+    #  temporada, no su ficha para siempre.
+    t = db.totales_de_partidos(uid, ids={pid}).get(pid)
+    if t:
+        stats = {
+            'partidos': t['partidos'],
+            'minutos': t['minutos'],
+            'goles': t['goles'],
+            'asistencias': t['asistencias'],
+            'jugadas_clave': t['jugadas_clave'],
+            'rating': _valoracion_media(uid, pid, manual),
+        }
+        auto = True
+    elif manual:
         stats = {'partidos': '—',
                  'minutos': manual.get('minutos_jugados') or 0,
                  'goles': manual.get('goles') or 0,
                  'asistencias': manual.get('asistencias') or 0,
+                 'jugadas_clave': 0,
                  'rating': manual.get('valoracion_promedio') or '—'}
         auto = False
     else:
-        partidos = db.rows('fut_matches', 'partidos eval', coach_id=uid, _limit=100) or []
-        marcas = []
-        if partidos:
-            marcas = db.q(
-                lambda: db.sb().table('fut_match_stats').select('*')
-                .in_('match_id', [m['id'] for m in partidos])
-                .eq('player_id', pid).execute().data or [], [], 'stats jugador')
-        valoraciones = [float(m['valoracion']) for m in marcas if m.get('valoracion')]
-        stats = {
-            'partidos': len(marcas),
-            'minutos': sum(int(m.get('minutos') or 0) for m in marcas),
-            'goles': sum(int(m.get('goles') or 0) for m in marcas),
-            'asistencias': sum(int(m.get('asistencias') or 0) for m in marcas),
-            'rating': round(sum(valoraciones) / len(valoraciones), 1) if valoraciones else '—',
-        }
+        stats = {'partidos': 0, 'minutos': 0, 'goles': 0, 'asistencias': 0,
+                 'jugadas_clave': 0, 'rating': '—'}
         auto = True
 
     fila = db.fila_atributos(**dueno) or {}
