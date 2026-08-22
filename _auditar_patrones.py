@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Vigila los tres fallos que ya mordieron una vez, para que no vuelvan.
+"""Vigila los cuatro fallos que ya mordieron una vez, para que no vuelvan.
 
 Son fallos de los que no se ven: la pantalla no revienta, simplemente enseña
 menos de lo que hay. Por eso estuvieron meses ahí y por eso conviene una
@@ -140,10 +140,47 @@ def auditar_una_fila():
                               % (f.name, i + 1))
 
 
-for comprobacion in (auditar_dueno, auditar_manuales, auditar_una_fila):
+# ═══════════════════════════════════════════════════════════════════════════
+#  4. Una fila con dos dueños posibles y uno de ellos NOT NULL
+# ═══════════════════════════════════════════════════════════════════════════
+#  `fut_attendance.player_id` era NOT NULL, pero pasar lista a un jugador SIN
+#  CUENTA escribe ahi NULL. Fallaba siempre, y en silencio, asi que la
+#  asistencia no se guardo nunca para nadie sin cuenta.
+#
+#  Esto NO se puede comprobar leyendo el codigo: hay que preguntarle al
+#  esquema. Se ejecuta solo si hay credenciales a mano; si no, se avisa y se
+#  sigue, para que la auditoria valga igual sin conexion.
+def auditar_dos_duenyos():
+    try:
+        import os
+        from dotenv import load_dotenv
+        load_dotenv(str(WEB / '.env'))
+        from supabase import create_client
+        sb = create_client(os.environ['SUPABASE_URL'],
+                           os.environ.get('SUPABASE_SERVICE_KEY') or os.environ['SUPABASE_KEY'])
+    except Exception:
+        print('  (sin credenciales: no se comprueba el esquema)')
+        return
+
+    #  PostgREST no da el esquema, asi que se prueba de la unica forma directa:
+    #  se pide una fila con player_id nulo. Si la columna fuese NOT NULL, la
+    #  tabla no podria tener ninguna — y las que admiten los dos tipos siempre
+    #  acaban teniendo alguna en cuanto se usa con jugadores sin cuenta.
+    for tabla in ('fut_attendance', 'fut_attributes', 'fut_medical',
+                  'fut_eval_results', 'fut_injuries', 'fut_attribute_history'):
+        try:
+            sb.table(tabla).select('id').is_('player_id', 'null').limit(1).execute()
+        except Exception as e:
+            if 'player_id' in str(e):
+                aviso('dos dueños', '%s: no admite player_id nulo, asi que no se '
+                                    'puede guardar nada de un jugador sin cuenta' % tabla)
+
+
+for comprobacion in (auditar_dueno, auditar_manuales, auditar_una_fila,
+                     auditar_dos_duenyos):
     comprobacion()
 
-print('Auditoría de los tres patrones')
+print('Auditoría de los patrones conocidos')
 print('=' * 62)
 if fallos:
     print('%d aviso(s):\n' % len(fallos))

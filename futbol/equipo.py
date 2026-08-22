@@ -312,7 +312,8 @@ def api_manual():
     if mid:
         if not db.one('fut_manual_players', 'mio', id=mid, coach_id=uid):
             return jsonify({'error': 'Ese jugador no es de tu equipo.'}), 403
-        db.update('fut_manual_players', datos, 'manual up', id=mid, coach_id=uid)
+        db.update('fut_manual_players', datos, 'manual up', obligatorio=True,
+                  id=mid, coach_id=uid)
         if campos_perfil:
             db.guardar_atributos(manual_player_id=mid, **campos_perfil)
         if campos_medicos:

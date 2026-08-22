@@ -407,7 +407,8 @@ def api_lesion():
         datos['alta_real'] = db.hoy_iso()
 
     if lid:
-        db.update('fut_injuries', datos, 'lesion up', id=lid, coach_id=uid)
+        db.update('fut_injuries', datos, 'lesion up', obligatorio=True,
+                  id=lid, coach_id=uid)
         return jsonify({'ok': True, 'id': lid, 'mensaje': 'Parte actualizado.'})
 
     datos['registrado_por'] = current_user.id

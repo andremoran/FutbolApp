@@ -715,7 +715,8 @@ def api_cal_evento():
     if eid:
         if not db.one('fut_events', 'mio', id=eid, coach_id=uid):
             return jsonify({'error': 'Ese evento no es tuyo.'}), 403
-        db.update('fut_events', datos, 'evento up', id=eid, coach_id=uid)
+        db.update('fut_events', datos, 'evento up', obligatorio=True,
+                  id=eid, coach_id=uid)
         return jsonify({'ok': True, 'id': eid, 'mensaje': 'Evento actualizado.'})
 
     # Sin plan Pro hay tope de eventos futuros: se puede organizar una
