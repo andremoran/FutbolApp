@@ -895,3 +895,27 @@ img, svg { max-width: 100%; }
 .ev-acc--stats .ev-acc__ico {
   background: rgba(245,158,11,0.14); color: #b45309;
 }
+
+/* ─── Los dos avatares que se pulsan ─────────────────────────────────────
+   El del perfil en la cabecera (38 px) y el del listado médico (32 px) se
+   quedan cortos para el dedo. Como en .pf-hero__btn, el círculo no cambia de
+   tamaño y lo que se estira es la zona que responde.
+
+   Aquí hace falta un paso más: estos llevan overflow:hidden para recortar la
+   foto en círculo, y eso recortaba también el ::after, que se quedaba sin
+   efecto. Se le pasa el redondeo a la propia foto y así el avatar ya no
+   necesita recortar nada.
+
+   Solo los <a>: de adorno un avatar no necesita zona táctil, y un ::after
+   suelto podría robarle el toque a lo que tenga al lado.                   */
+a.pf-hero__avatar,
+a.pf-avatar { position: relative; overflow: visible; }
+a.pf-hero__avatar img,
+a.pf-avatar img { border-radius: inherit; }
+
+a.pf-hero__avatar::after { content: ''; position: absolute; inset: -3px; }  /* 38 → 44 */
+a.pf-avatar::after       { content: ''; position: absolute; inset: -2px; }  /* 40 → 44 */
+a.pf-avatar--sm::after   { inset: -6px; }                                   /* 32 → 44 */
+/* Los grandes ya pasan de 44 px: no necesitan zona de más. */
+a.pf-avatar--lg::after,
+a.pf-avatar--xl::after   { inset: 0; }
