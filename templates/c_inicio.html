@@ -63,15 +63,21 @@
   .cd-cod__b:active { transform: scale(.96); }
 
   /* ── Tres cifras con su curva (medidas de statMiniCard en la app) ── */
-  .cd-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 16px 16px 0; }
+  /*  minmax(0,1fr) y no 1fr: con 1fr la columna nunca baja del ancho de su
+      contenido, y las tres tarjetas juntas se salian de la pantalla en un
+      movil estrecho, arrastrando la pagina entera hacia la derecha.  */
+  .cd-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+              gap: 10px; margin: 16px 16px 0; }
   .cd-stat {
     background: #fff; border-radius: 14px; padding: 12px;
     box-shadow: var(--sh-sm); border: 1px solid var(--border-soft);
   }
-  .cd-stat__top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .cd-stat__top { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; }
   .cd-stat__n { font-size: 26px; font-weight: 800; letter-spacing: -.5px; line-height: 1; }
   .cd-stat__l { font-size: 12px; font-weight: 600; color: var(--text-sec); margin-top: 4px; }
-  .cd-spark { width: 56px; height: 22px; flex: none; }
+  /*  Que pueda encoger: era el que no cabia. Lleva viewBox, asi que al
+      estrecharse se dibuja igual, solo que mas pequena.  */
+  .cd-spark { width: 56px; height: 22px; flex: 0 1 auto; min-width: 0; max-width: 100%; }
 
   /* ── Banners de acceso ── */
   .cd-ban {

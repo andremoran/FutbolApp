@@ -47,7 +47,11 @@
   .ev-fila__v { flex: 1; font-size: 13.5px; font-weight: 600; }
 
   /* Las dos acciones grandes */
-  .ev-acc { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  /*  Sin width:100%. Lo llevaba junto a un margen lateral de 16 px, asi que
+      medía el ancho ENTERO del contenedor y ademas empezaba 16 px mas a la
+      derecha: se salia de la pantalla por ese lado y el texto se cortaba.
+      Siendo flex ya ocupa el hueco que le queda descontando los margenes.  */
+  .ev-acc { display: flex; align-items: center; gap: 12px; text-align: left;
             margin: 12px 16px 0; padding: 15px; border-radius: var(--r-xl); color: #fff; }
   .ev-acc--lista { background: var(--info); }
   .ev-acc--ia { background: var(--purple); }

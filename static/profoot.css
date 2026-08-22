@@ -232,10 +232,16 @@ img, svg { max-width: 100%; }
 }
 .pf-item__body { flex: 1; min-width: 0; }
 .pf-item__title {
+  display: block;                    /* igual que el subtitulo, para que corte */
   font-size: 14px; font-weight: 700; color: var(--text);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .pf-item__sub {
+  /*  display:block es imprescindible, no decorativo: en un elemento en línea
+      overflow y text-overflow no hacen NADA, asi que el «nowrap» dejaba el
+      texto largo saliendose de la tarjeta en vez de cortarlo con puntos
+      suspensivos. Se veia en el resumen de pago, donde la linea es larga.  */
+  display: block;
   font-size: 12px; color: var(--text-sec); margin-top: 2px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
@@ -466,7 +472,11 @@ img, svg { max-width: 100%; }
 .pf-flash--warning { background: var(--warning-bg); color: #92400e; }
 
 /* ─── UTILIDADES ──────────────────────────────────────────────────────── */
-.pf-row { display: flex; align-items: center; gap: 8px; }
+/*  min-width:0 porque una .pf-row metida dentro de otra es un elemento flex,
+    y por defecto no encoge por debajo de su contenido: en la portada del
+    jugador el bloque de la derecha se salia de la pantalla en un movil
+    estrecho. Es el mismo motivo por el que .pf-grow ya lo llevaba.        */
+.pf-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .pf-row--between { justify-content: space-between; }
 .pf-col { display: flex; flex-direction: column; }
 .pf-grow { flex: 1; min-width: 0; }
@@ -745,6 +755,12 @@ img, svg { max-width: 100%; }
 }
 .pf-rating__badge small { font-size: 10px; font-weight: 700; opacity: 0.85; }
 .pf-rating__btns { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; }
+/*  Diez casillas cuadradas no caben en un movil estrecho: como son cuadradas
+    no pueden encoger por debajo de su alto minimo y se salian de la tarjeta.
+    Debajo de 360 px pasan a dos filas de cinco, que ademas se tocan mejor.  */
+@media (max-width: 359px) {
+  .pf-rating__btns { grid-template-columns: repeat(5, 1fr); }
+}
 .pf-rating__btn {
   aspect-ratio: 1; min-height: 26px; border-radius: 8px;
   border: 1.5px solid var(--border); background: #fff;
