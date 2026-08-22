@@ -46,15 +46,62 @@ def _contexto_jugador(user):
              if m.get('estado') != 'completada']
     habitos = db.habitos(uid)
 
+    #  Su ficha completa y su parte medico. Sin esto la IA le contestaba con
+    #  los cuatro atributos de siempre y sin saber su edad ni si esta lesionado
+    #  — y «¿puedo entrenar hoy?» es de lo que mas se pregunta.
+    ficha = db.ficha_atributos(player_id=uid) or {}
+    medica = db.ficha_medica(player_id=uid) or {}
+    yo = db.one('usuarios', 'ia yo', id=uid) or {}
+    edad = db.edad_de(yo.get('fecha_nacimiento'), yo.get('anio_nacimiento'))
+
     partes = [
         f"Nombre: {getattr(user, 'name', '') or 'jugador'}",
         f"Posición: {perfil.get('posicion') or 'sin definir'}",
+    ]
+    if edad is not None:
+        partes.append(f"Edad: {edad} años")
+    if ficha.get('_tiene_perfil'):
+        partes.append(
+            f"Perfil dinamico: overall {ficha['overall']}, potencial {ficha['potencial']} "
+            f"(tecnica {ficha['media_tecnica']}, fisico {ficha['media_fisica']}, "
+            f"mental {ficha['media_mental']})")
+        flojo = min(db.ATRIBUTOS_18, key=lambda k: ficha.get(k) if ficha.get(k) is not None else 999)
+        fuerte = max(db.ATRIBUTOS_18, key=lambda k: ficha.get(k) if ficha.get(k) is not None else -1)
+        partes.append(f"Su mejor atributo es {fuerte} ({ficha.get(fuerte)}) y el mas flojo "
+                      f"{flojo} ({ficha.get(flojo)})")
+    else:
+        partes.append('Perfil dinamico: todavia sin evaluar')
+    partes.append(
         f"Atributos (0-100): técnica {attrs['tecnica']}, físico {attrs['fisico']}, "
-        f"táctico {attrs['tactico']}, mental {attrs['mental']}",
+        f"táctico {attrs['tactico']}, mental {attrs['mental']}")
+
+    fatiga = db.nivel_de_fatiga(ficha.get('fatiga'))
+    if fatiga:
+        partes.append(f"Fatiga declarada: {fatiga}")
+    if (ficha.get('riesgo_sobrecarga') or 'bajo') != 'bajo':
+        partes.append(f"Riesgo de sobrecarga: {ficha['riesgo_sobrecarga']}")
+
+    partes += [
         f"Racha de hábitos: {db.racha_actual(uid)} días",
         f"Hábitos activos: {len(habitos)}",
         f"Entrenamientos registrados en los últimos días: {len(entrenos)}",
     ]
+
+    # ─── Su parte médico ────────────────────────────────────────────────────
+    lesiones = [x for x in (db.rows('fut_injuries', 'ia mis lesiones', player_id=uid) or [])
+                if (x.get('estado') or '') not in ('alta', 'recuperado')]
+    partes += _lista('Lesiones abiertas:', [
+        ', '.join(t for t in (x.get('zona'), x.get('tipo'), x.get('gravedad'),
+                              ('desde %s' % x['fecha']) if x.get('fecha') else None) if t)
+        for x in lesiones], 5)
+    ojo = [t for t in ((medica.get('alergias') or '').strip(),
+                       (medica.get('condiciones') or '').strip(),
+                       (medica.get('medicacion') or '').strip())
+           if t and t.lower() not in ('ninguna', 'ninguno', 'no', '-')]
+    if ojo:
+        partes.append('Ficha medica: ' + '; '.join(ojo))
+    if medica.get('apto_competir') is False:
+        partes.append('ATENCION: figura como NO apto para competir.')
     if getattr(user, 'last_weight', None):
         partes.append(f"Peso: {user.last_weight} kg")
     if getattr(user, 'last_height', None):
@@ -111,6 +158,365 @@ def _lista(titulo, filas, tope):
     return salida
 
 
+def _fichas_de_jugadores(uid, jugadores, manuales):
+    """La ficha de cada jugador: edad, perfil dinámico, estado y parte médico.
+
+    Antes el contexto solo llevaba nombre, posición y dorsal, y las medias de
+    atributos solo miraban a los jugadores CON CUENTA — así que en un equipo de
+    formación, donde casi nadie la tiene, la IA no veía ni un número. Preguntar
+    «¿cómo va Martín?» o «¿quién está lesionado?» no tenía respuesta posible.
+
+    Todo se pide EN BLOQUE, no jugador a jugador: son cuatro consultas en total
+    en vez de dos por cabeza. La pantalla de la IA tiene presupuesto de
+    segundos, y cuarenta consultas se lo comen.
+    """
+    ids_reg = [j['id'] for j in jugadores]
+    ids_man = [m['id'] for m in manuales]
+
+    def _bloque(tabla, columna, ids):
+        if not ids:
+            return {}
+        filas = db.q(
+            lambda: db.sb().table(tabla).select('*').in_(columna, ids).execute().data or [],
+            [], 'ia %s' % tabla)
+        return {f[columna]: f for f in filas if f.get(columna)}
+
+    attrs = dict(_bloque('fut_attributes', 'player_id', ids_reg))
+    attrs.update(_bloque('fut_attributes', 'manual_player_id', ids_man))
+    medico = dict(_bloque('fut_medical', 'player_id', ids_reg))
+    medico.update(_bloque('fut_medical', 'manual_player_id', ids_man))
+
+    fichas = []
+    for j in jugadores:
+        f = j.get('fut') or {}
+        fichas.append({
+            'id': j['id'], 'nombre': j.get('name'),
+            'posicion': f.get('posicion'), 'dorsal': f.get('dorsal'),
+            'edad': db.edad_de(j.get('fecha_nacimiento'), j.get('anio_nacimiento')),
+            'sin_cuenta': False,
+        })
+    for m in manuales:
+        fichas.append({
+            'id': m['id'], 'nombre': m.get('nombre'),
+            'posicion': m.get('posicion'), 'dorsal': m.get('dorsal'),
+            'edad': db.edad_de(m.get('fecha_nacimiento'), m.get('anio_nacimiento')),
+            'sin_cuenta': True,
+        })
+
+    for x in fichas:
+        a = attrs.get(x['id']) or {}
+        x['overall'] = a.get('overall')
+        x['potencial'] = a.get('potencial')
+        x['tecnica'], x['fisico'], x['mental'] = a.get('tecnica'), a.get('fisico'), a.get('mental')
+        x['fatiga'] = db.nivel_de_fatiga(a.get('fatiga'))
+        x['riesgo'] = a.get('riesgo_sobrecarga')
+        x['fuerte'] = (a.get('fortalezas') or '').strip()
+        x['flojo'] = (a.get('debilidades') or '').strip()
+        x['medico'] = medico.get(x['id']) or {}
+    return fichas
+
+
+def _seccion_jugadores(fichas):
+    """Una línea por jugador con lo que de verdad se le pregunta a la IA."""
+    lineas = []
+    for x in fichas:
+        partes = [x['nombre'] or 'sin nombre']
+        partes.append(x['posicion'] or 'sin posicion')
+        if x['dorsal']:
+            partes.append('dorsal %s' % x['dorsal'])
+        if x['edad'] is not None:
+            partes.append('%s años' % x['edad'])
+        if x['overall'] is not None:
+            partes.append('overall %s' % x['overall']
+                          + ('/%s de potencial' % x['potencial'] if x['potencial'] else ''))
+            medias = [('tec', x['tecnica']), ('fis', x['fisico']), ('men', x['mental'])]
+            sueltas = ['%s %s' % (k, v) for k, v in medias if v is not None]
+            if sueltas:
+                partes.append(' '.join(sueltas))
+        else:
+            partes.append('sin evaluar')
+        if x['fatiga'] and x['fatiga'] != 'bajo':
+            partes.append('fatiga %s' % x['fatiga'])
+        if x['riesgo'] and x['riesgo'] != 'bajo':
+            partes.append('riesgo de sobrecarga %s' % x['riesgo'])
+        lineas.append(', '.join(partes))
+    return lineas
+
+
+def _seccion_medica(fichas, lesiones):
+    """Quién está lesionado, quién no puede competir y qué hay que tener en cuenta.
+
+    Las lesiones se cruzan con el jugador POR SU ID: antes se listaban sueltas
+    —«Isquiotibiales, moderada»— sin decir de quién, que es justo lo que se
+    pregunta.
+    """
+    por_id = {x['id']: x for x in fichas}
+    salida = []
+
+    lineas = []
+    for l in lesiones:
+        duenyo = por_id.get(l.get('player_id') or l.get('manual_player_id'))
+        nombre = duenyo['nombre'] if duenyo else 'jugador no identificado'
+        detalle = ', '.join(p for p in (
+            l.get('zona'), l.get('tipo'), l.get('gravedad'),
+            ('desde %s' % l['fecha']) if l.get('fecha') else None,
+            ('alta prevista %s' % l['alta_prevista']) if l.get('alta_prevista') else None,
+        ) if p)
+        lineas.append('%s: %s' % (nombre, detalle))
+    salida += _lista('Lesionados ahora mismo (%d):' % len(lineas), lineas, 10)
+
+    no_aptos, avisos, medidas = [], [], []
+    for x in fichas:
+        m = x['medico'] or {}
+        apto = m.get('apto_competir')
+        if apto is False or (m.get('apto') or '') in ('no_apto', 'no apto'):
+            no_aptos.append(x['nombre'])
+        ojo = [t for t in ((m.get('alergias') or '').strip(),
+                           (m.get('condiciones') or '').strip(),
+                           (m.get('medicacion') or '').strip())
+               if t and t.lower() not in ('ninguna', 'ninguno', 'no', '-')]
+        if ojo:
+            avisos.append('%s: %s' % (x['nombre'], '; '.join(ojo)))
+        if m.get('estatura_cm') or m.get('peso_kg'):
+            medidas.append('%s: %s%s' % (
+                x['nombre'],
+                ('%s cm' % m['estatura_cm']) if m.get('estatura_cm') else '',
+                (' %s kg' % m['peso_kg']) if m.get('peso_kg') else ''))
+
+    if no_aptos:
+        salida.append('NO aptos para competir: ' + ', '.join(no_aptos))
+    salida += _lista('Alergias, condiciones o medicación a tener en cuenta:', avisos, 10)
+    salida += _lista('Talla y peso:', medidas, 12)
+    return salida
+
+
+def _asistencia(uid, eventos):
+    """La asistencia con sus CUATRO estados, por sesión y por jugador.
+
+    Antes se contaban juntos «presente» y «tarde» en un solo número, que es
+    justo la distinción que le importa al entrenador: quien llega tarde cinco
+    veces no es lo mismo que quien no falta nunca, y con un contador único los
+    dos salían igual. Se guardan por separado, con el motivo que se anotó.
+
+    Devuelve (por_evento, por_jugador). Todo de una consulta.
+    """
+    ids = [e['id'] for e in eventos if e.get('id')]
+    filas = db.asistencia_de(ids) if ids else []
+
+    por_evento, por_jugador = {}, {}
+    for a in filas:
+        estado = a.get('estado') or 'sin marcar'
+        por_evento.setdefault(a['event_id'], {}).setdefault(estado, 0)
+        por_evento[a['event_id']][estado] += 1
+
+        clave = a.get('player_id') or a.get('manual_player_id')
+        if not clave:
+            continue
+        j = por_jugador.setdefault(clave, {
+            'nombre': a.get('jugador_nombre') or '', 'total': 0,
+            'presente': 0, 'tarde': 0, 'justificado': 0, 'ausente': 0,
+            'motivos': []})
+        j['total'] += 1
+        if estado in j:
+            j[estado] += 1
+        if a.get('motivo'):
+            j['motivos'].append('%s (%s)' % (a['motivo'], estado))
+    return por_evento, por_jugador
+
+
+def _resumen_asistencia(conteo):
+    """«presentes 14, tarde 2, ausentes 3» — solo lo que no es cero."""
+    if not conteo:
+        return None
+    orden = (('presente', 'presentes'), ('tarde', 'tarde'),
+             ('justificado', 'justificados'), ('ausente', 'ausentes'))
+    trozos = ['%d %s' % (conteo[c], et) for c, et in orden if conteo.get(c)]
+    otros = sum(v for k, v in conteo.items()
+                if k not in dict(orden) and v)
+    if otros:
+        trozos.append('%d sin marcar' % otros)
+    return ', '.join(trozos) if trozos else None
+
+
+def _seccion_asistencia(por_jugador, fichas):
+    """Quién cumple y quién no, con nombres.
+
+    Se ordena por los que peor van —faltas primero y despues retrasos— porque
+    es lo que el entrenador busca cuando pregunta. Los que no faltan nunca se
+    resumen en una linea: nombrarlos uno a uno no aporta.
+    """
+    if not por_jugador:
+        return ['Asistencia: todavia no se ha pasado lista en ninguna sesion, '
+                'asi que no hay datos de quien viene y quien no.']
+
+    nombres = {x['id']: x['nombre'] for x in fichas}
+    filas = []
+    for clave, j in por_jugador.items():
+        nombre = j['nombre'] or nombres.get(clave) or 'jugador'
+        faltas = j['ausente'] + j['justificado']
+        #  Llegar tarde es HABER VENIDO. Contando solo «presente» salia que
+        #  quien llego tarde no fue al entrenamiento, que es lo contrario de lo
+        #  que paso. Se separan dos cosas: si vino, y si vino puntual.
+        asistio = j['presente'] + j['tarde']
+        filas.append({
+            'nombre': nombre, 'total': j['total'], 'tarde': j['tarde'],
+            'ausente': j['ausente'], 'justificado': j['justificado'],
+            'presente': j['presente'], 'asistio': asistio, 'faltas': faltas,
+            'motivos': j['motivos'],
+            'pct': round(100 * asistio / j['total']) if j['total'] else 0,
+        })
+    filas.sort(key=lambda f: (-(f['ausente'] * 2 + f['tarde']), f['nombre']))
+
+    salida = []
+    total_sesiones = max((f['total'] for f in filas), default=0)
+    salida.append('Asistencia: se ha pasado lista en %d sesion(es), sobre %d jugadores.'
+                  % (total_sesiones, len(filas)))
+
+    problematicos = [f for f in filas if f['ausente'] or f['tarde'] or f['justificado']]
+    perfectos = [f for f in filas if not (f['ausente'] or f['tarde'] or f['justificado'])]
+
+    lineas = []
+    for f in problematicos:
+        t = ['%s: vino a %d de %d sesiones (%d%%)'
+             % (f['nombre'], f['asistio'], f['total'], f['pct'])]
+        if f['tarde']:
+            t.append('pero %d de esas veces llego TARDE' % f['tarde'])
+        if f['ausente']:
+            t.append('%d falta(s) sin justificar' % f['ausente'])
+        if f['justificado']:
+            t.append('%d justificada(s)' % f['justificado'])
+        if f['motivos']:
+            t.append('motivos: ' + '; '.join(f['motivos'][:3]))
+        lineas.append(', '.join(t))
+    salida += _lista('Los que fallan o llegan tarde (peor primero):', lineas, 15)
+
+    if perfectos:
+        salida.append('Sin una sola falta ni retraso (%d): %s'
+                      % (len(perfectos),
+                         ', '.join(f['nombre'] for f in perfectos[:20])))
+    return salida
+
+
+def _seccion_entrenamientos(uid, n_plantilla, fichas):
+    """Los entrenamientos con TODO lo que los describe, y la semana evaluada.
+
+    Antes esto eran tres líneas —cuántos planes, cuántos eventos por delante y
+    los títulos— así que la IA no podía responder a lo que de verdad se le
+    pregunta: si la semana está bien cargada, si el reparto entre físico y
+    táctico tiene sentido, o si conviene bajar el ritmo antes del partido.
+
+    La evaluación de la semana NO se calcula aquí: se pide a
+    `calendario.analisis_semana()`, que es la misma que ve el entrenador en su
+    pantalla. Si se recalculara aparte, la IA y la app acabarían diciendo cosas
+    distintas sobre la misma semana.
+    """
+    from . import calendario as cal  # aquí dentro para no cruzar importaciones
+
+    partes = []
+    hoy = db.hoy_iso()
+    eventos = db.eventos_equipo(uid) or []
+    for e in eventos:
+        e['_fecha'] = db.parse_fecha(e.get('fecha'))
+
+    #  Quién vino a cada sesión, con los cuatro estados. En bloque.
+    por_evento, por_jugador = _asistencia(uid, eventos)
+
+    def describir(e, con_asistencia=True):
+        """Una sesión con sus características, no solo su título."""
+        trozos = ['%s%s' % (e.get('fecha'), ' ' + e['hora'] if e.get('hora') else '')]
+        tipo = e.get('tipo') or 'evento'
+        if tipo == 'entreno':
+            meta = cal.ENTRENO_META.get(e.get('tipo_entreno') or 'mixto', {})
+            trozos.append('entreno %s' % (meta.get('etiqueta') or 'mixto').lower())
+        elif tipo == 'partido':
+            trozos.append('partido' + (' vs %s' % e['rival'] if e.get('rival') else '')
+                          + (' (local)' if e.get('local') else ' (visitante)'))
+        else:
+            trozos.append(tipo)
+        trozos.append('"%s"' % (e.get('titulo') or 'sin titulo'))
+        if e.get('duracion_min'):
+            trozos.append('%s min' % e['duracion_min'])
+        if e.get('intensidad'):
+            etq = dict((c, n) for c, n, _ in cal.INTENSIDADES).get(e['intensidad'], e['intensidad'])
+            trozos.append('intensidad %s' % etq.lower())
+        if tipo == 'entreno':
+            trozos.append('carga %s' % cal.carga_de(e))
+        if e.get('lugar'):
+            trozos.append('en %s' % e['lugar'])
+        if e.get('estado') and e['estado'] != 'programado':
+            trozos.append(e['estado'])
+        if con_asistencia:
+            resumen = _resumen_asistencia(por_evento.get(e['id']))
+            if resumen:
+                trozos.append('asistencia: %s (de %d)' % (resumen, n_plantilla))
+            elif (e.get('fecha') or '') < hoy and tipo == 'entreno':
+                trozos.append('sin pasar lista')
+        return ', '.join(trozos)
+
+    # ─── La semana, evaluada ────────────────────────────────────────────────
+    a = cal.analisis_semana(eventos)
+    partes.append('SEMANA EN CURSO (%s a %s): %d entrenamientos y %d partidos, '
+                  '%d minutos, carga %d sobre un tope orientativo de 700.'
+                  % (a['lunes'], a['domingo'], a['n_entrenos'], a['n_partidos'],
+                     a['minutos'], a['carga']))
+    if a['reparto']:
+        partes.append('Reparto de la semana por tipo: ' + ', '.join(
+            '%s %d min (%d%%)' % (r['etiqueta'], r['minutos'], r['pct'])
+            for r in a['reparto']))
+    else:
+        partes.append('Reparto por tipo: las sesiones de esta semana no tienen '
+                      'tipo marcado, asi que no se puede repartir.')
+    if a['racha']:
+        partes.append('Racha: %d dias seguidos entrenando.' % a['racha'])
+    if a['proximo_partido'] is not None and a['dias_partido'] is not None:
+        p = a['proximo_partido']
+        partes.append('Proximo partido: %s (%s), dentro de %d dias.'
+                      % (p.get('titulo') or 'partido', p.get('fecha'), a['dias_partido']))
+    partes += _lista('Avisos que ya le da la app sobre esta semana:',
+                     [x['texto'] for x in a['alertas']], 5)
+
+    semana = [e for e in eventos
+              if e.get('_fecha') and a['lunes'] <= e['_fecha'] <= a['domingo']]
+    partes += _lista('Sesiones de esta semana, una por una:',
+                     [describir(e) for e in sorted(semana, key=lambda x: x['_fecha'])], 12)
+
+    # ─── Lo que viene y lo que ya pasó ──────────────────────────────────────
+    proximos = sorted([e for e in eventos if (e.get('fecha') or '') >= hoy],
+                      key=lambda x: x.get('fecha') or '')
+    pasados = sorted([e for e in eventos if (e.get('fecha') or '') < hoy],
+                     key=lambda x: x.get('fecha') or '', reverse=True)
+    partes.append('Agenda: %d eventos por delante, %d ya celebrados.'
+                  % (len(proximos), len(pasados)))
+    partes += _lista('Proximos:', [describir(e, con_asistencia=False) for e in proximos], 8)
+    partes += _lista('Ultimos celebrados:', [describir(e) for e in pasados], 8)
+
+    # ─── Los planes de sesión ───────────────────────────────────────────────
+    planes = db.rows('fut_training_plans', 'ia planes', coach_id=uid,
+                     _order='creado', _desc=True, _limit=12) or []
+    partes.append('Planes de sesion guardados: %d' % len(planes))
+    lineas = []
+    for p in planes:
+        t = [p.get('nombre') or 'sin nombre']
+        if p.get('tipo'):
+            t.append(p['tipo'] + ('/' + p['subtipo'] if p.get('subtipo') else ''))
+        if p.get('duracion_min'):
+            t.append('%s min' % p['duracion_min'])
+        if p.get('intensidad'):
+            t.append('intensidad %s' % p['intensidad'])
+        if p.get('carga_fisica') is not None:
+            t.append('carga fisica %s/100' % p['carga_fisica'])
+        if p.get('objetivo'):
+            t.append('objetivo: %s' % str(p['objetivo'])[:120])
+        if p.get('veces_usado'):
+            t.append('usado %s veces' % p['veces_usado'])
+        lineas.append(', '.join(t))
+    partes += _lista('Planes:', lineas, 8)
+
+    # ─── Quién cumple y quién no ────────────────────────────────────────────
+    partes += _seccion_asistencia(por_jugador, fichas)
+    return partes
+
+
 def _contexto_entrenador(user):
     """Todo lo que el entrenador tiene cargado, para que la IA no responda a ciegas.
 
@@ -140,31 +546,26 @@ def _contexto_entrenador(user):
         f"({len(jugadores)} con cuenta, {len(manuales)} apuntados a mano)",
     ]
 
-    # ─── Quiénes son ────────────────────────────────────────────────────────
-    fichas = []
-    for j in jugadores:
-        f = j.get('fut') or {}
-        fichas.append(f"{j.get('name')}: {f.get('posicion') or 'sin posicion'}"
-                      + (f", dorsal {f['dorsal']}" if f.get('dorsal') else ''))
-    for m in manuales:
-        fichas.append(f"{m.get('nombre')}: {m.get('posicion') or 'sin posicion'}"
-                      + (f", dorsal {m['dorsal']}" if m.get('dorsal') else '')
-                      + ' (sin cuenta)')
-    partes += _lista('Jugadores:', fichas, 30)
+    # ─── Quiénes son y cómo están ───────────────────────────────────────────
+    fichas = _fichas_de_jugadores(uid, jugadores, manuales)
+    partes.append('Jugadores (nombre, posicion, dorsal, edad, overall/potencial, '
+                  'medias por familia y estado):')
+    partes += _lista('', _seccion_jugadores(fichas), 30)[1:]
 
-    # ─── Cómo están ─────────────────────────────────────────────────────────
-    ids = [j['id'] for j in jugadores]
-    if ids:
-        attrs = db.q(
-            lambda: db.sb().table('fut_attributes').select('*').in_('player_id', ids).execute().data or [],
-            [], 'ia attrs')
-        medias = []
-        for k in db.ATRIBUTOS:
-            vals = [a[k] for a in attrs if a.get(k) is not None]
-            if vals:
-                medias.append(f"{k} {round(sum(vals) / len(vals))}")
-        if medias:
-            partes.append('Medias del equipo (0-100): ' + ', '.join(medias))
+    # ─── La media del equipo ────────────────────────────────────────────────
+    #  Sobre TODOS los jugadores, no solo los que tienen cuenta: antes se
+    #  miraban solo esos y en un equipo de formacion la media salia vacia.
+    overalls = [x['overall'] for x in fichas if x['overall'] is not None]
+    if overalls:
+        partes.append('Overall medio del equipo: %d (sobre %d jugadores evaluados de %d)'
+                      % (round(sum(overalls) / len(overalls)), len(overalls), len(fichas)))
+        mejor = max(fichas, key=lambda x: x['overall'] if x['overall'] is not None else -1)
+        peor = min((x for x in fichas if x['overall'] is not None),
+                   key=lambda x: x['overall'])
+        partes.append('El mas alto es %s (%s) y el mas bajo %s (%s)'
+                      % (mejor['nombre'], mejor['overall'], peor['nombre'], peor['overall']))
+    sin_evaluar = [x['nombre'] for x in fichas if x['overall'] is None]
+    partes += _lista('Todavia sin evaluar:', sin_evaluar, 10)
 
     # ─── Evaluaciones ───────────────────────────────────────────────────────
     #  Es lo que más se le pregunta y lo que antes no se le pasaba en absoluto.
@@ -195,43 +596,13 @@ def _contexto_entrenador(user):
     else:
         partes.append('Evaluaciones registradas: 0 (todavia no ha tomado ninguna prueba)')
 
-    # ─── Entrenamientos ─────────────────────────────────────────────────────
-    planes = db.rows('fut_training_plans', 'ia planes', coach_id=uid,
-                     _order='creado', _desc=True, _limit=12) or []
-    partes.append(f"Planes de entrenamiento creados: {len(planes)}")
-    partes += _lista('Planes:', [
-        f"{p.get('nombre')}: {p.get('tipo') or 'sin tipo'}"
-        + (f"/{p['subtipo']}" if p.get('subtipo') else '')
-        + (f", {p['duracion_min']} min" if p.get('duracion_min') else '')
-        + (f", intensidad {p['intensidad']}" if p.get('intensidad') else '')
-        for p in planes], 8)
-
-    # ─── Agenda ─────────────────────────────────────────────────────────────
-    #  Los eventos pasados importan tanto como los próximos: «cuántos entrenos
-    #  llevamos este mes» es justo lo que se pregunta, y antes solo veía el
-    #  futuro, así que un equipo con historial parecía recién creado.
-    hoy = db.hoy_iso()
-    todos = db.eventos_equipo(uid) or []
-    proximos = [e for e in todos if (e.get('fecha') or '') >= hoy]
-    pasados = sorted([e for e in todos if (e.get('fecha') or '') < hoy],
-                     key=lambda x: x.get('fecha') or '', reverse=True)
-    partes.append(f"Agenda: {len(proximos)} eventos por delante, {len(pasados)} ya celebrados")
-    partes += _lista('Proximos eventos:', [
-        f"{e.get('fecha')} {e.get('hora') or ''}, {e.get('tipo') or 'evento'}: "
-        f"{e.get('titulo') or 'sin titulo'}".replace('  ', ' ')
-        for e in proximos], 8)
-    partes += _lista('Ultimos eventos celebrados:', [
-        f"{e.get('fecha')}, {e.get('tipo') or 'evento'}: {e.get('titulo') or 'sin titulo'}"
-        for e in pasados], 6)
+    # ─── Entrenamientos y la semana ─────────────────────────────────────────
+    partes += _seccion_entrenamientos(uid, len(jugadores) + len(manuales), fichas)
 
     # ─── Parte médico ───────────────────────────────────────────────────────
     lesiones = [x for x in (db.rows('fut_injuries', 'ia lesiones', coach_id=uid) or [])
                 if (x.get('estado') or '') not in ('alta', 'recuperado')]
-    partes += _lista(f'Partes medicos abiertos ({len(lesiones)}):', [
-        f"{x.get('zona') or 'zona sin indicar'}, {x.get('tipo') or 'lesion'}"
-        f", {x.get('gravedad') or 'gravedad sin indicar'}"
-        + (f", desde {x['fecha']}" if x.get('fecha') else '')
-        for x in lesiones], 8)
+    partes += _seccion_medica(fichas, lesiones)
 
     return "\n".join(partes)
 
