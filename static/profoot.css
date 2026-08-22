@@ -146,6 +146,16 @@ img, svg { max-width: 100%; }
   background: rgba(255,255,255,0.18);
   display: flex; align-items: center; justify-content: center;
   color: #fff; transition: background .15s;
+  position: relative;
+}
+/*  El circulo se queda en 38 px, que es lo que pide la cabecera, pero la zona
+    que responde al dedo se estira a los 44 px recomendados. Se hace con un
+    ::after transparente y no agrandando el boton, porque este es el boton de
+    volver de casi toda la app —63 usos en 59 pantallas— y crecerlo movia la
+    cabecera entera. Los 3 px que sobresalen por lado caben de sobra en el
+    hueco de 10 px que deja .pf-hero__actions entre dos botones.  */
+.pf-hero__btn::after {
+  content: ''; position: absolute; inset: -3px; border-radius: 22px;
 }
 .pf-hero__btn:active { background: rgba(255,255,255,0.30); }
 .pf-hero__avatar {
