@@ -69,7 +69,9 @@ def mensajes():
             m['_fecha'] = db.parse_fecha(m.get('creado'))
             m['_para_mi'] = bool(m.get('player_id'))
 
-        # Marcar como leídos los personales
+        # Marcar como leídos los personales. Sin obligatorio: esto pasa
+        # mientras se pinta la pantalla, y no verlo en negrita es mucho menos
+        # grave que romperle los mensajes al jugador por un fallo de red.
         for m in lista:
             if m.get('player_id') and not m.get('leido'):
                 db.update('fut_messages', {'leido': True}, 'leer', id=m['id'])
@@ -119,7 +121,7 @@ def api_mensaje_borrar(mid):
     err = api_guard(solo_coach=True)
     if err:
         return err
-    db.delete('fut_messages', 'borrar mensaje', id=mid, coach_id=db.equipo_id(current_user.id))
+    db.delete('fut_messages', 'borrar mensaje', id=mid, coach_id=db.equipo_id(current_user.id), obligatorio=True)
     return jsonify({'ok': True})
 
 
@@ -224,5 +226,5 @@ def api_observacion_borrar(oid):
     err = api_guard(solo_coach=True)
     if err:
         return err
-    db.delete('fut_observaciones', 'borrar obs', id=oid, coach_id=db.equipo_id(current_user.id))
+    db.delete('fut_observaciones', 'borrar obs', id=oid, coach_id=db.equipo_id(current_user.id), obligatorio=True)
     return jsonify({'ok': True})

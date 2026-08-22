@@ -106,20 +106,21 @@ def api_habito_toggle(hid):
                        habit_id=hid, player_id=uid, fecha=hoy)
     if existente:
         nuevo = not existente.get('hecho')
-        db.update('fut_habit_completions', {'hecho': nuevo}, 'toggle up', id=existente['id'])
+        db.update('fut_habit_completions', {'hecho': nuevo}, 'toggle up', id=existente['id'], obligatorio=True)
     else:
         nuevo = True
         db.insert('fut_habit_completions', {
             'habit_id': hid, 'player_id': uid, 'fecha': hoy, 'hecho': True,
-        })
+        }, obligatorio=True)
     return jsonify({'ok': True, 'hecho': nuevo, 'racha': db.racha_actual(uid)})
 
 
 @bp.route('/api/habito/<hid>', methods=['DELETE'])
 @api
 def api_habito_borrar(hid):
-    db.update('fut_habits', {'activo': False}, 'borrar habito',
-              id=hid, player_id=current_user.id)
+    if not db.update('fut_habits', {'activo': False}, 'borrar habito',
+                     id=hid, player_id=current_user.id):
+        return jsonify({'error': 'Ese hábito no es tuyo o ya no existe.'}), 404
     return jsonify({'ok': True})
 
 
@@ -172,7 +173,8 @@ def api_meta_actualizar(mid):
     filtro = {'id': mid}
     if not es_coach():
         filtro['player_id'] = current_user.id
-    db.update('fut_goals', cambios, 'meta up', **filtro)
+    if not db.update('fut_goals', cambios, 'meta up', **filtro):
+        return jsonify({'error': 'Esa meta no es tuya o ya no existe.'}), 404
     return jsonify({'ok': True, **cambios})
 
 
@@ -182,7 +184,7 @@ def api_meta_borrar(mid):
     filtro = {'id': mid}
     if not es_coach():
         filtro['player_id'] = current_user.id
-    db.delete('fut_goals', 'meta del', **filtro)
+    db.delete('fut_goals', 'meta del', **filtro, obligatorio=True)
     return jsonify({'ok': True})
 
 
@@ -209,7 +211,7 @@ def api_entreno_crear():
 @bp.route('/api/entreno/<eid>', methods=['DELETE'])
 @api
 def api_entreno_borrar(eid):
-    db.delete('fut_trainings', 'entreno del', id=eid, player_id=current_user.id)
+    db.delete('fut_trainings', 'entreno del', id=eid, player_id=current_user.id, obligatorio=True)
     return jsonify({'ok': True})
 
 
@@ -227,7 +229,7 @@ def api_entreno_borrar(eid):
 def api_evento_borrar(eid):
     if not es_coach():
         return jsonify({'error': 'Solo el entrenador borra eventos.'}), 403
-    db.delete('fut_events', 'evento del', id=eid, coach_id=db.equipo_id(current_user.id))
+    db.delete('fut_events', 'evento del', id=eid, coach_id=db.equipo_id(current_user.id), obligatorio=True)
     return jsonify({'ok': True})
 
 
@@ -262,14 +264,14 @@ def api_asistencia():
         db.update('fut_attendance',
                   {'estado': estado, 'motivo': (d.get('motivo') or '')[:200],
                    'actualizado': ahora()},
-                  'asist up', id=existente['id'])
+                  'asist up', id=existente['id'], obligatorio=True)
     else:
         db.insert('fut_attendance', {
             'event_id': eid, 'player_id': pid, 'estado': estado,
             'motivo': (d.get('motivo') or '')[:200],
             'registrado_por': current_user.id,
             'creado': ahora(), 'actualizado': ahora(),
-        })
+        }, obligatorio=True)
     return jsonify({'ok': True, 'estado': estado})
 
 
@@ -297,7 +299,7 @@ def api_equipo_guardar():
         # `current_user.id`, así que un ASISTENTE que cambiara el nombre del
         # equipo se lo quedaba: el equipo pasaba a ser suyo y el principal lo
         # perdía de vista. El dueño solo se fija al crearlo.
-        db.update('fut_teams', datos, 'equipo up', id=existente['id'])
+        db.update('fut_teams', datos, 'equipo up', id=existente['id'], obligatorio=True)
     else:
         datos['coach_id'] = uid
         datos['creado'] = ahora()
@@ -410,7 +412,7 @@ def api_evaluacion():
             'notas': (d.get('notas') or '')[:2000],
             'puntuaciones': puntuaciones,
             'creado': ahora(),
-        })
+        }, obligatorio=True)
 
     destino = ('futbol.c_eval_jugador' if es_manual else 'futbol.c_jugador')
     return jsonify({'ok': True, 'redirect': url_for(destino, pid=pid)})
@@ -472,9 +474,9 @@ def api_partido_stats(mid):
 
     existente = db.one('fut_match_stats', 'stats', match_id=mid, player_id=pid)
     if existente:
-        db.update('fut_match_stats', datos, 'stats up', id=existente['id'])
+        db.update('fut_match_stats', datos, 'stats up', id=existente['id'], obligatorio=True)
     else:
-        db.insert('fut_match_stats', datos)
+        db.insert('fut_match_stats', datos, obligatorio=True)
     return jsonify({'ok': True})
 
 
@@ -518,11 +520,11 @@ def api_test_resultado(tid):
 
     existente = db.one('fut_test_results', 'res', test_id=tid, player_id=pid)
     if existente:
-        db.update('fut_test_results', {'valor': valor}, 'res up', id=existente['id'])
+        db.update('fut_test_results', {'valor': valor}, 'res up', id=existente['id'], obligatorio=True)
     else:
         db.insert('fut_test_results', {
             'test_id': tid, 'player_id': pid, 'valor': valor, 'creado': ahora(),
-        })
+        }, obligatorio=True)
     return jsonify({'ok': True})
 
 
@@ -544,7 +546,8 @@ def api_jugada_guardar():
     if jid:
         # Sin tocar el dueño: se filtraba por el equipo pero se reescribía el
         # `coach_id` con el del asistente, y la jugada desaparecía de la lista.
-        db.update('fut_tactical_plays', datos, 'jugada up', id=jid, coach_id=uid)
+        if not db.update('fut_tactical_plays', datos, 'jugada up', id=jid, coach_id=uid):
+            return jsonify({'error': 'Esa jugada no es de tu equipo o ya no existe.'}), 404
         return jsonify({'ok': True, 'id': jid})
 
     datos['coach_id'] = uid
@@ -560,7 +563,7 @@ def api_jugada_guardar():
 def api_jugada_borrar(jid):
     if not es_coach():
         return jsonify({'error': 'Solo el entrenador borra jugadas.'}), 403
-    db.delete('fut_tactical_plays', 'jugada del', id=jid, coach_id=db.equipo_id(current_user.id))
+    db.delete('fut_tactical_plays', 'jugada del', id=jid, coach_id=db.equipo_id(current_user.id), obligatorio=True)
     return jsonify({'ok': True})
 
 
@@ -585,10 +588,6 @@ def api_checkin():
     puntaje = round(sum(valores) / len(valores) / 5 * 100)
     semaforo = 'verde' if puntaje >= 70 else ('ambar' if puntaje >= 45 else 'rojo')
 
-    # Si el entrenador se lo había asignado, queda cerrada.
-    from .mental import cerrar_asignacion
-    cerrar_asignacion(current_user.id)
-
     fila = db.insert('fut_checkins', {
         'player_id': current_user.id,
         'fecha': db.hoy_iso(),
@@ -599,6 +598,13 @@ def api_checkin():
     })
     if not fila:
         return jsonify({'error': 'No se pudo guardar el check-in.'}), 500
+
+    #  Se cierra DESPUES de guardar, no antes. Al reves, un fallo al guardar
+    #  dejaba la asignacion como «respondido» sin respuesta detras: el jugador
+    #  perdia lo que escribio y el entrenador lo veia como hecho.
+    from .mental import cerrar_asignacion
+    cerrar_asignacion(current_user.id)
+
     return jsonify({'ok': True, 'puntaje': puntaje, 'semaforo': semaforo,
                     'redirect': url_for('futbol.checkin_resultado', cid=fila['id'])})
 
@@ -627,6 +633,8 @@ def api_ia():
 
     respuesta = responder_ia(current_user, pregunta)
 
+    #  Sin obligatorio: el historial es un extra. Si no se puede guardar, la
+    #  respuesta ya esta calculada y el jugador tiene que recibirla igual.
     db.insert('fut_ia_chat', {
         'user_id': current_user.id,
         'rol': getattr(current_user, 'role', 'paciente'),

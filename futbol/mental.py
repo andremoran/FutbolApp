@@ -156,7 +156,12 @@ def asignacion_pendiente(player_id):
 
 
 def cerrar_asignacion(player_id):
-    """Al responder, se cierra la asignación pendiente si la había."""
+    """Al responder, se cierra la asignación pendiente si la había.
+
+    Sin obligatorio y se llama DESPUES de guardar la respuesta: si el cierre
+    falla, al jugador le vuelve a aparecer el check-in pendiente, que es un
+    incordio pequeño. Al reves —cerrar primero— se perdia lo que escribio.
+    """
     a = asignacion_pendiente(player_id)
     if a:
         db.update('fut_mental_asignaciones',

@@ -112,7 +112,7 @@ def api_asistente_quitar(aid):
     # su nombre y hay que poder saber quién era.
     db.update('fut_team_coaches',
               {'estado': 'retirado', 'retirado': _ahora()}, 'quitar asist',
-              id=fila['id'])
+              id=fila['id'], obligatorio=True)
     return jsonify({'ok': True, 'mensaje': 'Fuera del cuerpo técnico. Lo que '
                                            'anotó se conserva con su firma.'})
 
@@ -354,8 +354,9 @@ def api_manual_archivar(mid):
     error = _guardia_coach()
     if error:
         return error
-    db.update('fut_manual_players', {'activo': False}, 'archivar',
-              id=mid, coach_id=db.equipo_id(current_user.id))
+    if not db.update('fut_manual_players', {'activo': False}, 'archivar',
+                     id=mid, coach_id=db.equipo_id(current_user.id)):
+        return jsonify({'error': 'Ese jugador no es de tu equipo.'}), 404
     return jsonify({'ok': True, 'mensaje': 'Jugador archivado. Su histórico se conserva.'})
 
 
@@ -365,8 +366,9 @@ def api_manual_restaurar(mid):
     error = _guardia_coach()
     if error:
         return error
-    db.update('fut_manual_players', {'activo': True}, 'restaurar',
-              id=mid, coach_id=db.equipo_id(current_user.id))
+    if not db.update('fut_manual_players', {'activo': True}, 'restaurar',
+                     id=mid, coach_id=db.equipo_id(current_user.id)):
+        return jsonify({'error': 'Ese jugador no es de tu equipo.'}), 404
     return jsonify({'ok': True, 'mensaje': 'Jugador de vuelta en la plantilla.'})
 
 
@@ -394,11 +396,11 @@ def api_manual_vincular(mid):
     for r in (db.rows('fut_eval_results', 'evals manual',
                       coach_id=uid, manual_player_id=mid) or []):
         db.update('fut_eval_results',
-                  {'player_id': pid, 'manual_player_id': None}, 'traspasar', id=r['id'])
+                  {'player_id': pid, 'manual_player_id': None}, 'traspasar', id=r['id'], obligatorio=True)
         n += 1
 
     db.update('fut_manual_players', {'vinculado_a': pid, 'activo': False},
-              'vincular', id=mid)
+              'vincular', id=mid, obligatorio=True)
     return jsonify({'ok': True,
                     'mensaje': f'Vinculado. Se traspasaron {n} evaluación(es).'})
 
@@ -466,12 +468,12 @@ def api_solicitud(sid):
                  'rol': 'asistente', 'estado': 'activo',
                  'retirado': None, 'creado': _ahora()}
         if previo:
-            db.update('fut_team_coaches', datos, 'cambiar cuerpo', id=previo['id'])
+            db.update('fut_team_coaches', datos, 'cambiar cuerpo', id=previo['id'], obligatorio=True)
         else:
-            db.insert('fut_team_coaches', datos, 'alta asistente')
+            db.insert('fut_team_coaches', datos, 'alta asistente', obligatorio=True)
 
         db.update('fut_join_requests', {'estado': 'aceptada', 'resuelto': _ahora()},
-                  'aceptar asist', id=sid)
+                  'aceptar asist', id=sid, obligatorio=True)
         return jsonify({'ok': True,
                         'mensaje': 'Asistente aceptado. Ya puede evaluar, medir '
                                    'y pasar lista en tu equipo.'})
@@ -489,19 +491,19 @@ def api_solicitud(sid):
         previo = db.one('fut_plantilla', 'vinculo previo', player_id=sol['player_id'])
         if previo:
             db.update('fut_plantilla', {'coach_id': uid, 'activo': True},
-                      'cambiar equipo', id=previo['id'])
+                      'cambiar equipo', id=previo['id'], obligatorio=True)
         else:
             db.insert('fut_plantilla', {
                 'coach_id': uid, 'player_id': sol['player_id'],
-                'activo': True, 'creado': _ahora()}, 'aceptar solicitud')
+                'activo': True, 'creado': _ahora()}, 'aceptar solicitud', obligatorio=True)
 
         db.update('fut_join_requests', {'estado': 'aceptada', 'resuelto': _ahora()},
-                  'aceptar', id=sid)
+                  'aceptar', id=sid, obligatorio=True)
         return jsonify({'ok': True, 'mensaje': 'Jugador aceptado en el equipo.'})
 
     if accion == 'rechazar':
         db.update('fut_join_requests', {'estado': 'rechazada', 'resuelto': _ahora()},
-                  'rechazar', id=sid)
+                  'rechazar', id=sid, obligatorio=True)
         return jsonify({'ok': True, 'mensaje': 'Solicitud rechazada.'})
 
     return jsonify({'error': 'Acción desconocida.'}), 400
@@ -517,7 +519,7 @@ def c_sacar_jugador(pid):
     v = db.one('fut_plantilla', 'vinculo', player_id=pid, coach_id=uid)
     if not v:
         return jsonify({'error': 'Ese jugador no es de tu plantilla.'}), 404
-    db.delete('fut_plantilla', 'sacar', id=v['id'])
+    db.delete('fut_plantilla', 'sacar', id=v['id'], obligatorio=True)
     return jsonify({'ok': True, 'mensaje': 'Jugador fuera de la plantilla. '
                                            'Su cuenta y su histórico siguen ahí.'})
 
@@ -593,9 +595,9 @@ def api_unirme_equipo():
     previa = db.one('fut_join_requests', 'previa',
                     player_id=uid, coach_id=principal['id'])
     if previa:
-        db.update('fut_join_requests', datos, 'resolicitar asist', id=previa['id'])
+        db.update('fut_join_requests', datos, 'resolicitar asist', id=previa['id'], obligatorio=True)
     else:
-        db.insert('fut_join_requests', datos, 'solicitar asist')
+        db.insert('fut_join_requests', datos, 'solicitar asist', obligatorio=True)
 
     return jsonify({'ok': True,
                     'mensaje': f'Solicitud enviada a {principal["nombre"]}. '
@@ -658,9 +660,9 @@ def api_unirme():
     }
     previa = db.one('fut_join_requests', 'previa', player_id=uid, coach_id=coach['id'])
     if previa:
-        db.update('fut_join_requests', datos, 'resolicitar', id=previa['id'])
+        db.update('fut_join_requests', datos, 'resolicitar', id=previa['id'], obligatorio=True)
     else:
-        db.insert('fut_join_requests', datos, 'solicitar')
+        db.insert('fut_join_requests', datos, 'solicitar', obligatorio=True)
 
     return jsonify({'ok': True,
                     'mensaje': f'Solicitud enviada a {coach["nombre"]}. '

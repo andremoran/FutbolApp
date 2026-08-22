@@ -302,7 +302,7 @@ def api_usuario(uid):
 
     if accion == 'bloquear':
         bloquear = bool(d.get('valor'))
-        db.update('usuarios', {'bloqueado': bloquear}, 'bloquear', id=uid)
+        db.update('usuarios', {'bloqueado': bloquear}, 'bloquear', id=uid, obligatorio=True)
         return jsonify({'ok': True,
                         'mensaje': ('Cuenta bloqueada.' if bloquear else 'Cuenta desbloqueada.')})
 
@@ -313,7 +313,7 @@ def api_usuario(uid):
             return jsonify({'error': 'Ya hay tres administradores. Quita a uno primero.'}), 400
         if not hacer and str(uid) == str(current_user.id):
             return jsonify({'error': 'No puedes quitarte a ti mismo el acceso.'}), 400
-        db.update('usuarios', {'es_admin': hacer}, 'admin', id=uid)
+        db.update('usuarios', {'es_admin': hacer}, 'admin', id=uid, obligatorio=True)
         # Sin esto, el proceso seguiría creyendo que no hay administradores y
         # ADMIN_EMAILS del entorno volvería a conceder acceso.
         from usuarios import olvidar_cache_admins
@@ -338,7 +338,7 @@ def api_usuario(uid):
                 return jsonify({'error': 'Ese correo ya lo usa otra cuenta.'}), 400
         if not cambios:
             return jsonify({'error': 'Nada que cambiar.'}), 400
-        db.update('usuarios', cambios, 'datos usuario', id=uid)
+        db.update('usuarios', cambios, 'datos usuario', id=uid, obligatorio=True)
         return jsonify({'ok': True, 'mensaje': 'Datos actualizados.'})
 
     if accion == 'codigo_equipo':
@@ -346,7 +346,7 @@ def api_usuario(uid):
             return jsonify({'error': 'Solo los entrenadores tienen código de equipo.'}), 400
         from auth import _nuevo_codigo_equipo
         nuevo = _nuevo_codigo_equipo()
-        db.update('usuarios', {'codigo_equipo': nuevo}, 'nuevo codigo eq', id=uid)
+        db.update('usuarios', {'codigo_equipo': nuevo}, 'nuevo codigo eq', id=uid, obligatorio=True)
         return jsonify({'ok': True, 'codigo': nuevo,
                         'mensaje': f'Código de equipo nuevo: {nuevo}'})
 
@@ -367,7 +367,7 @@ def api_borrar_usuario(uid):
     if fila.get('es_admin'):
         return jsonify({'error': 'Quítale primero el rol de administrador.'}), 400
 
-    db.delete('usuarios', 'borrar usuario', id=uid)
+    db.delete('usuarios', 'borrar usuario', id=uid, obligatorio=True)
     avisos.avisar('baja', f'Cuenta borrada: {fila.get("nombre")}',
                   f'{fila.get("correo")} · la borró {current_user.name}')
     return jsonify({'ok': True, 'mensaje': 'Cuenta borrada.'})
@@ -409,7 +409,8 @@ def api_codigo_cambiar(cid):
     from futbol import db
     d = _cuerpo()
     if 'activo' in d:
-        db.update('fut_promo_codes', {'activo': bool(d['activo'])}, 'codigo activo', id=cid)
+        if not db.update('fut_promo_codes', {'activo': bool(d['activo'])}, 'codigo activo', id=cid):
+            return jsonify({'error': 'Ese código ya no existe.'}), 404
         return jsonify({'ok': True,
                         'mensaje': 'Código reactivado.' if d['activo'] else 'Código desactivado.'})
     return jsonify({'error': 'Nada que cambiar.'}), 400
@@ -419,7 +420,7 @@ def api_codigo_cambiar(cid):
 @_api
 def api_codigo_borrar(cid):
     from futbol import db
-    db.delete('fut_promo_codes', 'borrar codigo', id=cid)
+    db.delete('fut_promo_codes', 'borrar codigo', id=cid, obligatorio=True)
     return jsonify({'ok': True, 'mensaje': 'Código borrado.'})
 
 
@@ -445,7 +446,7 @@ def api_pago(pid):
         db.update('fut_pagos', {
             'estado': 'aprobado', 'revisado_por': current_user.id,
             'revisado': _ahora(), 'nota_admin': nota, 'meses': meses,
-        }, 'aprobar pago', id=pid)
+        }, 'aprobar pago', id=pid, obligatorio=True)
         usuario = db.one('usuarios', 'usuario pago', id=pago['user_id']) or {}
         avisos.avisar('pago', f'Pago aprobado · {usuario.get("nombre", "?")}',
                       f'{meses} mes(es) de Pro · lo aprobó {current_user.name}',
@@ -458,7 +459,7 @@ def api_pago(pid):
         db.update('fut_pagos', {
             'estado': 'rechazado', 'revisado_por': current_user.id,
             'revisado': _ahora(), 'nota_admin': nota,
-        }, 'rechazar pago', id=pid)
+        }, 'rechazar pago', id=pid, obligatorio=True)
         return jsonify({'ok': True, 'mensaje': 'Comprobante rechazado.'})
 
     return jsonify({'error': 'Acción desconocida.'}), 400

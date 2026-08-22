@@ -742,6 +742,8 @@ def api_cal_evento():
     # los que de verdad se usan.
     if d.get('plan_id'):
         plan = db.one('fut_training_plans', 'plan uso', id=d['plan_id'], coach_id=uid)
+        #  Sin obligatorio: es un contador para ordenar, no un dato del
+        #  entrenamiento. El evento ya esta creado y no se tira por esto.
         if plan:
             db.update('fut_training_plans',
                       {'veces_usado': int(plan.get('veces_usado') or 0) + 1},
@@ -756,7 +758,7 @@ def api_cal_borrar(eid):
     error = _guardia_coach()
     if error:
         return error
-    db.delete('fut_events', 'borrar evento', id=eid, coach_id=db.equipo_id(current_user.id))
+    db.delete('fut_events', 'borrar evento', id=eid, coach_id=db.equipo_id(current_user.id), obligatorio=True)
     return jsonify({'ok': True, 'mensaje': 'Evento borrado.'})
 
 
@@ -886,7 +888,7 @@ def api_plan():
     if plid:
         if not db.one('fut_training_plans', 'plan mio', id=plid, coach_id=uid):
             return jsonify({'error': 'Ese plan no es tuyo.'}), 403
-        db.update('fut_training_plans', datos, 'plan up', id=plid, coach_id=uid)
+        db.update('fut_training_plans', datos, 'plan up', id=plid, coach_id=uid, obligatorio=True)
         return jsonify({'ok': True, 'id': plid, 'mensaje': 'Plan actualizado.'})
 
     datos.update({'coach_id': uid, 'creado': _ahora()})
@@ -914,7 +916,7 @@ def api_plan():
             'plan_id': fila['id'],
             'estado': 'programado',
             'creado': _ahora(),
-        }, 'evento del plan')
+        }, 'evento del plan', obligatorio=True)
         mensaje = 'Plan creado y agendado.'
 
     return jsonify({'ok': True, 'id': fila['id'], 'mensaje': mensaje,
@@ -927,7 +929,7 @@ def api_plan_borrar(plid):
     error = _guardia_coach()
     if error:
         return error
-    db.delete('fut_training_plans', 'borrar plan', id=plid, coach_id=db.equipo_id(current_user.id))
+    db.delete('fut_training_plans', 'borrar plan', id=plid, coach_id=db.equipo_id(current_user.id), obligatorio=True)
     return jsonify({'ok': True, 'mensaje': 'Plan borrado.'})
 
 
@@ -969,6 +971,7 @@ def api_plan_agendar(plid):
         if fila:
             creados += 1
 
+    #  Igual que arriba: contador de uso, no dato. Las sesiones ya estan.
     db.update('fut_training_plans',
               {'veces_usado': int(plan.get('veces_usado') or 0) + creados},
               'uso plan', id=plid)

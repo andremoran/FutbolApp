@@ -427,5 +427,5 @@ def api_lesion_borrar(lid):
         return error
     if getattr(current_user, 'role', '') != 'especialista':
         return jsonify({'error': 'Solo el entrenador borra partes.'}), 403
-    db.delete('fut_injuries', 'borrar lesion', id=lid, coach_id=db.equipo_id(current_user.id))
+    db.delete('fut_injuries', 'borrar lesion', id=lid, coach_id=db.equipo_id(current_user.id), obligatorio=True)
     return jsonify({'ok': True, 'mensaje': 'Parte borrado.'})

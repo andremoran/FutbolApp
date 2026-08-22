@@ -181,7 +181,9 @@ def _500(e):
     #  viera un fallo de sintaxis en vez de lo que paso. Solo `api.py` tenia su
     #  propia red (@api); los otros seis modulos, con 29 endpoints de
     #  escritura, caian aqui.
-    if request.path.startswith('/api/'):
+    #  `startswith` no bastaba: las de admin son /admin/api/... y se quedaban
+    #  fuera, recibiendo el HTML igual.
+    if '/api/' in request.path:
         return jsonify({'error': 'No se pudo completar la accion. '
                                  'Vuelve a intentarlo.'}), 500
     from flask import render_template

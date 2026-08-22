@@ -176,8 +176,70 @@ def auditar_dos_duenyos():
                                     'puede guardar nada de un jugador sin cuenta' % tabla)
 
 
+def auditar_escrituras_mudas():
+    """Escrituras cuyo resultado nadie mira y que no son obligatorias.
+
+    `db.insert/update/delete` nunca lanzan: si Supabase rechaza la operación
+    devuelven None y la pantalla sigue como si nada, diciendole al entrenador
+    que se guardó. Una escritura vale si se cumple UNA de estas tres:
+
+      · lleva `obligatorio=True`, y entonces revienta y el usuario se entera;
+      · alguien mira lo que devolvió y responde un error o un 404;
+      · está en la lista de abajo, porque perderla de verdad no importa.
+
+    Cualquier otra es una mentira esperando a pasar. Esta comprobación existe
+    para que una escritura nueva no se cuele sin decidir a cuál de las tres
+    pertenece.
+    """
+    import ast, glob
+
+    #  Las que pueden fallar sin consecuencias, con el motivo al lado.
+    PERDONADAS = {
+        ('futbol/api.py', 'api_ia'):
+            'el historial del chat es un extra; la respuesta ya está calculada',
+        ('futbol/calendario.py', 'api_cal_evento'):
+            'contador veces_usado, sirve para ordenar y nada más',
+        ('futbol/calendario.py', 'api_plan_agendar'):
+            'contador veces_usado, las sesiones ya están creadas',
+        ('futbol/mental.py', 'cerrar_asignacion'):
+            'se cierra después de guardar; si falla, solo se vuelve a pedir',
+        ('futbol/social.py', 'mensajes'):
+            'marcar leído mientras se pinta; romper la pantalla sería peor',
+    }
+
+    def es_db(n):
+        f = getattr(n, 'func', None)
+        return (isinstance(n, ast.Call) and isinstance(f, ast.Attribute)
+                and f.attr in ('insert', 'update', 'delete')
+                and isinstance(f.value, ast.Name) and f.value.id == 'db')
+
+    for archivo in sorted(glob.glob('futbol/*.py')) + ['admin.py']:
+        arbol = ast.parse(open(archivo, encoding='utf-8').read())
+        duenyo = {}
+        for n in ast.walk(arbol):
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                for l in range(n.lineno, (n.end_lineno or n.lineno) + 1):
+                    duenyo[l] = n.name
+        #  Una llamada que es un statement suelto = nadie mira el resultado.
+        sueltas = {n.value.lineno for n in ast.walk(arbol)
+                   if isinstance(n, ast.Expr) and es_db(n.value)}
+        for n in ast.walk(arbol):
+            if not es_db(n) or n.lineno not in sueltas:
+                continue
+            if 'obligatorio' in {k.arg for k in n.keywords if k.arg}:
+                continue
+            clave = (archivo.replace(chr(92), '/'), duenyo.get(n.lineno, '?'))
+            if clave in PERDONADAS:
+                continue
+            aviso('escritura muda',
+                  '%s:%d (%s) db.%s puede fallar sin que nadie se entere. '
+                  'Ponle obligatorio=True, mira lo que devuelve, o añádela a '
+                  'PERDONADAS con su motivo.'
+                  % (clave[0], n.lineno, clave[1], n.func.attr))
+
+
 for comprobacion in (auditar_dueno, auditar_manuales, auditar_una_fila,
-                     auditar_dos_duenyos):
+                     auditar_dos_duenyos, auditar_escrituras_mudas):
     comprobacion()
 
 print('Auditoría de los patrones conocidos')

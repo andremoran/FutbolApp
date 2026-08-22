@@ -82,13 +82,20 @@ def contexto_de(jugador, coach_id=None):
 
 
 def guardar_contexto(coach_id, categoria_edad, nivel):
+    """La edad y el nivel del equipo, que son los que eligen el baremo.
+
+    Obligatorio a proposito: si esto se pierde en silencio, el entrenador lee
+    «Listo» y las evaluaciones siguen comparandose con la categoria vieja. Es
+    exactamente el lio que se queria quitar de encima al juntar el ajuste en
+    un solo sitio, asi que aqui mentir sale caro.
+    """
     eq = db.one('fut_teams', 'equipo ctx', coach_id=coach_id)
     datos = {'categoria_edad': categoria_edad, 'nivel': nivel}
     if eq:
-        db.update('fut_teams', datos, 'ctx up', id=eq['id'])
+        db.update('fut_teams', datos, 'ctx up', obligatorio=True, id=eq['id'])
     else:
         datos.update({'coach_id': coach_id, 'nombre': 'Mi equipo', 'creado': _ahora()})
-        db.insert('fut_teams', datos, 'ctx nuevo')
+        db.insert('fut_teams', datos, 'ctx nuevo', obligatorio=True)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1167,7 +1174,7 @@ def api_eval_borrar(rid):
     error = _guardia_coach()
     if error:
         return error
-    db.delete('fut_eval_results', 'borrar eval', id=rid, coach_id=db.equipo_id(current_user.id))
+    db.delete('fut_eval_results', 'borrar eval', id=rid, coach_id=db.equipo_id(current_user.id), obligatorio=True)
     return jsonify({'ok': True})
 
 
@@ -1253,5 +1260,5 @@ def api_eval_test_borrar(tid):
     error = _guardia_coach()
     if error:
         return error
-    db.delete('fut_eval_templates', 'borrar prueba', id=tid, coach_id=db.equipo_id(current_user.id))
+    db.delete('fut_eval_templates', 'borrar prueba', id=tid, coach_id=db.equipo_id(current_user.id), obligatorio=True)
     return jsonify({'ok': True})
