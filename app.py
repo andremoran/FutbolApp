@@ -13,7 +13,7 @@ import os
 import secrets
 
 from dotenv import load_dotenv
-from flask import Flask, redirect, request, session, url_for
+from flask import Flask, redirect, request, session, url_for, jsonify
 from flask_login import LoginManager, current_user
 from supabase import create_client
 
@@ -176,6 +176,14 @@ def _404(_e):
 @app.errorhandler(500)
 def _500(e):
     logger.error('Error 500 en %s: %s', request.path, e, exc_info=True)
+    #  A una llamada de /api/ hay que responderle JSON. Devolverle la pagina de
+    #  error en HTML hacia que PF.api intentara leerla como JSON y el usuario
+    #  viera un fallo de sintaxis en vez de lo que paso. Solo `api.py` tenia su
+    #  propia red (@api); los otros seis modulos, con 29 endpoints de
+    #  escritura, caian aqui.
+    if request.path.startswith('/api/'):
+        return jsonify({'error': 'No se pudo completar la accion. '
+                                 'Vuelve a intentarlo.'}), 500
     from flask import render_template
     return render_template('error.html', hide_tabbar=True), 500
 

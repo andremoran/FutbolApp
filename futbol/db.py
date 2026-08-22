@@ -69,19 +69,45 @@ def one(table, ctx='', **filters):
     return r[0] if r else None
 
 
-def insert(table, data, ctx=''):
+class ErrorDeEscritura(Exception):
+    """Una escritura que TENIA que salir bien y no salio.
+
+    `q()` se traga los errores a proposito: que falte una tabla o falle la red
+    no debe tumbar una pantalla de lectura. Pero en una ESCRITURA ese mismo
+    silencio es dañino — el usuario guarda, se le dice que si, y no se guardo
+    nada. Paso de verdad con pasar lista: `fut_attendance.player_id` era NOT
+    NULL, fallaba con todos los jugadores sin cuenta y la pantalla respondia
+    «Lista guardada» igual.
+
+    Se lanza solo con `obligatorio=True`, en las escrituras que SON el objeto de
+    la peticion. Las de mejor esfuerzo —guardar el historial del chat de IA, por
+    ejemplo— siguen fallando en silencio a proposito: si no se guarda el
+    historial, el usuario debe recibir su respuesta igual.
+    """
+
+
+def insert(table, data, ctx='', obligatorio=False):
     def _go():
         return (_sb.table(table).insert(data).execute().data or [None])[0]
-    return q(_go, None, ctx or ('insert ' + table))
+    fila = q(_go, None, ctx or ('insert ' + table))
+    if obligatorio and not fila:
+        raise ErrorDeEscritura('no se pudo insertar en %s (%s)' % (table, ctx))
+    return fila
 
 
-def update(table, data, ctx='', **filters):
+def update(table, data, ctx='', obligatorio=False, **filters):
     def _go():
         upd = _sb.table(table).update(data)
         for k, v in filters.items():
             upd = upd.eq(k, v)
         return upd.execute().data
-    return q(_go, None, ctx or ('update ' + table))
+    filas = q(_go, None, ctx or ('update ' + table))
+    #  Una lista vacia tambien es un fallo cuando la escritura es obligatoria:
+    #  significa que el filtro no encontro la fila, o sea que no se actualizo
+    #  nada aunque no hubiera excepcion.
+    if obligatorio and not filas:
+        raise ErrorDeEscritura('no se pudo actualizar %s (%s)' % (table, ctx))
+    return filas
 
 
 def upsert(table, data, ctx='', on_conflict=None):
@@ -92,13 +118,16 @@ def upsert(table, data, ctx='', on_conflict=None):
     return q(_go, None, ctx or ('upsert ' + table))
 
 
-def delete(table, ctx='', **filters):
+def delete(table, ctx='', obligatorio=False, **filters):
     def _go():
         d = _sb.table(table).delete()
         for k, v in filters.items():
             d = d.eq(k, v)
         return d.execute().data
-    return q(_go, None, ctx or ('delete ' + table))
+    filas = q(_go, None, ctx or ('delete ' + table))
+    if obligatorio and filas is None:
+        raise ErrorDeEscritura('no se pudo borrar de %s (%s)' % (table, ctx))
+    return filas
 
 
 # ─── Cuerpo técnico: principal y asistentes ──────────────────────────────────
