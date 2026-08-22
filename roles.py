@@ -227,7 +227,7 @@ def _es_llamada_api():
 def _sin_sesion():
     """La respuesta de sesion caducada, igual que la de app.py."""
     if _es_llamada_api():
-        return jsonify({'error': 'Tu sesion caduco. Entra otra vez para seguir.',
+        return jsonify({'error': 'Tu sesión caducó. Entra otra vez para seguir.',
                         'login': True, 'url': url_for('auth.entrar')}), 401
     return redirect(url_for('auth.entrar'))
 

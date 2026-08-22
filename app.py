@@ -78,7 +78,7 @@ def _sin_sesion():
     `startswith`, porque las rutas de admin son /admin/api/...
     """
     if '/api/' in request.path:
-        return jsonify({'error': 'Tu sesion caduco. Entra otra vez para seguir.',
+        return jsonify({'error': 'Tu sesión caducó. Entra otra vez para seguir.',
                         'login': True, 'url': url_for('auth.entrar')}), 401
     if login_manager.login_message:
         flash(login_manager.login_message, login_manager.login_message_category)
