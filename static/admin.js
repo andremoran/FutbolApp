@@ -24,6 +24,14 @@
     });
     let j = {};
     try { j = await r.json(); } catch (e) { /* respuesta sin JSON */ }
+    /* Sesión caducada: antes el redirect al login se seguía solo y volvía un
+       200 con HTML, así que j quedaba en {} y ADM.accion cantaba «Listo» y
+       recargaba — dejando al admin en la pantalla de entrar sin explicación. */
+    if ((r.status === 401 && j.login) || (r.redirected && /\/entrar/.test(r.url))) {
+      ADM.toast('Tu sesión caducó. Te llevo a entrar otra vez.', 'mal');
+      setTimeout(() => { location.href = j.url || '/entrar'; }, 1400);
+      throw new Error('Sesión caducada');
+    }
     if (!r.ok || j.error) throw new Error(j.error || 'No se pudo completar la acción.');
     return j;
   };

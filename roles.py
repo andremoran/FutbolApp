@@ -213,10 +213,29 @@ def puede(usuario, permiso):
 
 
 # ─── Guardias de ruta ───────────────────────────────────────────────────────
+def _es_llamada_api():
+    """Si quien llama espera JSON y no una pantalla.
+
+    `startswith('/api/')` no valia: las rutas de admin son /admin/api/... y se
+    quedaban fuera, asi que a un `fetch` le llegaba HTML donde esperaba JSON.
+    Es el mismo fallo que ya hubo en los manejadores de error de app.py, y por
+    eso ahora hay UN solo sitio donde se decide.
+    """
+    return '/api/' in request.path or request.is_json
+
+
+def _sin_sesion():
+    """La respuesta de sesion caducada, igual que la de app.py."""
+    if _es_llamada_api():
+        return jsonify({'error': 'Tu sesion caduco. Entra otra vez para seguir.',
+                        'login': True, 'url': url_for('auth.entrar')}), 401
+    return redirect(url_for('auth.entrar'))
+
+
 def _respuesta_bloqueo(permiso):
     """Página de mejora, o JSON si quien llama es la API."""
     nombre = PERMISOS_PRO.get(permiso, 'Esta función')
-    if request.path.startswith('/api/') or request.is_json:
+    if _es_llamada_api():
         return jsonify({'error': f'{nombre} es del plan Pro.',
                         'pro': True,
                         'url': url_for('futbol.planes')}), 402
@@ -234,7 +253,7 @@ def solo_pro(permiso):
         @wraps(f)
         def wrapper(*a, **kw):
             if not getattr(current_user, 'is_authenticated', False):
-                return redirect(url_for('auth.entrar'))
+                return _sin_sesion()
             if not puede(current_user, permiso):
                 return _respuesta_bloqueo(permiso)
             return f(*a, **kw)
@@ -253,10 +272,10 @@ def solo_principal(permiso):
         @wraps(f)
         def wrapper(*a, **kw):
             if not getattr(current_user, 'is_authenticated', False):
-                return redirect(url_for('auth.entrar'))
+                return _sin_sesion()
             if es_asistente(current_user):
                 texto = SOLO_PRINCIPAL.get(permiso, 'Esto')
-                if request.path.startswith('/api/') or request.is_json:
+                if _es_llamada_api():
                     return jsonify({'error': f'{texto} solo lo hace el '
                                              'entrenador principal.'}), 403
                 flash(f'{texto} solo lo hace el entrenador principal '
@@ -271,9 +290,9 @@ def solo_admin(f):
     @wraps(f)
     def wrapper(*a, **kw):
         if not getattr(current_user, 'is_authenticated', False):
-            return redirect(url_for('auth.entrar'))
+            return _sin_sesion()
         if not es_admin(current_user):
-            if request.path.startswith('/api/') or request.is_json:
+            if _es_llamada_api():
                 return jsonify({'error': 'Solo para administradores.'}), 403
             flash('Esa página es solo para administradores.', 'error')
             return redirect(url_for('futbol.home'))

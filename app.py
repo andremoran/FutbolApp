@@ -13,7 +13,7 @@ import os
 import secrets
 
 from dotenv import load_dotenv
-from flask import Flask, redirect, request, session, url_for, jsonify
+from flask import Flask, redirect, request, session, url_for, jsonify, flash
 from flask_login import LoginManager, current_user
 from supabase import create_client
 
@@ -61,6 +61,28 @@ login_manager.init_app(app)
 login_manager.login_view = 'auth.entrar'
 login_manager.login_message = 'Entra para continuar.'
 login_manager.login_message_category = 'info'
+
+
+@login_manager.unauthorized_handler
+def _sin_sesion():
+    """Sesion caducada: a /api/ se le responde JSON, no la pantalla de entrar.
+
+    Flask-Login redirige (302) al login, y para un `fetch` eso es peor que un
+    error. La peticion sigue el redirect ella sola, recibe un 200 con la
+    pagina de entrar en HTML, no la puede leer como JSON y se queda con {}.
+    Como el 200 cuenta como exito, el ayudante devolvia ese {} sin quejarse:
+    en el panel de admin llegaba a decir «Listo» y recargar, y en la app la
+    pantalla se quedaba vacia. Nunca se decia que lo caducado era la sesion.
+
+    Igual que en el manejador del 500, la comprobacion es `in` y no
+    `startswith`, porque las rutas de admin son /admin/api/...
+    """
+    if '/api/' in request.path:
+        return jsonify({'error': 'Tu sesion caduco. Entra otra vez para seguir.',
+                        'login': True, 'url': url_for('auth.entrar')}), 401
+    if login_manager.login_message:
+        flash(login_manager.login_message, login_manager.login_message_category)
+    return redirect(url_for(login_manager.login_view))
 
 
 # ─── CSRF (patrón "synchronizer token", sin dependencias) ────────────────────

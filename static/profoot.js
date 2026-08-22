@@ -84,6 +84,15 @@
     }
     return fetch(url, opts).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (body) {
+        /* Sesión caducada. El servidor ya responde 401 con login:true, pero se
+           mira también el rebote a /entrar por si alguna ruta se escapa: eso
+           llegaba como un 200 con HTML que no se podía leer, y esta función
+           devolvía {} como si la llamada hubiera ido bien. */
+        if ((r.status === 401 && body.login) || (r.redirected && /\/entrar/.test(r.url))) {
+          PF.toast('Tu sesión caducó. Te llevo a entrar otra vez.', 'error');
+          setTimeout(function () { location.href = body.url || '/entrar'; }, 1400);
+          throw new Error('Sesión caducada');
+        }
         if (!r.ok || body.error) throw new Error(body.error || ('Error ' + r.status));
         return body;
       });
