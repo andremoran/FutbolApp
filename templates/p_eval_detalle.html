@@ -51,6 +51,20 @@
     {{ r._test.protocolo }}
   </p>
   {% endif %}
+
+  {# La ficha entera de la prueba, la misma que ve el entrenador. Se pide al
+     abrirla, no viene en la página. A quien acaban de tomarle la prueba es al
+     que más le sirve saber qué mide y cómo se hace bien. #}
+  <details class="as-ficha" id="pe-ficha" data-clave="{{ r.test_clave }}">
+    <summary>
+      <i data-ico="book-open" class="pf-ico--sm"></i>
+      <span>Ver la ficha completa de la prueba</span>
+      <i data-ico="chevron-down" class="pf-ico--sm pf-item__chev"></i>
+    </summary>
+    <div id="pe-ficha-cuerpo" class="as-ficha__cuerpo">
+      <p class="as-ficha__cargando">Cargando…</p>
+    </div>
+  </details>
 </div>
 {% endif %}
 
@@ -107,4 +121,49 @@
 {% endif %}
 
 <div style="height:34px"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+/*  La ficha de la prueba, pedida al desplegarla. Mismo endpoint que usa el
+    asistente del entrenador: el texto de las 58 pruebas son 44 KB y aquí se
+    mira una sola.                                                          */
+(function () {
+  var det = document.getElementById('pe-ficha');
+  if (!det) return;
+  var pedida = false;
+
+  det.addEventListener('toggle', function () {
+    if (!det.open || pedida) return;
+    pedida = true;
+    PF.api('/api/eval/ficha/' + encodeURIComponent(det.dataset.clave))
+      .then(function (r) {
+        var f = r.ficha || {}, cuerpo = document.getElementById('pe-ficha-cuerpo');
+        cuerpo.innerHTML = '';
+        [['Objetivo', f.objetivo], ['Material necesario', f.material],
+         ['Protocolo detallado', f.protocolo], ['Variables medidas', f.variables],
+         ['Valores normativos', f.normativa], ['De dónde sale', f.bibliografia],
+         ['Dónde se usa', f.donde_se_usa]].forEach(function (par) {
+          if (!par[1]) return;
+          var b = document.createElement('div'); b.className = 'as-ficha__b';
+          var t = document.createElement('div'); t.className = 'as-ficha__t';
+          t.textContent = par[0];
+          var p = document.createElement('p'); p.className = 'as-ficha__p';
+          p.textContent = par[1];
+          b.appendChild(t); b.appendChild(p); cuerpo.appendChild(b);
+        });
+        if (!cuerpo.children.length) {
+          cuerpo.innerHTML = '<p class="as-ficha__cargando">Esta prueba todavía ' +
+                             'no tiene ficha detallada.</p>';
+        }
+      })
+      .catch(function (e) {
+        pedida = false;
+        document.getElementById('pe-ficha-cuerpo').innerHTML =
+          '<p class="as-ficha__cargando">No se pudo cargar la ficha.</p>';
+        PF.toast(e.message, 'error');
+      });
+  });
+})();
+</script>
 {% endblock %}

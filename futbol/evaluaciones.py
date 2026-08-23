@@ -630,18 +630,31 @@ def c_eval_catalogo():
 @bp.route('/api/eval/ficha/<clave>')
 @login_required
 def api_eval_ficha(clave):
-    """La ficha de una prueba, para enseñarla dentro del asistente.
+    """La ficha de una prueba: como se toma y que mide.
 
     Se pide suelta y no va en la pagina porque el texto de las 58 pruebas son
-    44 KB, y el entrenador va a mirar UNA. En el movil, con datos, eso importa.
+    44 KB, y quien mira va a abrir UNA. En el movil, con datos, eso importa.
+
+    La ve tambien el JUGADOR, no solo el entrenador: es la explicacion de una
+    prueba estandar —que mide, con que material, con que protocolo— y a quien
+    se la acaban de tomar es al que mas le sirve saberlo. No lleva ningun dato
+    del equipo, asi que no hay nada que proteger; lo que si depende del equipo
+    son las pruebas que el entrenador se haya inventado, y por eso se resuelve
+    contra SU equipo tanto si pregunta el como si pregunta uno de sus
+    jugadores.
     """
     from .api import api_guard
 
-    err = api_guard(solo_coach=True)
+    err = api_guard()
     if err:
         return err
 
-    t = prueba(clave, db.equipo_id(current_user.id))
+    if getattr(current_user, 'role', '') == 'especialista':
+        equipo = db.equipo_id(current_user.id)
+    else:
+        equipo = (db.entrenador_del_jugador(current_user.id) or {}).get('id')
+
+    t = prueba(clave, equipo)
     if not t:
         return jsonify({'error': 'Esa prueba no existe.'}), 404
 
