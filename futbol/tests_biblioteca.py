@@ -742,10 +742,17 @@ BIBLIOTECA = {
         'variables': 'Distancia máxima (m), precisión por zona (% de aciertos).',
         'normativa': 'Profesional adulto: > 30 m. Bueno sub-18: > 20 m. Precisión zona '
         'media: ≥ 4/5.',
-        'bibliografia': 'Kollath, E., & Quade, K. (1993). Measurement of sprinting speed of '
-        'professional and amateur soccer players. In Science and Football II. '
-        'E&FN Spon. ▸ Incorporado en evaluaciones de la DFB (Federación '
-        'Alemana), Selección Alemana Sub-19 y academias del Bayern München.',
+        #  La cita que traia aqui —Kollath & Quade, «Measurement of sprinting
+        #  speed of professional and amateur soccer players»— es de un estudio
+        #  sobre VELOCIDAD DE ESPRINT y no tiene nada que ver con el saque de
+        #  banda. Venia asi en el documento de origen. Se quita en vez de
+        #  sustituirla: una cita equivocada es peor que ninguna, porque parece
+        #  verificada y no lo esta. Los equipos que la acompañaban si valen y
+        #  se quedan.
+        'bibliografia': 'Sin referencia publicada propia: el protocolo es de uso '
+        'corriente pero no procede de un estudio concreto. ▸ Incorporado en '
+        'evaluaciones de la DFB (Federación Alemana), Selección Alemana Sub-19 '
+        'y academias del Bayern München.',
         'descripcion': 'Técnica de saque de banda con medición de distancia y zonas.',
         'protocolo': 'El jugador realiza el saque de banda con técnica reglamentaria '
         '(ambos pies en el suelo o con carrera permitida según categoría). '

@@ -1715,9 +1715,9 @@ _BIBLIOTECA_TESTS = {
         'categoria': 'tecnico',
         'orden': 520,
         'icono': 'arrow-right',
-        'fuente': 'Kollath, E., & Quade, K. (1993). Measurement of sprinting speed of '
-        'professional and amateur soccer players. In Science and Football II. '
-        'E&FN Spon',
+        #  Ver la nota en tests_biblioteca.py: la cita que habia aqui era de un
+        #  estudio sobre velocidad de esprint, no sobre saques de banda.
+        'fuente': 'Protocolo de uso corriente; sin referencia publicada propia',
         'campos': [
             _campo('max_distance_m', 'Distancia máxima', 'm', 5, 50, 1, '22.0', MAYOR),
             _campo('accuracy_pct', 'Precisión zona media', '%', 0, 100, 0, '80', MAYOR, False),
