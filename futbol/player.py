@@ -282,16 +282,25 @@ def partidos():
                 [], 'mis stats')
             mis_stats = {s['match_id']: s for s in stats}
 
-    totales = {'partidos': 0, 'minutos': 0, 'goles': 0, 'asistencias': 0}
+    #  Las cifras salen de db.totales_de_partidos, el mismo sitio del que las
+    #  saca la ficha que ve el entrenador. Antes se sumaban aqui aparte y con
+    #  otro criterio —contaba como jugado un partido con cero minutos—, asi
+    #  que el jugador y su entrenador podian leer numeros distintos del mismo
+    #  chaval. Y faltaban las jugadas clave, las titularidades y las tarjetas.
+    t = {}
+    if coach:
+        t = db.totales_de_partidos(coach['id'], ids={uid},
+                                   partidos=lista or None).get(uid, {})
+    totales = {
+        'partidos': t.get('partidos', 0), 'minutos': t.get('minutos', 0),
+        'goles': t.get('goles', 0), 'asistencias': t.get('asistencias', 0),
+        'jugadas_clave': t.get('jugadas_clave', 0),
+        'titularidades': t.get('titularidades', 0),
+        'tarjetas_a': t.get('tarjetas_a', 0), 'tarjetas_r': t.get('tarjetas_r', 0),
+    }
     for m in lista:
-        s = mis_stats.get(m['id'])
-        if s:
-            totales['partidos'] += 1
-            totales['minutos'] += int(s.get('minutos') or 0)
-            totales['goles'] += int(s.get('goles') or 0)
-            totales['asistencias'] += int(s.get('asistencias') or 0)
         m['_fecha'] = db.parse_fecha(m.get('fecha'))
-        m['_stats'] = s
+        m['_stats'] = mis_stats.get(m['id'])
 
     return render_template('p_partidos.html',
                            tab_activa='progreso', partidos=lista,

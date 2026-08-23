@@ -29,6 +29,78 @@ MODELOS = ('gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash')
 PRESUPUESTO_S = int(os.getenv('IA_PRESUPUESTO_S', '30'))
 
 
+def _seccion_mis_partidos(uid, coach):
+    """Lo que ha hecho este jugador en partido.
+
+    Su IA veia sus evaluaciones y sus lesiones, pero de los partidos no sabia
+    nada: ni si juega, ni cuanto, ni si marca. Es lo primero que pregunta un
+    chaval —«¿por que no estoy jugando?»— y no habia con que responderle.
+
+    Sale de db.totales_de_partidos, el mismo sitio que su pantalla y que la
+    ficha del entrenador, para que los tres digan lo mismo.
+    """
+    if not coach:
+        return ['Partidos: todavia no esta en ningun equipo.']
+
+    partidos = db.rows('fut_matches', 'ia mis partidos', coach_id=coach['id'],
+                       _order='fecha', _desc=True) or []
+    if not partidos:
+        return ['Partidos: su equipo no tiene ninguno apuntado todavia.']
+
+    t = db.totales_de_partidos(coach['id'], ids={uid}, partidos=partidos).get(uid)
+    if not t or not t['partidos']:
+        return ['Partidos del equipo: %d, pero el todavia no ha jugado ni un '
+                'minuto en ninguno.' % len(partidos)]
+
+    trozos = ['Ha jugado %d de los %d partidos del equipo'
+              % (t['partidos'], len(partidos))]
+    if t['titularidades']:
+        trozos.append('%d de titular' % t['titularidades'])
+    trozos.append('%d minutos en total (%d por partido)'
+                  % (t['minutos'], round(t['minutos'] / t['partidos'])))
+    for n, uno, varios in ((t['goles'], 'gol', 'goles'),
+                           (t['asistencias'], 'asistencia', 'asistencias'),
+                           (t['jugadas_clave'], 'jugada clave', 'jugadas clave')):
+        if n:
+            trozos.append('%d %s' % (n, uno if n == 1 else varios))
+    if t['tarjetas_a'] or t['tarjetas_r']:
+        trozos.append('%d amarilla(s) y %d roja(s)'
+                      % (t['tarjetas_a'], t['tarjetas_r']))
+    return ['En partido: ' + ', '.join(trozos) + '.']
+
+
+def _seccion_mi_asistencia(uid):
+    """Si viene a entrenar, y si llega a su hora.
+
+    Va aparte de los partidos porque responde a otra pregunta, y porque suele
+    ser la explicacion de la primera: al que falta tres semanas seguidas no le
+    hace falta que la IA le adivine por que no juega.
+    """
+    marcas = db.q(
+        lambda: db.sb().table('fut_attendance').select('estado')
+        .eq('player_id', uid).execute().data or [], [], 'mi asistencia')
+    if not marcas:
+        return []
+
+    from collections import Counter
+    c = Counter((m.get('estado') or 'sin marcar') for m in marcas)
+    total = len(marcas)
+    vino = c.get('presente', 0) + c.get('tarde', 0)
+    partes = ['Asistencia a entrenamientos: vino a %d de %d sesiones (%d%%)'
+              % (vino, total, round(100 * vino / total))]
+    detalle = []
+    for clave, uno, varios in (('tarde', 'vez llego tarde', 'veces llego tarde'),
+                               ('ausente', 'falta sin justificar', 'faltas sin justificar'),
+                               ('justificado', 'falta justificada', 'faltas justificadas')):
+        n = c.get(clave)
+        if n:
+            detalle.append('%d %s' % (n, uno if n == 1 else varios))
+    if detalle:
+        partes[0] += ': ' + ', '.join(detalle)
+    partes[0] += '.'
+    return partes
+
+
 def _contexto_jugador(user):
     """Datos reales del jugador para que la respuesta no sea genérica.
 
@@ -137,6 +209,12 @@ def _contexto_jugador(user):
         partes += _lista('Sus marcas:', lineas, 10)
     else:
         partes.append('Evaluaciones que le han tomado: 0')
+
+    # ─── Competicion y compromiso ───────────────────────────────────────────
+    #  Lo mismo que ve su entrenador sobre el, para que las dos IA no le
+    #  cuenten historias distintas al chaval y al coach.
+    partes += _seccion_mis_partidos(uid, db.entrenador_del_jugador(uid))
+    partes += _seccion_mi_asistencia(uid)
 
     # ─── Lo que tiene por delante ───────────────────────────────────────────
     eventos = db.eventos_para_jugador(uid, desde=db.hoy_iso()) or []

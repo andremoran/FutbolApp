@@ -18,6 +18,12 @@
   <div class="pf-hero-kpi"><span class="pf-hero-kpi__v">{{ totales.goles }}</span><span class="pf-hero-kpi__l">goles</span></div>
   <div class="pf-hero-kpi"><span class="pf-hero-kpi__v">{{ totales.asistencias }}</span><span class="pf-hero-kpi__l">asistencias</span></div>
   <div class="pf-hero-kpi"><span class="pf-hero-kpi__v">{{ totales.minutos }}</span><span class="pf-hero-kpi__l">minutos</span></div>
+  {# Las jugadas clave son lo que apunta el entrenador y no es ni gol ni
+     asistencia: el último pase, el robo, la parada. Si nunca se le ha
+     apuntado ninguna no se enseña el cero, que desanima sin informar. #}
+  {% if totales.jugadas_clave %}
+  <div class="pf-hero-kpi"><span class="pf-hero-kpi__v">{{ totales.jugadas_clave }}</span><span class="pf-hero-kpi__l">jugadas clave</span></div>
+  {% endif %}
 </div>
 {% endblock %}
 
@@ -90,6 +96,10 @@
             <span class="pf-pill pf-pill--warning">🟨 {{ m._stats.tarjetas_a }}</span>{% endif %}
           {% if m._stats.tarjetas_r %}
             <span class="pf-pill pf-pill--danger">🟥 {{ m._stats.tarjetas_r }}</span>{% endif %}
+          {% if m._stats.jugadas_clave %}
+            <span class="pf-pill pf-pill--info">✦ {{ m._stats.jugadas_clave }}</span>{% endif %}
+          {% if m._stats.titular %}
+            <span class="pf-pill">XI</span>{% endif %}
           {% if m._stats.valoracion %}
             <span class="pf-pill pf-pill--purple">★ {{ m._stats.valoracion }}</span>{% endif %}
         </span>
