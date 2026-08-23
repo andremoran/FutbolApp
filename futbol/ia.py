@@ -143,9 +143,19 @@ def _contexto_jugador(user):
                       f"{flojo} ({ficha.get(flojo)})")
     else:
         partes.append('Perfil dinamico: todavia sin evaluar')
-    partes.append(
-        f"Atributos (0-100): técnica {attrs['tecnica']}, físico {attrs['fisico']}, "
-        f"táctico {attrs['tactico']}, mental {attrs['mental']}")
+
+    #  Los cuatro atributos SOLO si esta evaluado. `db.atributos()` devuelve 50
+    #  en todo cuando no hay nada, como punto de partida neutro, y pasarselos a
+    #  la IA justo debajo de «todavia sin evaluar» es contradecirse: la IA se
+    #  cree los cincuenta y le habla al chaval de un nivel que nadie ha medido.
+    #  Es el mismo 50 inventado que se quito de la cabecera de su perfil.
+    if db.fila_atributos(player_id=uid):
+        partes.append(
+            f"Atributos (0-100): técnica {attrs['tecnica']}, físico {attrs['fisico']}, "
+            f"táctico {attrs['tactico']}, mental {attrs['mental']}")
+    else:
+        partes.append('Todavia no tiene ninguna nota puesta: no le hables de su '
+                      'nivel como si estuviera medido.')
 
     fatiga = db.nivel_de_fatiga(ficha.get('fatiga'))
     if fatiga:
