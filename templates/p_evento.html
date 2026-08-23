@@ -1,0 +1,234 @@
+{% extends '_shell.html' %}
+{% block title %}{{ evento.titulo }} · ProFoot{% endblock %}
+
+{# La ficha de un entrenamiento o un partido, vista por el jugador.
+
+   En su agenda esto era una línea: día, título y poco más. El entrenador
+   apunta duración, intensidad, tipo, lugar, lo que hay que llevar y hasta un
+   plan con sus bloques — y de todo eso no le llegaba casi nada. #}
+
+{% set es_partido = evento.tipo == 'partido' %}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.agenda') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}
+<div class="pf-hero__label">
+  {%- if es_partido %}Partido{% elif evento.tipo == 'reunion' %}Reunión
+  {%- else %}Entrenamiento{% endif -%}
+  {%- if evento._fecha %} · {{ evento._fecha.strftime('%d/%m/%Y') }}{% endif -%}
+</div>
+{% endblock %}
+{% block hero_title %}{{ evento.titulo }}{% endblock %}
+
+{% block head %}
+<style>
+  .pe-datos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(120px,100%), 1fr));
+              gap: 10px; margin-top: 12px; }
+  .pe-dato { background: var(--bg-soft, rgba(15,23,42,.03));
+             border: 1px solid var(--border-soft); border-radius: var(--r-md);
+             padding: 11px 12px; }
+  .pe-dato__e { font-size: 10.5px; font-weight: 800; letter-spacing: .4px;
+                text-transform: uppercase; color: var(--text-muted); }
+  .pe-dato__v { font-size: 14.5px; font-weight: 700; margin-top: 3px; }
+  .pe-bloque { display: flex; gap: 10px; padding: 10px 0;
+               border-top: 1px solid var(--border-soft); }
+  .pe-bloque:first-of-type { border-top: none; }
+  .pe-bloque__n { flex: none; width: 24px; height: 24px; border-radius: 8px;
+                  background: var(--primary-soft); color: var(--primary);
+                  display: flex; align-items: center; justify-content: center;
+                  font-size: 12px; font-weight: 800; }
+  .pe-bloque__t { font-size: 13.5px; font-weight: 700; }
+  .pe-bloque__d { font-size: 12.5px; color: var(--text-sec); line-height: 1.55;
+                  margin-top: 2px; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ══════════ CUÁNDO Y DÓNDE ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Cuándo y dónde</h2></div>
+  <div class="pe-datos">
+    {% if evento.hora %}
+    <div class="pe-dato">
+      <div class="pe-dato__e">Hora</div>
+      <div class="pe-dato__v">{{ evento.hora[:5] }}</div>
+    </div>
+    {% endif %}
+    {% if evento.duracion_min %}
+    <div class="pe-dato">
+      <div class="pe-dato__e">Duración</div>
+      <div class="pe-dato__v">{{ evento.duracion_min }} min</div>
+    </div>
+    {% endif %}
+    {% if evento.lugar %}
+    <div class="pe-dato">
+      <div class="pe-dato__e">Lugar</div>
+      <div class="pe-dato__v">{{ evento.lugar }}</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{# ══════════ QUÉ SE VA A HACER ══════════ #}
+{% if evento._tipo_entreno or evento._intensidad or es_partido %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">{{ 'El partido' if es_partido else 'La sesión' }}</h2>
+  </div>
+  <div class="pe-datos">
+    {% if es_partido %}
+      {% if evento.rival %}
+      <div class="pe-dato">
+        <div class="pe-dato__e">Rival</div>
+        <div class="pe-dato__v">{{ evento.rival }}</div>
+      </div>
+      {% endif %}
+      <div class="pe-dato">
+        <div class="pe-dato__e">Dónde se juega</div>
+        <div class="pe-dato__v">{{ 'En casa' if evento.local else 'Fuera' }}</div>
+      </div>
+    {% else %}
+      {% if evento._tipo_entreno %}
+      <div class="pe-dato">
+        <div class="pe-dato__e">Tipo</div>
+        <div class="pe-dato__v">{{ evento._tipo_entreno }}</div>
+      </div>
+      {% endif %}
+      {% if evento._intensidad %}
+      <div class="pe-dato">
+        <div class="pe-dato__e">Intensidad</div>
+        <div class="pe-dato__v">{{ evento._intensidad }}</div>
+      </div>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{# ══════════ LO QUE PIDE EL ENTRENADOR ══════════
+   Lo primero que busca el jugador la noche antes: qué tengo que llevar. Va en
+   su propia tarjeta y en ámbar para que no se pierda entre los datos. #}
+{% if evento.descripcion or (plan and plan.material) %}
+<div class="pf-card" style="border-color:#fcd34d;background:var(--warning-bg)">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title" style="color:#92400e">
+      <i data-ico="alert-circle" class="pf-ico--sm"></i> Lo que pide tu entrenador
+    </h2>
+  </div>
+  {% if evento.descripcion %}
+  <p style="margin:10px 0 0;font-size:13.5px;line-height:1.65;color:#92400e;
+            white-space:pre-wrap">{{ evento.descripcion }}</p>
+  {% endif %}
+  {% if plan and plan.material %}
+  <p style="margin:10px 0 0;font-size:13px;line-height:1.6;color:#92400e">
+    <b>Material:</b> {{ plan.material }}
+  </p>
+  {% endif %}
+</div>
+{% endif %}
+
+{# ══════════ EL PLAN DE LA SESIÓN ══════════ #}
+{% if plan %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Qué vais a trabajar</h2>
+    {% if plan.duracion_min %}
+    <span class="pf-card__badge">{{ plan.duracion_min }} min</span>
+    {% endif %}
+  </div>
+
+  {% if plan.nombre %}
+  <div style="font-size:14px;font-weight:700;margin-top:10px">{{ plan.nombre }}</div>
+  {% endif %}
+  {% if plan.objetivo %}
+  <p style="margin:6px 0 0;font-size:13px;line-height:1.65;color:var(--text-sec)">
+    {{ plan.objetivo }}
+  </p>
+  {% endif %}
+
+  {% if plan.bloques %}
+  <div class="pf-mt-12">
+    {% for b in plan.bloques %}
+    <div class="pe-bloque">
+      <span class="pe-bloque__n">{{ loop.index }}</span>
+      <span class="pf-grow">
+        <span class="pe-bloque__t" style="display:block">
+          {{ b.nombre or b.titulo or 'Bloque ' ~ loop.index }}
+          {%- if b.minutos %} · {{ b.minutos }} min{% endif -%}
+        </span>
+        {% if b.descripcion %}
+        <span class="pe-bloque__d" style="display:block">{{ b.descripcion }}</span>
+        {% endif %}
+      </span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+{# ══════════ TU ASISTENCIA ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">¿Vas a ir?</h2></div>
+
+  {# Si el entrenador ya pasó lista, lo que cuenta es su marca: lo que el
+     jugador dijo antes ya no cambia nada y verlo enfrentado confunde. #}
+  {% if marca and marca.estado and marca.estado != 'pendiente' %}
+  <div class="pf-alerta pf-mt-12
+              {{ 'pf-alerta--bien' if marca.estado == 'presente'
+                 else ('pf-alerta--warn' if marca.estado == 'tarde' else 'pf-alerta--mal') }}">
+    <i data-ico="{{ 'check-circle' if marca.estado == 'presente' else 'alert-circle' }}"
+       class="pf-ico--xs"></i>
+    <span>
+      Tu entrenador ya pasó lista:
+      <b>
+        {%- for c, e, _, _ in estados %}{% if c == marca.estado %}{{ e }}{% endif %}{% endfor -%}
+      </b>
+      {%- if marca.motivo %} · {{ marca.motivo }}{% endif -%}
+    </span>
+  </div>
+  {% else %}
+  <p style="margin:10px 0 0;font-size:13px;color:var(--text-sec);line-height:1.55">
+    Avisa para que tu entrenador pueda contar contigo.
+  </p>
+  <div style="display:flex;gap:8px;margin-top:11px" data-asist="{{ evento.id }}">
+    {% for clave, texto in [('presente', 'Voy'), ('justificado', 'Quizá'), ('ausente', 'No voy')] %}
+    <button type="button" class="pf-asist-btn"
+            data-estado="{{ clave }}" data-evento="{{ evento.id }}">{{ texto }}</button>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+{% if entrenador %}
+<p style="text-align:center;font-size:12px;color:var(--text-muted);margin:16px 0 0">
+  Lo puso {{ entrenador.name }}
+</p>
+{% endif %}
+
+<div style="height:28px"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+/*  Los mismos botones que en la agenda: se avisa de si vas o no. Se reutiliza
+    el endpoint que ya existe para no tener dos formas de decir lo mismo.     */
+document.querySelectorAll('.pf-asist-btn').forEach(function (b) {
+  b.addEventListener('click', function () {
+    var todos = b.parentElement.querySelectorAll('.pf-asist-btn');
+    todos.forEach(function (x) { x.classList.remove('is-on'); });
+    b.classList.add('is-on');
+    PF.api('{{ url_for("futbol.api_asistencia") }}', { event_id: b.dataset.evento, estado: b.dataset.estado })
+      .then(function () { PF.toast('Avisado'); })
+      .catch(function (e) {
+        b.classList.remove('is-on');
+        PF.toast(e.message, 'error');
+      });
+  });
+});
+</script>
+{% endblock %}

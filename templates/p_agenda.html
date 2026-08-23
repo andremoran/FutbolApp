@@ -61,7 +61,8 @@
       </span>
 
       <span class="pf-item__body">
-        <span class="pf-item__title">{{ e.titulo }}</span>
+        <a class="pf-item__title" style="display:block;color:inherit"
+           href="{{ url_for('futbol.p_evento', eid=e.id) }}">{{ e.titulo }}</a>
         <span class="pf-item__sub">
           {%- if e._hoy %}Hoy{% endif -%}
           {%- if e.hora %}{% if e._hoy %} · {% endif %}{{ e.hora[:5] }}{% endif -%}

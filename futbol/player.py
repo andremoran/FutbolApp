@@ -166,6 +166,52 @@ def inicio():
 
 
 # ═══════════════════════ 2. AGENDA ═══════════════════════
+@bp.route('/agenda/<eid>')
+@solo_jugador
+def p_evento(eid):
+    """Un entrenamiento o un partido, con todo lo que el entrenador puso.
+
+    El jugador solo ve los eventos de SU equipo: se resuelve por su entrenador
+    y no por el id que venga en la direccion, porque si no cualquiera podria
+    leer la agenda de otro club cambiando el numero.
+    """
+    from . import calendario as cal
+
+    uid = current_user.id
+    coach = db.entrenador_del_jugador(uid)
+    if not coach:
+        return redirect(url_for('futbol.p_unirme'))
+
+    evento = db.one('fut_events', 'evento del jugador', id=eid,
+                    coach_id=coach['id'])
+    if not evento:
+        abort(404)
+
+    evento['_fecha'] = db.parse_fecha(evento.get('fecha'))
+    meta = cal.ENTRENO_META.get(evento.get('tipo_entreno') or '', {})
+    evento['_tipo_entreno'] = meta.get('etiqueta')
+    evento['_intensidad'] = dict(
+        (c, e) for c, e, _ in cal.INTENSIDADES).get(evento.get('intensidad'))
+    if evento.get('tipo') == 'entreno':
+        evento['_carga'] = cal.carga_de(evento)
+
+    #  El plan de la sesion, que es donde el entrenador escribe el material y
+    #  los bloques. Es lo que de verdad le dice al jugador que va a hacer.
+    plan = None
+    if evento.get('plan_id'):
+        plan = db.one('fut_training_plans', 'plan del evento',
+                      id=evento['plan_id'], coach_id=coach['id'])
+
+    #  Lo que el entrenador ya marco de el en ese evento, si paso lista.
+    marca = (db.asistencia_de([eid], uid) or [None])[0]
+
+    return render_template('p_evento.html',
+                           tab_activa='agenda', hide_tabbar=True,
+                           evento=evento, plan=plan, entrenador=coach,
+                           marca=marca,
+                           estados=cal.ESTADOS_ASISTENCIA)
+
+
 @bp.route('/agenda')
 @solo_jugador
 def agenda():
