@@ -98,6 +98,25 @@
     </button>
   </div>
 
+  {% if not entrenador %}
+  {# Sin equipo no se pintaba NADA sobre equipos, asi que desde el perfil no
+     habia forma de unirse a uno. Es lo primero que hace un jugador nuevo. #}
+  <div class="pf-card">
+    <div class="pf-card__head"><h2 class="pf-card__title">Mi equipo</h2></div>
+    <div class="pf-empty" style="padding:18px 8px">
+      <div class="pf-empty__icon"><i data-ico="shield" class="pf-ico--xxl"></i></div>
+      <h3 class="pf-empty__title">Todavía no estás en un equipo</h3>
+      <p class="pf-empty__text">
+        Con el código de tu entrenador se te llenan solas la agenda, las
+        evaluaciones y los partidos.
+      </p>
+    </div>
+    <a class="pf-btn pf-btn--primary pf-btn--block" href="{{ url_for('futbol.p_unirme') }}">
+      <i data-ico="log-in" class="pf-ico--sm"></i> Unirme con un código
+    </a>
+  </div>
+  {% endif %}
+
   {% if entrenador %}
   <div class="pf-card">
     <div class="pf-card__head"><h2 class="pf-card__title">Mi equipo</h2></div>

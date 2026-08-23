@@ -158,10 +158,15 @@
     <i data-ico="alert-circle" class="pf-ico--sm" style="color:#b45309"></i>
     <strong style="font-size:14px;color:#92400e">Aún no estás en un equipo</strong>
   </div>
-  <p style="font-size:13px;color:#92400e;margin:0;line-height:1.5">
+  <p style="font-size:13px;color:#92400e;margin:0 0 12px;line-height:1.5">
     Pídele el código a tu entrenador para que tu agenda, tus partidos y tus
     evaluaciones se llenen automáticamente.
   </p>
+  {# El aviso decía «pídele el código» y no daba dónde escribirlo: la pantalla
+     de unirse existía pero solo se llegaba desde el panel «Ver más». #}
+  <a class="pf-btn pf-btn--primary pf-btn--block" href="{{ url_for('futbol.p_unirme') }}">
+    <i data-ico="log-in" class="pf-ico--sm"></i> Tengo un código
+  </a>
 </div>
 {% endif %}
 
