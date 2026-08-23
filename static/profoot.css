@@ -987,3 +987,12 @@ a.pf-avatar--xl::after   { inset: 0; }
 .pm-medida__v { font-size: 22px; font-weight: 800; letter-spacing: -.5px; }
 .pm-medida__v span { font-size: 12px; font-weight: 700; opacity: .6; margin-left: 2px; }
 .pm-medida__e { font-size: 11.5px; color: var(--text-sec); margin-top: 3px; }
+
+/*  Una tarjeta que es un enlace entero. Se usa en el perfil para la ficha
+    médica: la fila ocupa la tarjeta y se toca de lado a lado, que en el móvil
+    es la diferencia entre acertar y no.                                     */
+.pf-card--link {
+  display: block; text-decoration: none; color: inherit;
+  transition: transform .12s;
+}
+.pf-card--link:active { transform: scale(.99); }

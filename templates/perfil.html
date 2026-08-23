@@ -101,6 +101,27 @@
   {% if entrenador %}
   <div class="pf-card">
     <div class="pf-card__head"><h2 class="pf-card__title">Mi equipo</h2></div>
+
+    {# El nombre del equipo primero: el del entrenador ya se lo sabe, en qué
+       equipo está apuntado y desde cuándo no lo tenía en ningún sitio. #}
+    {% if equipo and equipo.nombre %}
+    <div class="pf-item">
+      <span class="pf-item__icon" style="background:var(--primary-soft);color:var(--primary)">
+        <i data-ico="shield" class="pf-ico--sm"></i>
+      </span>
+      <span class="pf-item__body">
+        <span class="pf-item__title">{{ equipo.nombre }}</span>
+        <span class="pf-item__sub">
+          {%- if en_el_equipo_desde -%}
+            En el equipo desde {{ en_el_equipo_desde.strftime('%d/%m/%Y') }}
+          {%- else -%}
+            Tu equipo
+          {%- endif -%}
+        </span>
+      </span>
+    </div>
+    {% endif %}
+
     <div class="pf-item">
       <span class="pf-avatar">
         {%- if entrenador.profile_photo %}<img src="{{ entrenador.profile_photo }}" alt="">
@@ -111,8 +132,41 @@
         <span class="pf-item__sub">Tu entrenador</span>
       </span>
     </div>
+
+    <a class="pf-item" href="{{ url_for('futbol.mensajes') }}">
+      <span class="pf-item__icon" style="background:rgba(59,130,246,.10);color:var(--info)">
+        <i data-ico="message-circle" class="pf-ico--sm"></i>
+      </span>
+      <span class="pf-item__body">
+        <span class="pf-item__title">Mensajes de tu entrenador</span>
+        <span class="pf-item__sub">Lo que te ha escrito</span>
+      </span>
+      <span class="pf-item__chev"><i data-ico="chevron-right" class="pf-ico--sm"></i></span>
+    </a>
   </div>
   {% endif %}
+
+  {# ── Su ficha médica ──
+     Estaba solo en la barra de abajo. Se busca aquí, junto a la ficha
+     deportiva, porque para el jugador las dos son «mis datos». #}
+  <a class="pf-card pf-card--link" href="{{ url_for('futbol.p_medico') }}">
+    <div class="pf-item" style="padding:0">
+      <span class="pf-item__icon" style="background:var(--danger-bg);color:var(--danger)">
+        <i data-ico="heart" class="pf-ico--sm"></i>
+      </span>
+      <span class="pf-item__body">
+        <span class="pf-item__title">Mi ficha médica</span>
+        <span class="pf-item__sub">
+          {%- if lesiones_abiertas -%}
+            {{ lesiones_abiertas }} lesión{{ '' if lesiones_abiertas == 1 else 'es' }} sin alta
+          {%- else -%}
+            Alergias, contacto de emergencia y tus medidas
+          {%- endif -%}
+        </span>
+      </span>
+      <span class="pf-item__chev"><i data-ico="chevron-right" class="pf-ico--sm"></i></span>
+    </div>
+  </a>
 {% endif %}
 
 {# ── Cuenta ── #}

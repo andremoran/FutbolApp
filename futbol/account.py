@@ -37,6 +37,24 @@ def perfil():
         #  entrenador, sobre el mismo chaval, ve «sin evaluar»: el mismo dato
         #  contado de dos formas. Con esto la pantalla sabe cual es el caso.
         datos['evaluado'] = bool(db.fila_atributos(player_id=uid))
+
+        #  El nombre del equipo y desde cuando esta en el. La tarjeta enseñaba
+        #  solo el nombre del entrenador, que es lo de menos: el chaval sabe
+        #  como se llama su entrenador, lo que no tenia en ningun sitio es en
+        #  que equipo esta apuntado ni desde cuando.
+        if datos['entrenador']:
+            datos['equipo'] = db.equipo_del_entrenador(datos['entrenador']['id'])
+            vinculo = db.one('fut_plantilla', 'mi vinculo',
+                             player_id=uid, coach_id=datos['entrenador']['id'],
+                             activo=True)
+            datos['en_el_equipo_desde'] = db.parse_fecha((vinculo or {}).get('creado'))
+
+        #  Cuantas lesiones tiene abiertas, para que el acceso a la ficha
+        #  medica lo diga sin tener que entrar.
+        datos['lesiones_abiertas'] = len([
+            l for l in (db.rows('fut_injuries', 'mis lesiones perfil',
+                                player_id=uid) or [])
+            if l.get('estado') != 'alta'])
         datos['racha'] = db.racha_actual(uid)
 
     return render_template('perfil.html',
