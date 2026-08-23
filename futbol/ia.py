@@ -560,6 +560,105 @@ def _seccion_observaciones(uid, eventos):
     return _lista(cabecera, lineas, 12)
 
 
+def _seccion_partidos(uid, fichas):
+    """Los partidos: resultados y lo que hizo cada jugador en ellos.
+
+    La IA veia los partidos solo como huecos en la agenda —«partido vs Emelec,
+    90 min»— y nada de lo que pasaba dentro. No podia decir quien esta
+    marcando, quien no esta jugando ni como va el equipo de resultados, que es
+    la mitad de lo que se le pregunta a un asistente de entrenador.
+
+    Se apoya en `db.totales_de_partidos`, el mismo sitio del que salen las
+    cifras de la ficha del jugador, para que las dos cuenten lo mismo.
+    """
+    partidos = db.rows('fut_matches', 'ia partidos', coach_id=uid,
+                       _order='fecha', _desc=True) or []
+    if not partidos:
+        return ['Partidos: todavia no hay ninguno con estadisticas apuntadas, '
+                'asi que de lo que pasa en competicion no hay datos.']
+
+    partes = []
+
+    # ─── El balance ─────────────────────────────────────────────────────────
+    g = e = p = gf = gc = 0
+    for m in partidos:
+        f, c = int(m.get('goles_favor') or 0), int(m.get('goles_contra') or 0)
+        gf += f
+        gc += c
+        if f > c:
+            g += 1
+        elif f == c:
+            e += 1
+        else:
+            p += 1
+    partes.append('Partidos jugados: %d — %d ganados, %d empatados, %d perdidos. '
+                  'Goles %d a favor y %d en contra.' % (len(partidos), g, e, p, gf, gc))
+
+    # ─── Uno a uno, del mas reciente ────────────────────────────────────────
+    lineas = []
+    for m in partidos[:10]:
+        f, c = int(m.get('goles_favor') or 0), int(m.get('goles_contra') or 0)
+        signo = 'victoria' if f > c else ('empate' if f == c else 'derrota')
+        t = ['%s, %s %s' % (m.get('fecha') or 'sin fecha',
+                            'vs' if m.get('local') else 'en casa de',
+                            m.get('rival') or 'rival')]
+        t.append('%d-%d (%s)' % (f, c, signo))
+        if m.get('competicion'):
+            t.append(m['competicion'])
+        lineas.append(', '.join(t))
+    partes += _lista('Ultimos partidos:', lineas, 10)
+
+    # ─── Lo que hizo cada uno ───────────────────────────────────────────────
+    tot = db.totales_de_partidos(uid, partidos=partidos)
+    if not tot:
+        partes.append('De esos partidos no hay ninguna estadistica individual '
+                      'apuntada: no se sabe quien jugo ni quien marco.')
+        return partes
+
+    nombres = {x['id']: x['nombre'] for x in fichas}
+    filas = []
+    for clave, t in tot.items():
+        filas.append({
+            'nombre': nombres.get(clave) or 'jugador',
+            'pj': t['partidos'], 'xi': t['titularidades'], 'min': t['minutos'],
+            'g': t['goles'], 'a': t['asistencias'], 'clave': t['jugadas_clave'],
+            'ta': t['tarjetas_a'], 'tr': t['tarjetas_r'],
+        })
+    filas.sort(key=lambda f: (-f['g'], -f['a'], -f['min']))
+
+    lineas = []
+    for f in filas:
+        t = ['%s: %d partido(s)' % (f['nombre'], f['pj'])]
+        if f['xi']:
+            t.append('%d de titular' % f['xi'])
+        if f['min']:
+            t.append('%d min' % f['min'])
+            if f['pj']:
+                t.append('%d min por partido' % round(f['min'] / f['pj']))
+        #  Singular y plural escritos a mano: pegarle una «s» al final daba
+        #  «2 gols» y «3 jugada claves». Lo lee una IA, pero tambien acaba
+        #  saliendo en lo que ella responde.
+        for n, uno, varios in ((f['g'], 'gol', 'goles'),
+                               (f['a'], 'asistencia', 'asistencias'),
+                               (f['clave'], 'jugada clave', 'jugadas clave')):
+            if n:
+                t.append('%d %s' % (n, uno if n == 1 else varios))
+        if f['ta'] or f['tr']:
+            t.append('%d amarilla(s), %d roja(s)' % (f['ta'], f['tr']))
+        lineas.append(', '.join(t))
+    partes += _lista('En partido, jugador por jugador (los mas decisivos primero):',
+                     lineas, 20)
+
+    #  Quien no esta jugando. Es de lo primero que mira un entrenador y de lo
+    #  que peor se ve en una lista ordenada por goles.
+    sin_jugar = [x['nombre'] for x in fichas
+                 if x['id'] not in tot or not tot[x['id']]['minutos']]
+    if sin_jugar:
+        partes.append('Sin un solo minuto en partido (%d): %s'
+                      % (len(sin_jugar), ', '.join(sin_jugar[:20])))
+    return partes
+
+
 def _contexto_entrenador(user):
     """Todo lo que el entrenador tiene cargado, para que la IA no responda a ciegas.
 
@@ -652,6 +751,7 @@ def _contexto_entrenador(user):
     partes += _seccion_entrenamientos(uid, len(jugadores) + len(manuales), fichas,
                                       eventos)
     partes += _seccion_observaciones(uid, eventos)
+    partes += _seccion_partidos(uid, fichas)
 
     # ─── Parte médico ───────────────────────────────────────────────────────
     lesiones = [x for x in (db.rows('fut_injuries', 'ia lesiones', coach_id=uid) or [])

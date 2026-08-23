@@ -310,7 +310,7 @@ CAMPOS_PARTIDO = ('minutos', 'goles', 'asistencias', 'jugadas_clave',
                   'tarjetas_a', 'tarjetas_r')
 
 
-def totales_de_partidos(coach_id, ids=None):
+def totales_de_partidos(coach_id, ids=None, partidos=None):
     """Lo acumulado en partidos por cada jugador del equipo.
 
     Devuelve {id_del_jugador: {partidos, minutos, goles, asistencias, ...}}.
@@ -320,7 +320,10 @@ def totales_de_partidos(coach_id, ids=None):
     Se hace en dos consultas para todo el equipo, no una por jugador: el
     perfil y la lista de plantilla los piden de golpe.
     """
-    partidos = rows('fut_matches', 'partidos del equipo', coach_id=coach_id) or []
+    #  Los trae quien llama si ya los tiene: el contexto de la IA necesita
+    #  los partidos para contar el balance y no hay que pedirlos dos veces.
+    if partidos is None:
+        partidos = rows('fut_matches', 'partidos del equipo', coach_id=coach_id) or []
     if not partidos:
         return {}
     mids = [p['id'] for p in partidos]

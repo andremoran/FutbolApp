@@ -332,22 +332,51 @@ def auditar_contexto_ia_con_datos():
         'player_id': None, 'manual_player_id': 'y', 'coach_id': coach['id'],
     }]
 
-    reales = ev.resultados_equipo, ev.resultados_de
+    #  Un partido inventado, con lo que hizo un jugador. Mismo motivo: la
+    #  seccion de partidos solo se recorre entera si hay alguno, y hasta que
+    #  el entrenador apunte el primero ese codigo no se ejecuta nunca.
+    partido = {'id': 'p1', 'coach_id': coach['id'], 'fecha': fdb.hoy_iso(),
+               'rival': 'Rival de prueba', 'local': True,
+               'goles_favor': 3, 'goles_contra': 1, 'competicion': ''}
+    totales = {'z': {'partidos': 1, 'titularidades': 1, 'minutos': 90,
+                     'goles': 2, 'asistencias': 1, 'jugadas_clave': 3,
+                     'tarjetas_a': 0, 'tarjetas_r': 0}}
+
+    reales = (ev.resultados_equipo, ev.resultados_de,
+              fdb.rows, fdb.totales_de_partidos)
+    filas_reales = fdb.rows
+
+    def rows_falso(tabla, *a, **k):
+        if tabla == 'fut_matches':
+            return [dict(partido)]
+        return filas_reales(tabla, *a, **k)
+
     ev.resultados_equipo = lambda *a, **k: list(inventado)
     ev.resultados_de = lambda *a, **k: list(inventado)
+    fdb.rows = rows_falso
+    fdb.totales_de_partidos = lambda *a, **k: dict(totales)
     try:
         ctx = ia._contexto_entrenador(Falso())
         if 'Sprint 30m' not in ctx:
             aviso('contexto de la IA',
                   'con evaluaciones guardadas, el contexto del entrenador no '
                   'las menciona: la IA no sabria de las pruebas de su equipo')
+        if 'Rival de prueba' not in ctx or '3-1' not in ctx:
+            aviso('contexto de la IA',
+                  'con partidos guardados, el contexto del entrenador no dice '
+                  'el resultado: la IA no sabria como va el equipo')
+        if '2 goles' not in ctx:
+            aviso('contexto de la IA',
+                  'con estadisticas de partido guardadas, el contexto no dice '
+                  'quien marco: la IA no sabria quien esta decidiendo')
     except Exception as e:
         aviso('contexto de la IA',
               'el contexto del entrenador revienta cuando HAY evaluaciones '
               '(%s: %s). responder_ia() se lo traga y contesta con el respaldo, '
               'asi que el fallo no se ve.' % (type(e).__name__, e))
     finally:
-        ev.resultados_equipo, ev.resultados_de = reales
+        (ev.resultados_equipo, ev.resultados_de,
+         fdb.rows, fdb.totales_de_partidos) = reales
 
 
 for comprobacion in (auditar_dueno, auditar_manuales, auditar_una_fila,
