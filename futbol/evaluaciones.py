@@ -653,6 +653,7 @@ def api_eval_ficha(clave):
         'variables': t.get('variables') or '',
         'normativa': t.get('normativa') or '',
         'bibliografia': t.get('bibliografia') or t.get('fuente') or '',
+        'donde_se_usa': t.get('donde_se_usa') or '',
         'url': url_for('futbol.c_eval_ficha', clave=clave),
     }})
 

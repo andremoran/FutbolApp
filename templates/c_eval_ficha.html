@@ -185,6 +185,16 @@
 </div>
 {% endif %}
 
+{# Dónde se usa. Las 40 avaladas lo llevan dentro de su propia bibliografía
+   —los clubes venían en el documento de origen—; las otras lo tienen aquí,
+   con la institución o el centro de referencia detrás de la prueba. #}
+{% if test.donde_se_usa %}
+<div class="fi-bloque">
+  <div class="fi-rotulo">Dónde se usa</div>
+  <p class="fi-texto fi-texto--sec">{{ test.donde_se_usa }}</p>
+</div>
+{% endif %}
+
 {# ══════════ QUÉ HACER CON ELLA ══════════ #}
 <div style="margin:0 16px 10px">
   <a class="pf-btn pf-btn--primary pf-btn--block"

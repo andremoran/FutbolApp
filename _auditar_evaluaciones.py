@@ -213,6 +213,29 @@ def revisar_el_conjunto():
               % (len(sin_baremo), ', '.join(sorted(sin_baremo)[:8])))
 
 
+
+def revisar_las_tablas():
+    """Que la tabla de rangos no enseñe la misma fila varias veces.
+
+    Ocho campos miden una diferencia o una asimetria —el desfase entre conducir
+    y esprintar, los centimetros de descompensacion entre una pierna y la
+    otra— y su baremo es el mismo para todas las edades y niveles, porque 3 cm
+    son 3 cm a los 12 y a los 30. La tabla los colapsa en una sola fila; si
+    alguna vez vuelve a enseñar once identicas, salta aqui.
+    """
+    for clave, t in cat.CATALOGO.items():
+        for campo in (t.get('baremos') or {}):
+            filas = cat.tabla_baremos(clave, campo, 'sub_17', 'juvenil')
+            vistos = {tuple(f['cortes']) for f in filas}
+            #  Solo cuando TODAS son iguales. Que dos coincidan por casualidad
+            #  es normal —el corte de un sub-16 puede caer donde el de un
+            #  amateur— y eso no hay que colapsarlo ni avisarlo.
+            if len(filas) > 1 and len(vistos) == 1:
+                fallo(clave, '%s: la tabla de rangos enseña %d filas identicas; '
+                             'deberia colapsarse en una' % (campo, len(filas)))
+
+
+revisar_las_tablas()
 revisar_el_conjunto()
 
 print('Auditoría de las %d pruebas de evaluación' % len(cat.CATALOGO))

@@ -1928,6 +1928,20 @@ for _clave, _ficha in tests_fichas_propias.FICHAS_PROPIAS.items():
     for _k, _v in _ficha.items():
         _t.setdefault(_k, _v)
 
+# ─── Dónde se usa cada prueba ───────────────────────────────────────────────
+#  La institución, federación o centro de referencia detrás de cada una. Va
+#  aparte de la cita porque responde a otra pregunta: la cita dice de dónde
+#  salieron los números, y esto dice quién la usa de verdad.
+#
+#  Con `setdefault` como las demás: si alguna ya lo traía —las de FIFA y la
+#  federación portuguesa lo dicen en su propia fuente— no se le toca.
+from . import tests_donde_se_usa  # noqa: E402
+
+for _clave, _texto in tests_donde_se_usa.DONDE_SE_USA.items():
+    _t = CATALOGO.get(_clave)
+    if _t:
+        _t.setdefault('donde_se_usa', _texto)
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  CONSULTA
@@ -2189,6 +2203,17 @@ def tabla_baremos(clave_test, campo, categoria_edad='general', nivel='general'):
             continue
         filas.append({'nivel': et_nivel, 'edad': et_edad, 'cortes': cortes,
                       'actual': par == par_usado})
+
+    #  Si todas las filas dicen lo mismo, se enseña UNA. Pasa en los ocho
+    #  campos que miden una diferencia o una asimetria —el desfase entre
+    #  conducir y esprintar, los centimetros de descompensacion entre una
+    #  pierna y la otra—: eso no cambia con la edad ni con la categoria, 3 cm
+    #  son 3 cm a los 12 y a los 30. Enseñar once filas identicas no informa
+    #  de nada y hace dudar de si la tabla esta bien.
+    if len(filas) > 1 and len({tuple(f['cortes']) for f in filas}) == 1:
+        return [{'nivel': 'Cualquier nivel', 'edad': 'Cualquier edad',
+                 'cortes': filas[0]['cortes'], 'actual': True,
+                 'unica': True}]
     return filas
 
 
