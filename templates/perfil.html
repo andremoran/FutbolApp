@@ -140,6 +140,20 @@
     <span class="pf-item__chev"><i data-ico="chevron-right" class="pf-ico--sm"></i></span>
   </a>
 
+  {# Canjear un código estaba SOLO dentro del panel «Ver más», que hay que
+     desplegar y que nadie abre buscando esto. Quien tiene un código lo busca
+     aquí, en su cuenta, justo al lado de los planes. #}
+  <a class="pf-item" href="{{ url_for('futbol.canjear') }}">
+    <span class="pf-item__icon" style="background:rgba(139,92,246,.12);color:var(--purple)">
+      <i data-ico="gift" class="pf-ico--sm"></i>
+    </span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">Canjear un código</span>
+      <span class="pf-item__sub">Meses de Pro sin tarjeta</span>
+    </span>
+    <span class="pf-item__chev"><i data-ico="chevron-right" class="pf-ico--sm"></i></span>
+  </a>
+
   <button class="pf-item" type="button" onclick="PF.openSheet('pf-sheet-mas')">
     <span class="pf-item__icon" style="background:rgba(59,130,246,.10);color:var(--info)">
       <i data-ico="grid" class="pf-ico--sm"></i>
