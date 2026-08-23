@@ -31,6 +31,12 @@ def perfil():
         datos['entrenador'] = db.entrenador_del_jugador(uid)
         datos['atributos'] = db.atributos(uid)
         datos['media'] = db.media_atributos(uid)
+        #  `atributos()` devuelve 50 en todo cuando no hay fila, como punto de
+        #  partida neutro. Vale para calcular, pero en la cabecera del perfil
+        #  ese 50 se lee como una nota que alguien le ha puesto. Y su
+        #  entrenador, sobre el mismo chaval, ve «sin evaluar»: el mismo dato
+        #  contado de dos formas. Con esto la pantalla sabe cual es el caso.
+        datos['evaluado'] = bool(db.fila_atributos(player_id=uid))
         datos['racha'] = db.racha_actual(uid)
 
     return render_template('perfil.html',

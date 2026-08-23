@@ -34,7 +34,8 @@
         {%- if perfil.dorsal %} · Dorsal {{ perfil.dorsal }}{% endif %}
       </div>
       <div style="font-size:13px;color:rgba(255,255,255,.75);margin-top:3px">
-        Valoración {{ media }} · 🔥 {{ racha }} día{{ '' if racha == 1 else 's' }}
+        {%- if evaluado %}Valoración {{ media }}{% else %}Sin evaluar todavía{% endif %}
+        · 🔥 {{ racha }} día{{ '' if racha == 1 else 's' }}
       </div>
     {% endif %}
   </div>
@@ -127,6 +128,10 @@
     <span class="pf-item__chev"><i data-ico="chevron-right" class="pf-ico--sm"></i></span>
   </a>
 
+  {# El plan, no el estado de la cuenta. `dias_pro` y `caduca_pronto` se
+     calculaban en la vista y no los usaba nadie: quien acaba de canjear un
+     código no tenía dónde comprobar que le entró, y quien está a punto de
+     quedarse sin Pro no se enteraba hasta que dejaba de funcionarle algo. #}
   <a class="pf-item" href="{{ url_for('futbol.planes') }}">
     <span class="pf-item__icon" style="background:var(--warning-bg);color:var(--warning)">
       <i data-ico="star" class="pf-ico--sm"></i>
@@ -134,9 +139,18 @@
     <span class="pf-item__body">
       <span class="pf-item__title">Planes y pagos</span>
       <span class="pf-item__sub">
-        {{ 'Cuenta activa' if current_user.activo else 'Cuenta sin activar' }}
+        {%- if dias_pro is not none and dias_pro > 0 -%}
+          Pro · te {{ 'queda' if dias_pro == 1 else 'quedan' }} {{ dias_pro }} día{{ '' if dias_pro == 1 else 's' }}
+        {%- elif fut_es_pro -%}
+          Plan Pro activo
+        {%- else -%}
+          Plan gratuito
+        {%- endif -%}
       </span>
     </span>
+    {% if caduca_pronto %}
+    <span class="pf-pill pf-pill--warning">Caduca pronto</span>
+    {% endif %}
     <span class="pf-item__chev"><i data-ico="chevron-right" class="pf-ico--sm"></i></span>
   </a>
 
