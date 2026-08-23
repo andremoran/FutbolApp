@@ -1646,8 +1646,9 @@ _BIBLIOTECA_TESTS = {
         'categoria': 'tecnico',
         'orden': 500,
         'icono': 'corner-down-right',
-        'fuente': 'Castagna, C. et al. (2006). J. Strength and Conditioning Research, '
-        '20(2), 320–325',
+        #  Ver la nota en tests_biblioteca.py: la cita era de un trabajo sobre
+        #  fitness aerobico y tests Yo-Yo, no sobre control orientado.
+        'fuente': 'Protocolo de uso corriente; sin referencia publicada propia',
         'campos': [
             _campo('success', 'Controles exitosos', '/10', 0, 10, 0, '7', MAYOR),
             _campo('reaction_s', 'Tiempo de reacción', 's', 0.3, 5, 2, '1.10', MENOR, False),
@@ -1941,6 +1942,31 @@ for _clave, _texto in tests_donde_se_usa.DONDE_SE_USA.items():
     _t = CATALOGO.get(_clave)
     if _t:
         _t.setdefault('donde_se_usa', _texto)
+
+# ─── Los títulos que les faltaban a 33 citas ────────────────────────────────
+#  Guardaban autor, año, revista y volumen, pero no el título del artículo. Sin
+#  título no hay forma de comprobar que la cita habla de la prueba: así estuvo
+#  el saque de banda citando un estudio de velocidad de esprint.
+#
+#  Se sustituye SOLO la cita. Lo que va detrás del marcador «▸» —los clubes y
+#  federaciones que venían en el documento de origen— se vuelve a pegar tal
+#  cual, que eso no se toca.
+from . import tests_citas  # noqa: E402
+
+
+def _con_titulo(texto_viejo, cita_nueva):
+    if texto_viejo and '▸' in texto_viejo:
+        return cita_nueva + ' ' + texto_viejo[texto_viejo.index('▸'):]
+    return cita_nueva
+
+
+for _clave, _cita in tests_citas.CITAS.items():
+    _t = CATALOGO.get(_clave)
+    if not _t:
+        continue
+    _t['fuente'] = _con_titulo(_t.get('fuente'), _cita)
+    if _t.get('bibliografia'):
+        _t['bibliografia'] = _con_titulo(_t['bibliografia'], _cita)
 
 
 # ═══════════════════════════════════════════════════════════════════════════

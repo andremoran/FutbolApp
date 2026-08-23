@@ -617,9 +617,16 @@ BIBLIOTECA = {
         'para controlar y orientar).',
         'variables': 'Controles exitosos / 10 intentos, tiempo de reacción.',
         'normativa': 'Excelente: ≥ 8/10. Bueno: 6–7/10. Deficiente: < 5/10.',
-        'bibliografia': 'Castagna, C. et al. (2006). J. Strength and Conditioning Research, '
-        '20(2), 320–325. ▸ Incluido en protocolos técnicos de las academias '
-        'de Feyenoord, RB Leipzig y Selección Sub-17 de España.',
+        #  La cita que traia —Castagna et al. (2006), JSCR 20(2), 320-325—
+        #  corresponde a «Aerobic fitness and yo-yo continuous and intermittent
+        #  tests performances in soccer players»: un trabajo sobre FITNESS
+        #  AEROBICO, no sobre recepcion ni control orientado. Mismo caso que el
+        #  saque de banda, y se le da el mismo trato: fuera la cita, que las
+        #  academias si valen y se quedan.
+        'bibliografia': 'Sin referencia publicada propia: el protocolo es de uso '
+        'corriente pero no procede de un estudio concreto. ▸ Incluido en '
+        'protocolos técnicos de las academias de Feyenoord, RB Leipzig y '
+        'Selección Sub-17 de España.',
         'descripcion': 'Primer toque orientado, con balón rodado y aéreo.',
         'protocolo': 'El evaluador lanza el balón (5 rodados + 5 aéreos) desde 8–10 m. El '
         'jugador debe controlar con el primer toque orientando el balón '

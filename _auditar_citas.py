@@ -145,6 +145,11 @@ for k in sorted(cat.CATALOGO):
         continue                       # coincide
     if any((esperado, e) in COMPATIBLES for e in encontrados):
         continue
+    #  Citas de dos partes: «el protocolo es de X, los valores de referencia
+    #  son de Y». El tema de Y no tiene por que ser el de la prueba, y el
+    #  propio texto ya lo explica.
+    if 'valores de referencia' in texto or 'baremos de' in texto:
+        continue
 
     sospechas += 1
     print()
