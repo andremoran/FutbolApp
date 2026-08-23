@@ -288,9 +288,71 @@ def auditar_html_donde_va_json():
                   % r.status_code)
 
 
+def auditar_contexto_ia_con_datos():
+    """Que el contexto de la IA se arme cuando SI hay evaluaciones.
+
+    Aqui hubo un fallo que estuvo escondido meses: la seccion de evaluaciones
+    leia `medias_por_categoria()` como un diccionario cuando devuelve una
+    lista. Solo se entra en ese trozo si hay resultados, y en la base no habia
+    ninguno, asi que nunca reventaba.
+
+    Y cuando por fin reventaba no se veia: `responder_ia()` se traga cualquier
+    excepcion y contesta con el respaldo local. El entrenador no habria visto
+    un error — solo una IA que de pronto deja de saber nada de sus pruebas, el
+    mismo dia que apunta la primera marca.
+
+    Por eso esto se prueba con datos INVENTADOS en memoria, sin tocar la base:
+    lo que se comprueba es que el codigo aguanta el caso «hay resultados», que
+    es el que no se da solo.
+    """
+    import futbol.ia as ia
+    import futbol.evaluaciones as ev
+    import futbol.db as fdb
+
+    coach = next((u for u in fdb.rows('usuarios', 'aud usuarios')
+                  if u.get('rol') == 'especialista' and fdb.equipo_id(u['id'])), None)
+    if not coach:
+        return
+
+    class Falso:
+        is_authenticated = True
+        id = coach['id']
+        role = coach.get('rol')
+        name = coach.get('nombre')
+        tier = coach.get('tier')
+        pro_hasta = coach.get('pro_hasta')
+
+        def is_admin(self):
+            return False
+
+    inventado = [{
+        'id': 'x', 'test_clave': 'sprint_30m', 'test_nombre': 'Sprint 30m',
+        'categoria': 'fisico', 'puntaje': 62, 'fecha': fdb.hoy_iso(),
+        'jugador_nombre': 'Jugador de prueba', 'valores': {'time_seconds': 4.35},
+        'player_id': None, 'manual_player_id': 'y', 'coach_id': coach['id'],
+    }]
+
+    reales = ev.resultados_equipo, ev.resultados_de
+    ev.resultados_equipo = lambda *a, **k: list(inventado)
+    ev.resultados_de = lambda *a, **k: list(inventado)
+    try:
+        ctx = ia._contexto_entrenador(Falso())
+        if 'Sprint 30m' not in ctx:
+            aviso('contexto de la IA',
+                  'con evaluaciones guardadas, el contexto del entrenador no '
+                  'las menciona: la IA no sabria de las pruebas de su equipo')
+    except Exception as e:
+        aviso('contexto de la IA',
+              'el contexto del entrenador revienta cuando HAY evaluaciones '
+              '(%s: %s). responder_ia() se lo traga y contesta con el respaldo, '
+              'asi que el fallo no se ve.' % (type(e).__name__, e))
+    finally:
+        ev.resultados_equipo, ev.resultados_de = reales
+
+
 for comprobacion in (auditar_dueno, auditar_manuales, auditar_una_fila,
                      auditar_dos_duenyos, auditar_escrituras_mudas,
-                     auditar_html_donde_va_json):
+                     auditar_html_donde_va_json, auditar_contexto_ia_con_datos):
     comprobacion()
 
 print('Auditoría de los patrones conocidos')

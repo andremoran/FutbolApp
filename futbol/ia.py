@@ -620,8 +620,16 @@ def _contexto_entrenador(user):
 
     if resultados:
         partes.append(f"Evaluaciones registradas: {len(resultados)}")
-        medias = ev.medias_por_categoria(resultados) or {}
-        sueltas = [f"{k} {v}" for k, v in medias.items() if v is not None]
+        #  Devuelve una LISTA de dicts, no un diccionario. Tratarla como
+        #  diccionario reventaba con AttributeError, y como responder_ia() se
+        #  traga la excepcion y contesta con el respaldo local, el entrenador
+        #  no veia ningun error: simplemente la IA dejaba de usar Gemini y de
+        #  ver sus evaluaciones en cuanto guardaba la primera marca. Sin
+        #  resultados no pasaba por aqui, asi que el fallo estuvo escondido
+        #  hasta que hubo datos.
+        medias = ev.medias_por_categoria(resultados) or []
+        sueltas = ['%s %s/100' % (m.get('etiqueta') or m.get('clave'), m['puntaje'])
+                   for m in medias if m.get('puntaje') is not None]
         if sueltas:
             partes.append('Puntaje medio por familia: ' + ', '.join(sueltas))
         lineas = []
