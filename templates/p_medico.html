@@ -83,6 +83,56 @@
 </div>
 {% endif %}
 
+{# ══════════ LO QUE MIDE EL CUERPO TÉCNICO ══════════
+   De lectura: esto no lo escribe el jugador. Van solo los datos de su propio
+   cuerpo y el visto bueno para competir; las notas del médico, del fisio y
+   del entrenador se quedan fuera porque son de trabajo interno. #}
+{% if ficha.estatura_cm or ficha.peso_kg or ficha.apto_competir is not none
+      or ficha.ultimo_chequeo %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Lo que te ha medido tu cuerpo técnico</h2>
+    <span class="pf-pill pf-pill--muted">no lo editas tú</span>
+  </div>
+
+  <div class="pm-medidas">
+    {% if ficha.estatura_cm %}
+    <div class="pm-medida">
+      <div class="pm-medida__v">{{ ficha.estatura_cm|round|int }}<span>cm</span></div>
+      <div class="pm-medida__e">Estatura</div>
+    </div>
+    {% endif %}
+    {% if ficha.peso_kg %}
+    <div class="pm-medida">
+      <div class="pm-medida__v">{{ ficha.peso_kg|round(1) }}<span>kg</span></div>
+      <div class="pm-medida__e">Peso</div>
+    </div>
+    {% endif %}
+    {% if ficha.ultimo_chequeo %}
+    <div class="pm-medida">
+      <div class="pm-medida__v" style="font-size:15px">{{ ficha.ultimo_chequeo }}</div>
+      <div class="pm-medida__e">Último chequeo</div>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if ficha.apto_competir is not none %}
+  <div class="pf-alerta pf-mt-12
+              {{ 'pf-alerta--bien' if ficha.apto_competir else 'pf-alerta--mal' }}">
+    <i data-ico="{{ 'check-circle' if ficha.apto_competir else 'alert-triangle' }}" class="pf-ico--xs"></i>
+    <span>
+      {% if ficha.apto_competir %}
+        Estás apto para competir.
+      {% else %}
+        Ahora mismo no estás apto para competir. Habla con tu entrenador antes
+        de forzar.
+      {% endif %}
+    </span>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
 {# ══════════ LA FICHA ══════════ #}
 <div class="pf-card">
   <div class="pf-card__head">

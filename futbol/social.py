@@ -208,6 +208,19 @@ def c_partido(mid):
 
 
 # ═══════════════════════ OBSERVACIONES DE ENTRENAMIENTO ═══════════════════════
+#
+#  DECISIÓN: estas NO se le enseñan al jugador. Ni las suyas.
+#
+#  Es una decisión tomada a conciencia, no un olvido, y conviene no
+#  «arreglarla»: son notas que el entrenador escribe en caliente al terminar
+#  el entrenamiento, pensando que las lee solo él. Además, la lectura que hace
+#  la IA de las notas de voz incluye por diseño a los jugadores nombrados y
+#  qué se dice de cada uno — enseñársela a uno le muestra lo que se dijo de
+#  sus compañeros.
+#
+#  Si algún día se quiere compartir alguna, lo que toca es un interruptor por
+#  observación, apagado por defecto, y que el entrenador decida una a una. No
+#  abrirlas todas.
 def _evento_del_coach(eid, uid):
     """El evento, solo si es de este equipo. None si no lo es o no existe.
 

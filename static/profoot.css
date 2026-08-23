@@ -632,6 +632,9 @@ img, svg { max-width: 100%; }
 .pf-alerta--warn { background: var(--warning-bg); color: #92400e; }
 .pf-alerta--mal  { background: var(--danger-bg);  color: #991b1b; }
 .pf-alerta--info { background: var(--info-bg);    color: #1e40af; }
+/*  La verde faltaba: se usa para decirle al jugador que esta apto para
+    competir, que es lo unico bueno que se anuncia en una ficha medica.  */
+.pf-alerta--bien { background: var(--primary-soft, #d1fae5); color: #047857; }
 
 /* ─── Asistencia ───────────────────────────────────────────────────────── */
 .pf-asis { display: flex; gap: 5px; }
@@ -968,3 +971,19 @@ a.pf-avatar--xl::after   { inset: 0; }
   margin: 7px 0 0; font-size: 11.5px; line-height: 1.55;
   color: var(--text-muted); font-style: italic;
 }
+
+/* ─── Lo que le mide el cuerpo técnico al jugador ────────────────────────
+   Tres cifras grandes y poco más: es información que se consulta de un
+   vistazo, no una tabla que se estudia.                                    */
+.pm-medidas {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(90px, 100%), 1fr));
+  gap: 10px; margin-top: 12px;
+}
+.pm-medida {
+  background: var(--bg-soft, rgba(15,23,42,0.03));
+  border: 1px solid var(--border-soft); border-radius: var(--r-md);
+  padding: 12px 10px; text-align: center;
+}
+.pm-medida__v { font-size: 22px; font-weight: 800; letter-spacing: -.5px; }
+.pm-medida__v span { font-size: 12px; font-weight: 700; opacity: .6; margin-left: 2px; }
+.pm-medida__e { font-size: 11.5px; color: var(--text-sec); margin-top: 3px; }
