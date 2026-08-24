@@ -568,7 +568,12 @@ def c_pasar_lista(eid):
                       'posicion': (j.get('fut') or {}).get('posicion'),
                       'foto': j.get('profile_photo'), 'manual': False,
                       'estado': m.get('estado') or 'pendiente',
-                      'motivo': m.get('motivo') or ''})
+                      'motivo': m.get('motivo') or '',
+                      #  Lo que el jugador aviso ANTES. No es su asistencia:
+                      #  se enseña para que el entrenador sepa con quien
+                      #  contaba y no tenga que preguntar el motivo.
+                      'aviso': m.get('aviso'),
+                      'aviso_motivo': m.get('aviso_motivo') or ''})
     for x in manuales:
         m = marcas.get(str(x['id']), {})
         lista.append({'id': x['id'], 'nombre': x['nombre'], 'dorsal': x.get('dorsal'),

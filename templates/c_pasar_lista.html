@@ -58,6 +58,24 @@
       </div>
     </div>
 
+    {# Lo que avisó el jugador. Es solo información: la asistencia la marcas tú
+       abajo, después de ver quién vino de verdad. #}
+    {% if j.aviso %}
+    <div class="cl-aviso cl-aviso--{{ j.aviso }}">
+      <i data-ico="{{ 'check-circle' if j.aviso == 'ire' else ('clock' if j.aviso == 'tarde' else 'x-circle') }}"
+         class="pf-ico--xs"></i>
+      <span>
+        Avisó:
+        <b>
+          {%- if j.aviso == 'ire' %}va a venir
+          {%- elif j.aviso == 'tarde' %}llegará tarde
+          {%- else %}no puede venir{% endif -%}
+        </b>
+        {%- if j.aviso_motivo %} · {{ j.aviso_motivo }}{% endif -%}
+      </span>
+    </div>
+    {% endif %}
+
     <div class="pf-asis">
       {% for clave, etiqueta, emoji, color in estados %}
         {% if clave != 'pendiente' %}

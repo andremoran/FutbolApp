@@ -996,3 +996,23 @@ a.pf-avatar--xl::after   { inset: 0; }
   transition: transform .12s;
 }
 .pf-card--link:active { transform: scale(.99); }
+
+/*  Los tres avisos del jugador. En columna cuando no caben: «Llegaré tarde»
+    no entra al lado de los otros dos en un móvil estrecho.                  */
+.pe-avisos {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;
+}
+.pe-avisos .pf-asist-btn { flex: 1 1 auto; min-width: 96px; }
+
+/*  El aviso del jugador dentro de la lista del entrenador. Va en gris claro y
+    pequeño a propósito: es información de apoyo, no la marca de asistencia —
+    esa la pone él con los botones de abajo.                                 */
+.cl-aviso {
+  display: flex; align-items: flex-start; gap: 7px;
+  margin: 0 0 8px; padding: 7px 10px; border-radius: var(--r-md);
+  font-size: 12px; line-height: 1.5;
+  background: var(--bg-soft, rgba(15,23,42,.04)); color: var(--text-sec);
+}
+.cl-aviso--tarde  { background: var(--warning-bg); color: #92400e; }
+.cl-aviso--no_ire { background: var(--danger-bg);  color: #991b1b; }
+.cl-aviso--ire    { background: var(--primary-soft); color: #047857; }

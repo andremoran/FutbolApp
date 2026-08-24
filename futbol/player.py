@@ -202,7 +202,8 @@ def p_evento(eid):
         plan = db.one('fut_training_plans', 'plan del evento',
                       id=evento['plan_id'], coach_id=coach['id'])
 
-    #  Lo que el entrenador ya marco de el en ese evento, si paso lista.
+    #  Dos cosas distintas en la misma fila: lo que el jugador AVISO antes y
+    #  lo que el entrenador MARCO despues. La segunda manda.
     marca = (db.asistencia_de([eid], uid) or [None])[0]
 
     return render_template('p_evento.html',

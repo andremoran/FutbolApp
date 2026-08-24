@@ -251,7 +251,20 @@ def api_evento_borrar(eid):
 @bp.route('/api/asistencia', methods=['POST'])
 @api
 def api_asistencia():
-    """Marca la asistencia de UNA persona a UN evento.
+    """Dos cosas distintas que antes se escribian en la misma casilla.
+
+    · Si quien llama es el ENTRENADOR, marca la asistencia de verdad
+      (`estado`): quien vino, quien llego tarde y quien falto. Eso es lo que
+      cuenta en las estadisticas.
+
+    · Si es el JUGADOR, deja un AVISO (`aviso`): dice si piensa ir, si va a
+      llegar tarde o si no puede, y por que. NO toca `estado`.
+
+    Antes el boton «Voy» del jugador escribia `estado = presente`, o sea que
+    se apuntaba a si mismo como asistente antes de que empezara el
+    entrenamiento — y eso subia su porcentaje de asistencia aunque luego no
+    apareciera. La asistencia la pone el entrenador DESPUES de ver quien vino;
+    lo del jugador es un aviso para que se pueda contar con el.
 
     Los nombres viejos ('asiste'/'falta'/'duda') se siguen aceptando y se
     traducen: hay clientes ya instalados como PWA que los mandan.
@@ -260,19 +273,55 @@ def api_asistencia():
 
     d = body()
     eid = d.get('event_id')
+    if not eid:
+        return jsonify({'error': 'Datos incompletos.'}), 400
+
+    # ─── El jugador: un aviso, no una asistencia ────────────────────────────
+    if not es_coach():
+        crudo = (d.get('aviso') or d.get('estado') or '').strip()
+        #  Se traduce lo que mandan los botones (y los clientes viejos) a los
+        #  tres avisos que existen.
+        aviso = {'presente': 'ire', 'asiste': 'ire', 'ire': 'ire',
+                 'tarde': 'tarde',
+                 'ausente': 'no_ire', 'falta': 'no_ire', 'no_ire': 'no_ire',
+                 'justificado': 'no_ire', 'duda': 'tarde'}.get(crudo)
+        if not aviso:
+            return jsonify({'error': 'Datos incompletos.'}), 400
+
+        motivo = (d.get('motivo') or d.get('aviso_motivo') or '').strip()[:300]
+        #  Si no va a venir o llega tarde, el motivo es lo util del aviso: sin
+        #  el, el entrenador tiene que preguntar igual.
+        if aviso in ('tarde', 'no_ire') and not motivo:
+            return jsonify({'error': 'Cuéntale a tu entrenador el motivo.'}), 400
+
+        datos = {'aviso': aviso, 'aviso_motivo': motivo or None,
+                 'aviso_en': ahora(), 'actualizado': ahora()}
+        existente = db.one('fut_attendance', 'aviso', event_id=eid, player_id=current_user.id)
+        if existente:
+            db.update('fut_attendance', datos, 'aviso up',
+                      id=existente['id'], obligatorio=True)
+        else:
+            #  `estado` a None a proposito: la columna tenia DEFAULT 'duda'
+            #  y una fila creada solo con el aviso nacia con una asistencia
+            #  que nadie habia marcado. El defecto ya se quito (v11b), y esto
+            #  lo deja escrito por si alguien lo vuelve a poner.
+            datos.update({'event_id': eid, 'player_id': current_user.id,
+                          'estado': None,
+                          'registrado_por': current_user.id, 'creado': ahora()})
+            db.insert('fut_attendance', datos, 'aviso nuevo', obligatorio=True)
+        return jsonify({'ok': True, 'aviso': aviso})
+
+    # ─── El entrenador: la asistencia de verdad ─────────────────────────────
     estado = (d.get('estado') or '').strip()
     estado = {'asiste': 'presente', 'falta': 'ausente',
               'duda': 'pendiente'}.get(estado, estado)
-
     validos = {c for c, _, _, _ in ESTADOS_ASISTENCIA}
-    if not eid or estado not in validos:
+    if estado not in validos:
         return jsonify({'error': 'Datos incompletos.'}), 400
 
-    # El entrenador puede pasar lista por un jugador suyo; el jugador solo por sí mismo.
-    pid = d.get('player_id') if es_coach() else current_user.id
-    if es_coach():
-        if not pid or not de_mi_plantilla(pid):
-            return jsonify({'error': 'Ese jugador no es de tu plantilla.'}), 403
+    pid = d.get('player_id')
+    if not pid or not de_mi_plantilla(pid):
+        return jsonify({'error': 'Ese jugador no es de tu plantilla.'}), 403
 
     existente = db.one('fut_attendance', 'asist', event_id=eid, player_id=pid)
     if existente:

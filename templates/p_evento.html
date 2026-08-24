@@ -171,13 +171,17 @@
 </div>
 {% endif %}
 
-{# ══════════ TU ASISTENCIA ══════════ #}
+{# ══════════ TU AVISO ══════════
+   Esto es un AVISO, no la asistencia. La asistencia la marca el entrenador
+   después del entrenamiento, cuando ya ha visto quién vino. Lo que diga aquí
+   el jugador no suma ni resta en su porcentaje. #}
 <div class="pf-card">
-  <div class="pf-card__head"><h2 class="pf-card__title">¿Vas a ir?</h2></div>
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">¿Vas a poder ir?</h2>
+  </div>
 
-  {# Si el entrenador ya pasó lista, lo que cuenta es su marca: lo que el
-     jugador dijo antes ya no cambia nada y verlo enfrentado confunde. #}
-  {% if marca and marca.estado and marca.estado != 'pendiente' %}
+  {% if marca and marca.estado and marca.estado not in ('pendiente', None) %}
+  {# Ya pasó lista: eso es lo que cuenta y lo que se enseña. #}
   <div class="pf-alerta pf-mt-12
               {{ 'pf-alerta--bien' if marca.estado == 'presente'
                  else ('pf-alerta--warn' if marca.estado == 'tarde' else 'pf-alerta--mal') }}">
@@ -185,22 +189,44 @@
        class="pf-ico--xs"></i>
     <span>
       Tu entrenador ya pasó lista:
-      <b>
-        {%- for c, e, _, _ in estados %}{% if c == marca.estado %}{{ e }}{% endif %}{% endfor -%}
-      </b>
+      <b>{% for c, e, _, _ in estados %}{% if c == marca.estado %}{{ e }}{% endif %}{% endfor %}</b>
       {%- if marca.motivo %} · {{ marca.motivo }}{% endif -%}
     </span>
   </div>
   {% else %}
   <p style="margin:10px 0 0;font-size:13px;color:var(--text-sec);line-height:1.55">
-    Avisa para que tu entrenador pueda contar contigo.
+    Avisa para que tu entrenador pueda contar contigo. Esto no es la asistencia:
+    esa la pone él después del entrenamiento.
   </p>
-  <div style="display:flex;gap:8px;margin-top:11px" data-asist="{{ evento.id }}">
-    {% for clave, texto in [('presente', 'Voy'), ('justificado', 'Quizá'), ('ausente', 'No voy')] %}
-    <button type="button" class="pf-asist-btn"
-            data-estado="{{ clave }}" data-evento="{{ evento.id }}">{{ texto }}</button>
+
+  <div class="pe-avisos" id="pe-avisos">
+    {% for clave, texto, pide in [('ire', 'Voy', false),
+                                  ('tarde', 'Llegaré tarde', true),
+                                  ('no_ire', 'No puedo ir', true)] %}
+    <button type="button" class="pf-asist-btn{{ ' is-on' if marca and marca.aviso == clave }}"
+            data-aviso="{{ clave }}" data-pide="{{ 1 if pide else 0 }}">{{ texto }}</button>
     {% endfor %}
   </div>
+
+  {# El motivo. Se pide solo si llega tarde o no puede ir: para «Voy» no hay
+     nada que explicar y un campo de más solo estorba. #}
+  <div id="pe-motivo" {% if not (marca and marca.aviso in ('tarde', 'no_ire')) %}hidden{% endif %}>
+    <label class="pf-label pf-mt-12" for="pe-motivo-txt">¿Por qué?</label>
+    <textarea class="pf-textarea" id="pe-motivo-txt" rows="2" maxlength="300"
+              placeholder="Salgo tarde del colegio, tengo médico…">{{ marca.aviso_motivo if marca else '' }}</textarea>
+    <button class="pf-btn pf-btn--primary pf-btn--block pf-mt-12" type="button" id="pe-enviar">
+      <i data-ico="send" class="pf-ico--sm"></i> Avisar a mi entrenador
+    </button>
+  </div>
+
+  {% if marca and marca.aviso %}
+  <p class="pf-mt-12" style="font-size:12px;color:var(--text-muted);line-height:1.5">
+    Ya avisaste
+    {%- if marca.aviso == 'ire' %} de que vas
+    {%- elif marca.aviso == 'tarde' %} de que llegarás tarde
+    {%- else %} de que no puedes ir{% endif -%}. Tu entrenador lo ve en su lista.
+  </p>
+  {% endif %}
   {% endif %}
 </div>
 
@@ -215,20 +241,55 @@
 
 {% block scripts %}
 <script>
-/*  Los mismos botones que en la agenda: se avisa de si vas o no. Se reutiliza
-    el endpoint que ya existe para no tener dos formas de decir lo mismo.     */
-document.querySelectorAll('.pf-asist-btn').forEach(function (b) {
-  b.addEventListener('click', function () {
-    var todos = b.parentElement.querySelectorAll('.pf-asist-btn');
-    todos.forEach(function (x) { x.classList.remove('is-on'); });
-    b.classList.add('is-on');
-    PF.api('{{ url_for("futbol.api_asistencia") }}', { event_id: b.dataset.evento, estado: b.dataset.estado })
-      .then(function () { PF.toast('Avisado'); })
-      .catch(function (e) {
-        b.classList.remove('is-on');
-        PF.toast(e.message, 'error');
-      });
+/*  El aviso del jugador. NO es la asistencia: el servidor lo guarda en su
+    propia casilla y la lista la sigue pasando el entrenador.               */
+(function () {
+  var caja = document.getElementById('pe-avisos');
+  if (!caja) return;
+  var motivo = document.getElementById('pe-motivo');
+  var texto = document.getElementById('pe-motivo-txt');
+  var enviar = document.getElementById('pe-enviar');
+  var elegido = null;
+
+  function mandar(aviso) {
+    return PF.api('{{ url_for("futbol.api_asistencia") }}', {
+      event_id: {{ evento.id|tojson }},
+      aviso: aviso,
+      motivo: texto ? texto.value.trim() : ''
+    });
+  }
+
+  caja.querySelectorAll('.pf-asist-btn').forEach(function (b) {
+    b.addEventListener('click', function () {
+      caja.querySelectorAll('.pf-asist-btn').forEach(function (x) { x.classList.remove('is-on'); });
+      b.classList.add('is-on');
+      elegido = b.dataset.aviso;
+
+      /*  «Voy» se manda solo; los otros dos esperan al motivo, que es lo que
+          de verdad le sirve al entrenador.  */
+      if (b.dataset.pide === '1') {
+        motivo.hidden = false;
+        texto.focus();
+        return;
+      }
+      motivo.hidden = true;
+      mandar(elegido)
+        .then(function () { PF.toast('Avisado. Tu entrenador ya lo ve.'); })
+        .catch(function (e) { b.classList.remove('is-on'); PF.toast(e.message, 'error'); });
+    });
   });
-});
+
+  if (enviar) {
+    enviar.addEventListener('click', function () {
+      if (!elegido) { PF.toast('Elige primero una opción.', 'error'); return; }
+      if (!texto.value.trim()) { texto.focus(); PF.toast('Escribe el motivo.', 'error'); return; }
+      enviar.disabled = true;
+      mandar(elegido)
+        .then(function () { PF.toast('Avisado. Tu entrenador ya lo ve.'); })
+        .catch(function (e) { PF.toast(e.message, 'error'); })
+        .then(function () { enviar.disabled = false; });
+    });
+  }
+})();
 </script>
 {% endblock %}
