@@ -49,6 +49,26 @@ def perfil():
                              activo=True)
             datos['en_el_equipo_desde'] = db.parse_fecha((vinculo or {}).get('creado'))
 
+        #  Su asistencia. Cuenta SOLO lo que marco el entrenador (`estado`),
+        #  nunca lo que aviso el jugador (`aviso`): son dos cosas distintas y
+        #  mezclarlas es justo lo que se acaba de arreglar.
+        marcas = db.q(
+            lambda: db.sb().table('fut_attendance').select('estado')
+            .eq('player_id', uid).execute().data or [], [], 'mi asistencia perfil')
+        marcadas = [m for m in marcas if m.get('estado')
+                    and m['estado'] != 'pendiente']
+        if marcadas:
+            from collections import Counter
+            c = Counter(m['estado'] for m in marcadas)
+            vino = c.get('presente', 0) + c.get('tarde', 0)
+            datos['asistencia'] = {
+                'total': len(marcadas), 'vino': vino,
+                'pct': round(100 * vino / len(marcadas)),
+                'tarde': c.get('tarde', 0),
+                'faltas': c.get('ausente', 0),
+                'justificadas': c.get('justificado', 0),
+            }
+
         #  Cuantas lesiones tiene abiertas, para que el acceso a la ficha
         #  medica lo diga sin tener que entrar.
         datos['lesiones_abiertas'] = len([

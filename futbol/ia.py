@@ -56,8 +56,12 @@ def _seccion_mis_partidos(uid, coach):
               % (t['partidos'], len(partidos))]
     if t['titularidades']:
         trozos.append('%d de titular' % t['titularidades'])
-    trozos.append('%d minutos en total (%d por partido)'
-                  % (t['minutos'], round(t['minutos'] / t['partidos'])))
+    #  Solo si hay minutos: el entrenador apunta los goles en caliente y a
+    #  veces no escribe los minutos, y «0 minutos en total» se lee como que no
+    #  jugo cuando en realidad marco.
+    if t['minutos']:
+        trozos.append('%d minutos en total (%d por partido)'
+                      % (t['minutos'], round(t['minutos'] / t['partidos'])))
     for n, uno, varios in ((t['goles'], 'gol', 'goles'),
                            (t['asistencias'], 'asistencia', 'asistencias'),
                            (t['jugadas_clave'], 'jugada clave', 'jugadas clave')):

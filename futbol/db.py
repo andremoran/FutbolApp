@@ -339,9 +339,17 @@ def totales_de_partidos(coach_id, ids=None, partidos=None):
         t = tot.setdefault(clave, dict(
             {c: 0 for c in CAMPOS_PARTIDO}, partidos=0, titularidades=0))
         #  Cuenta como partido jugado si de verdad piso el campo. Una fila a
-        #  cero es «estaba en la lista y no jugo», y sumarla como partido
-        #  jugado le bajaria la media a quien no llego a entrar.
-        if (f.get('minutos') or 0) > 0:
+        #  cero entera es «estaba en la lista y no jugo», y sumarla le bajaria
+        #  la media a quien no llego a entrar.
+        #
+        #  Pero no basta con mirar los minutos: el entrenador apunta los goles
+        #  en caliente y los minutos muchas veces no los pone. Con la regla
+        #  anterior, quien marcaba dos y no tenia minutos escritos salia con
+        #  «2 goles en 0 partidos». Quien marca, asiste, ve una tarjeta o sale
+        #  de titular, jugo.
+        jugo = ((f.get('minutos') or 0) > 0 or f.get('titular')
+                or any((f.get(c) or 0) for c in CAMPOS_PARTIDO))
+        if jugo:
             t['partidos'] += 1
         if f.get('titular'):
             t['titularidades'] += 1

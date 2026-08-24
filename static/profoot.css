@@ -1016,3 +1016,15 @@ a.pf-avatar--xl::after   { inset: 0; }
 .cl-aviso--tarde  { background: var(--warning-bg); color: #92400e; }
 .cl-aviso--no_ire { background: var(--danger-bg);  color: #991b1b; }
 .cl-aviso--ire    { background: var(--primary-soft); color: #047857; }
+
+/*  La barra de asistencia del jugador. Una sola barra y un porcentaje: es un
+    dato que se mira de reojo, no un informe.                                */
+.pa-barra {
+  height: 10px; border-radius: 999px; overflow: hidden;
+  background: var(--border-soft);
+}
+.pa-barra__r {
+  height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--primary), var(--success, #10b981));
+  transition: width .4s ease;
+}
