@@ -1,0 +1,268 @@
+{% extends '_shell.html' %}
+{% block title %}Progreso de {{ jugador.nombre }} · ProFoot{% endblock %}
+
+{# Cómo ha evolucionado un jugador con el tiempo.
+
+   La ficha dice cómo está HOY; esto dice de dónde viene. Todo se compara
+   contra un momento del pasado que elige el entrenador, y cada bloque cuenta
+   su propio cambio: el perfil, las pruebas, los partidos y la asistencia. #}
+
+{% macro flecha(d, menor_mejor=false) -%}
+  {%- if d is none -%}
+    <span class="pg-d pg-d--nada">sin comparar</span>
+  {%- elif d == 0 -%}
+    <span class="pg-d pg-d--igual">igual</span>
+  {%- else -%}
+    {% set bueno = (d < 0) if menor_mejor else (d > 0) %}
+    <span class="pg-d {{ 'pg-d--sube' if bueno else 'pg-d--baja' }}">
+      {{ '+' if d > 0 }}{{ d }}
+    </span>
+  {%- endif -%}
+{%- endmacro %}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_jugador', pid=jugador.id) if not jugador.es_manual else url_for('futbol.c_manuales') }}"
+   aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Progreso · {{ etiqueta_periodo }}</div>{% endblock %}
+{% block hero_title %}{{ jugador.nombre }}{% endblock %}
+
+{% block head %}
+<style>
+  .pg-periodos { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px;
+                 -webkit-overflow-scrolling: touch; }
+  .pg-periodo { flex: none; padding: 7px 13px; border-radius: 100px; font-size: 12.5px;
+                font-weight: 700; background: var(--border-soft); color: var(--text-sec);
+                text-decoration: none; position: relative; }
+  .pg-periodo::after { content: ''; position: absolute; inset: -7px -2px; }
+  .pg-periodo.on { background: var(--primary); color: #fff; }
+
+  .pg-d { font-size: 12px; font-weight: 800; padding: 2px 7px; border-radius: 100px;
+          white-space: nowrap; }
+  .pg-d--sube  { background: var(--primary-soft); color: #047857; }
+  .pg-d--baja  { background: var(--danger-bg);    color: #991b1b; }
+  .pg-d--igual { background: var(--border-soft);  color: var(--text-muted); }
+  .pg-d--nada  { background: transparent; color: var(--text-muted); font-weight: 600; }
+
+  .pg-grande { display: flex; align-items: baseline; gap: 10px; margin-top: 10px; }
+  .pg-grande__v { font-size: 40px; font-weight: 800; letter-spacing: -1.5px; line-height: 1; }
+
+  .pg-fam { font-size: 10.5px; font-weight: 800; letter-spacing: .5px;
+            text-transform: uppercase; color: var(--text-muted);
+            margin: 14px 0 6px; }
+  .pg-fila { display: flex; align-items: center; gap: 10px; padding: 8px 0;
+             border-top: 1px solid var(--border-soft); }
+  .pg-fila:first-of-type { border-top: none; }
+  .pg-fila__n { flex: 1; min-width: 0; font-size: 13.5px; }
+  .pg-fila__v { flex: none; font-size: 14px; font-weight: 800; width: 34px;
+                text-align: right; }
+  .pg-barra { flex: none; width: 62px; height: 6px; border-radius: 99px;
+              background: var(--border-soft); overflow: hidden; }
+  .pg-barra__r { height: 100%; border-radius: 99px; background: var(--primary); }
+
+  .pg-test { padding: 11px 0; border-top: 1px solid var(--border-soft); }
+  .pg-test:first-of-type { border-top: none; }
+  .pg-test__t { font-size: 13.5px; font-weight: 700; }
+  .pg-test__d { font-size: 12px; color: var(--text-sec); margin-top: 3px; }
+
+  .pg-cifras { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(88px,100%), 1fr));
+               gap: 9px; margin-top: 12px; }
+  .pg-cifra { background: var(--bg-soft, rgba(15,23,42,.03));
+              border: 1px solid var(--border-soft); border-radius: var(--r-md);
+              padding: 10px; text-align: center; }
+  .pg-cifra__v { font-size: 20px; font-weight: 800; letter-spacing: -.5px; }
+  .pg-cifra__e { font-size: 11px; color: var(--text-sec); margin-top: 2px; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ══════════ EL PERIODO ══════════ #}
+<div class="pf-card">
+  <div class="pg-periodos">
+    {% for clave, etiqueta, _ in periodos %}
+    <a class="pg-periodo {{ 'on' if periodo == clave }}"
+       href="{{ url_for('futbol.c_progreso_jugador', pid=jugador.id, periodo=clave) }}">{{ etiqueta }}</a>
+    {% endfor %}
+  </div>
+</div>
+
+{# ══════════ EL PERFIL DINÁMICO ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Perfil dinámico</h2>
+    {% if resumen.fotos %}
+    <span class="pf-card__badge">{{ resumen.fotos }} foto{{ 's' if resumen.fotos != 1 }}</span>
+    {% endif %}
+  </div>
+
+  {% if resumen.overall is not none %}
+  <div class="pg-grande">
+    <span class="pg-grande__v">{{ resumen.overall }}</span>
+    {{ flecha(resumen.delta) }}
+  </div>
+  {% if resumen.desde %}
+  <p style="margin:6px 0 0;font-size:12px;color:var(--text-muted)">
+    Comparado con la semana del {{ resumen.desde }}
+  </p>
+  {% elif resumen.fotos <= 1 %}
+  {# Sin dos fotos no hay evolución que enseñar, y decirlo es más honesto que
+     pintar un cero que se lee como «no ha mejorado». #}
+  <div class="pf-alerta pf-alerta--info pf-mt-12">
+    <i data-ico="info" class="pf-ico--xs"></i>
+    <span>
+      Solo hay una foto guardada de este jugador. La evolución aparece a
+      partir de la segunda evaluación: cada vez que le evalúes se guarda cómo
+      estaba esa semana.
+    </span>
+  </div>
+  {% endif %}
+
+  {% for fam, titulo in [('tecnica', 'Técnica'), ('fisico', 'Físico'), ('mental', 'Mental')] %}
+  {% set delfam = atributos | selectattr('familia', 'equalto', fam) | list %}
+  {% if delfam %}
+  <div class="pg-fam">{{ titulo }}</div>
+  {% for a in delfam %}
+  <div class="pg-fila">
+    <span class="pg-fila__n">{{ a.etiqueta }}</span>
+    <span class="pg-barra">
+      <span class="pg-barra__r" style="width:{{ (a.hoy or 0) * 10 }}%"></span>
+    </span>
+    <span class="pg-fila__v">{{ a.hoy if a.hoy is not none else '–' }}</span>
+    {{ flecha(a.delta) }}
+  </div>
+  {% endfor %}
+  {% endif %}
+  {% endfor %}
+
+  {% else %}
+  <div class="pf-empty" style="padding:20px 8px">
+    <div class="pf-empty__icon"><i data-ico="trending-up" class="pf-ico--xxl"></i></div>
+    <h3 class="pf-empty__title">Todavía sin evaluar</h3>
+    <p class="pf-empty__text">
+      En cuanto le pongas su primera evaluación empieza a guardarse cómo va
+      cambiando semana a semana.
+    </p>
+  </div>
+  {% endif %}
+</div>
+
+{# ══════════ LAS PRUEBAS ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Pruebas</h2>
+    {% if tests %}<span class="pf-card__badge">{{ tests|length }}</span>{% endif %}
+  </div>
+
+  {% if tests %}
+  {% for t in tests %}
+  <div class="pg-test">
+    <div class="pf-row" style="gap:10px;align-items:flex-start">
+      <span class="pf-grow">
+        <span class="pg-test__t" style="display:block">{{ t.nombre }}</span>
+        <span class="pg-test__d" style="display:block">
+          {%- if t.veces > 1 -%}
+            {{ t.primera }} {{ t.unidad }} ({{ t.fecha_primera }})
+            → {{ t.ultima }} {{ t.unidad }} ({{ t.fecha_ultima }})
+          {%- else -%}
+            {{ t.ultima }} {{ t.unidad }} · una sola marca en este periodo
+          {%- endif -%}
+          {%- if t.nivel %} · {{ t.nivel }}{% endif -%}
+        </span>
+      </span>
+      {% if t.veces > 1 %}{{ flecha(t.mejora) }}{% endif %}
+    </div>
+  </div>
+  {% endfor %}
+  <p style="margin:12px 0 0;font-size:11.5px;color:var(--text-muted);line-height:1.5">
+    En las pruebas de tiempo, bajar es mejorar: la flecha ya lo tiene en cuenta.
+  </p>
+  {% else %}
+  <div class="pf-empty" style="padding:18px 8px">
+    <p class="pf-empty__text">Ninguna prueba tomada en este periodo.</p>
+  </div>
+  {% endif %}
+</div>
+
+{# ══════════ COMPETICIÓN ══════════ #}
+{% if competicion and competicion.partidos %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">En partido</h2>
+    <span class="pf-card__badge">{{ competicion.partidos }} jugado{{ 's' if competicion.partidos != 1 }}</span>
+  </div>
+  <div class="pg-cifras">
+    {% for etq, valor in [('Goles', competicion.goles), ('Asistencias', competicion.asistencias),
+                          ('Minutos', competicion.minutos), ('Jugadas clave', competicion.jugadas_clave)] %}
+    <div class="pg-cifra">
+      <div class="pg-cifra__v">{{ valor }}</div>
+      <div class="pg-cifra__e">{{ etq }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  <p style="margin:10px 0 0;font-size:12px;color:var(--text-sec)">
+    {{ competicion.titularidades }} de titular
+    {%- if competicion.tarjetas_a or competicion.tarjetas_r %} ·
+      {{ competicion.tarjetas_a }}🟨 {{ competicion.tarjetas_r }}🟥
+    {%- endif %}
+  </p>
+</div>
+{% endif %}
+
+{# ══════════ ASISTENCIA ══════════ #}
+{% if asistencia %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Asistencia</h2>
+    <span class="pf-card__badge">{{ asistencia.total }} sesion{{ 'es' if asistencia.total != 1 }}</span>
+  </div>
+  <div class="pa-barra pf-mt-12">
+    <div class="pa-barra__r" style="width:{{ asistencia.pct }}%"></div>
+  </div>
+  <div class="pf-row pf-mt-12" style="justify-content:space-between;align-items:baseline">
+    <span style="font-size:24px;font-weight:800;letter-spacing:-.5px">{{ asistencia.pct }}%</span>
+    <span style="font-size:12.5px;color:var(--text-sec)">
+      vino a {{ asistencia.vino }} de {{ asistencia.total }}
+    </span>
+  </div>
+  {% if asistencia.tarde or asistencia.faltas or asistencia.justificadas %}
+  <p style="margin:9px 0 0;font-size:12.5px;color:var(--text-sec);line-height:1.5">
+    {%- if asistencia.tarde %}{{ asistencia.tarde }} tarde{% endif -%}
+    {%- if asistencia.tarde and (asistencia.faltas or asistencia.justificadas) %} · {% endif -%}
+    {%- if asistencia.faltas %}{{ asistencia.faltas }} sin justificar{% endif -%}
+    {%- if asistencia.faltas and asistencia.justificadas %} · {% endif -%}
+    {%- if asistencia.justificadas %}{{ asistencia.justificadas }} justificada{{ 's' if asistencia.justificadas != 1 }}{% endif -%}
+  </p>
+  {% endif %}
+</div>
+{% endif %}
+
+{# ══════════ LESIONES ══════════ #}
+{% if lesiones %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Lesiones en este periodo</h2>
+    <span class="pf-card__badge">{{ lesiones|length }}</span>
+  </div>
+  {% for l in lesiones %}
+  <div class="pf-item">
+    <span class="pf-item__icon" style="background:var(--danger-bg);color:var(--danger)">
+      <i data-ico="alert-triangle" class="pf-ico--sm"></i>
+    </span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">{{ l.zona or 'Lesión' }}{% if l.tipo %} · {{ l.tipo }}{% endif %}</span>
+      <span class="pf-item__sub">
+        {%- if l._fecha %}{{ l._fecha.strftime('%d/%m/%Y') }}{% endif -%}
+        {%- if l.gravedad %} · {{ l.gravedad }}{% endif -%}
+        {%- if l.estado %} · {{ l.estado }}{% endif -%}
+      </span>
+    </span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div style="height:28px"></div>
+{% endblock %}

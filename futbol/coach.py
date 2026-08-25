@@ -275,6 +275,185 @@ def c_equipo():
                            codigo=db.codigo_equipo(uid))
 
 
+#  Los periodos que se pueden mirar. El de un mes es el que sale por defecto:
+#  una semana suele ser poco para que se mueva nada, y tres meses ya es una
+#  pregunta distinta.
+PERIODOS = [
+    ('7',    'Una semana',         7),
+    ('30',   'Un mes',             30),
+    ('90',   'Tres meses',         90),
+    ('365',  'Una temporada',      365),
+    ('todo', 'Desde el principio', None),
+]
+
+
+def _dias_del_periodo(clave):
+    for c, _, d in PERIODOS:
+        if c == clave:
+            return d
+    return 30
+
+
+def _delta(ahora, antes):
+    """El cambio entre dos numeros, o None si falta alguno.
+
+    Devolver None y no cero importa: «no habia dato» y «no cambio» son cosas
+    distintas, y en una pantalla de evolucion se leen muy distinto.
+    """
+    if ahora is None or antes is None:
+        return None
+    return round(ahora - antes, 1)
+
+
+@bp.route('/coach/jugador/<pid>/progreso')
+@solo_entrenador
+def c_progreso_jugador(pid):
+    """Como ha evolucionado un jugador, con todo lo que la app sabe de el.
+
+    Responde a «¿esta mejorando?» sin que el entrenador tenga que ir juntando
+    cuatro pantallas: su ficha dice como esta HOY, y esto dice de donde viene.
+
+    Todo se compara contra un momento del pasado que el elige —una semana, un
+    mes, la temporada— y cada bloque cuenta su propio cambio.
+    """
+    from datetime import date, timedelta
+    from . import evaluaciones as ev
+
+    uid = db.equipo_id(current_user.id)
+
+    #  El jugador, tenga cuenta o no. `plantilla_completa` evita el fallo de
+    #  siempre: buscar solo entre los registrados y no encontrar a nadie.
+    jugador = next((x for x in db.plantilla_completa(uid) if str(x['id']) == str(pid)), None)
+    if not jugador:
+        abort(404)
+    dueno = db.dueno_filtro(
+        player_id=None if jugador['es_manual'] else pid,
+        manual_player_id=pid if jugador['es_manual'] else None)
+
+    clave = request.args.get('periodo', '30')
+    dias = _dias_del_periodo(clave)
+    desde = (date.today() - timedelta(days=dias)) if dias else None
+    desde_iso = desde.isoformat() if desde else '0000-01-01'
+
+    # ─── El perfil dinamico: hoy contra entonces ────────────────────────────
+    historial = db.rows('fut_attribute_history', 'historial progreso',
+                        _order='semana', **dueno) or []
+    ficha = db.ficha_atributos(**dueno)
+
+    dentro = [h for h in historial if (h.get('semana') or '') >= desde_iso]
+    #  La referencia es la ultima foto ANTERIOR al periodo; si no la hay, la
+    #  primera que caiga dentro. Comparar contra la de hoy no diria nada.
+    antes = next((h for h in reversed(historial) if (h.get('semana') or '') < desde_iso),
+                 dentro[0] if dentro else None)
+    hoy = historial[-1] if historial else None
+
+    def _valor(foto, k):
+        return ((foto or {}).get('atributos') or {}).get(k)
+
+    atributos = []
+    for k in db.ATRIBUTOS_18:
+        v_hoy = _valor(hoy, k)
+        if v_hoy is None:
+            v_hoy = ficha.get(k)
+        atributos.append({
+            'clave': k,
+            'etiqueta': k.replace('_', ' ').capitalize(),
+            'familia': ('tecnica' if k in db.ATRIBUTOS_TECNICOS
+                        else 'fisico' if k in db.ATRIBUTOS_FISICOS else 'mental'),
+            'hoy': v_hoy,
+            'delta': _delta(v_hoy, _valor(antes, k)),
+        })
+
+    overall_hoy = (hoy or {}).get('overall') if hoy else ficha.get('overall')
+    resumen = {
+        'overall': overall_hoy,
+        'delta': _delta(overall_hoy, (antes or {}).get('overall')),
+        'desde': (antes or {}).get('semana'),
+        'fotos': len(historial),
+        'serie': [{'semana': h.get('semana'), 'overall': h.get('overall')}
+                  for h in historial if h.get('overall') is not None],
+    }
+
+    # ─── Las pruebas: primera contra ultima del periodo ─────────────────────
+    if jugador['es_manual']:
+        marcas = [f for f in ev.resultados_equipo(uid, 400)
+                  if str(f.get('manual_player_id')) == str(pid)]
+    else:
+        marcas = ev.resultados_de(pid, 300)
+    marcas = ev.enriquecer(marcas, uid, con_nivel=True)
+
+    pruebas = {}
+    for m in sorted([x for x in marcas if (x.get('fecha') or '') >= desde_iso],
+                    key=lambda x: x.get('fecha') or ''):
+        p = pruebas.setdefault(m.get('test_clave'), {
+            'nombre': m.get('test_nombre') or m.get('test_clave'),
+            'unidad': m.get('_unidad') or '',
+            'menor_mejor': m.get('_menor_mejor'),
+            'marcas': []})
+        p['marcas'].append(m)
+
+    tests = []
+    for p in pruebas.values():
+        primera, ultima = p['marcas'][0], p['marcas'][-1]
+        a, b = primera.get('_valor'), ultima.get('_valor')
+        mejora = None
+        if isinstance(a, (int, float)) and isinstance(b, (int, float)) and a != b:
+            #  En una prueba de tiempo, bajar es mejorar. Se normaliza aqui
+            #  para que la pantalla no tenga que saber de que va cada prueba.
+            mejora = round((a - b) if p['menor_mejor'] else (b - a), 2)
+        tests.append({
+            'nombre': p['nombre'], 'unidad': p['unidad'], 'veces': len(p['marcas']),
+            'primera': a, 'ultima': b, 'mejora': mejora,
+            'menor_mejor': p['menor_mejor'],
+            'fecha_primera': primera.get('fecha'), 'fecha_ultima': ultima.get('fecha'),
+            'nivel': (ultima.get('_nivel_meta') or {}).get('etiqueta'),
+            'serie': [{'fecha': x.get('fecha'), 'valor': x.get('_valor')}
+                      for x in p['marcas'] if isinstance(x.get('_valor'), (int, float))],
+        })
+    tests.sort(key=lambda t: -t['veces'])
+
+    # ─── Competicion y compromiso, dentro del periodo ───────────────────────
+    partidos = [m for m in (db.rows('fut_matches', 'partidos progreso', coach_id=uid) or [])
+                if (m.get('fecha') or '') >= desde_iso]
+    competicion = db.totales_de_partidos(uid, ids={pid},
+                                         partidos=partidos or None).get(pid)
+
+    columna = 'manual_player_id' if jugador['es_manual'] else 'player_id'
+    marcas_asis = db.q(
+        lambda: db.sb().table('fut_attendance').select('estado,event_id')
+        .eq(columna, pid).execute().data or [], [], 'asistencia progreso')
+    eventos_periodo = {e['id'] for e in (db.eventos_equipo(uid) or [])
+                       if (e.get('fecha') or '') >= desde_iso}
+    #  Solo lo que marco el entrenador. El aviso del jugador no es asistencia.
+    puestas = [m for m in marcas_asis
+               if m.get('estado') and m['estado'] != 'pendiente'
+               and m.get('event_id') in eventos_periodo]
+    asistencia = None
+    if puestas:
+        from collections import Counter
+        c = Counter(m['estado'] for m in puestas)
+        vino = c.get('presente', 0) + c.get('tarde', 0)
+        asistencia = {'total': len(puestas), 'vino': vino,
+                      'pct': round(100 * vino / len(puestas)),
+                      'tarde': c.get('tarde', 0), 'faltas': c.get('ausente', 0),
+                      'justificadas': c.get('justificado', 0)}
+
+    # ─── Lesiones del periodo ───────────────────────────────────────────────
+    lesiones = [l for l in (db.rows('fut_injuries', 'lesiones progreso', **dueno) or [])
+                if (l.get('fecha') or '') >= desde_iso]
+    for l in lesiones:
+        l['_fecha'] = db.parse_fecha(l.get('fecha'))
+
+    return render_template('c_progreso_jugador.html',
+                           tab_activa='equipo', hide_tabbar=True,
+                           jugador=jugador, periodos=PERIODOS, periodo=clave,
+                           etiqueta_periodo=next((e for c, e, _ in PERIODOS if c == clave), ''),
+                           resumen=resumen, atributos=atributos, tests=tests,
+                           competicion=competicion, asistencia=asistencia,
+                           lesiones=lesiones,
+                           es_pro=roles.es_pro(current_user))
+
+
 def _valoracion_media(coach_id, pid, manual):
     """La media de las valoraciones puestas partido a partido.
 

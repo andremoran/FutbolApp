@@ -630,7 +630,36 @@ def guardar_atributos(player_id=None, manual_player_id=None, **campos):
             datos[campo] = fusion[campo]
     datos['actualizado'] = _ahora()
 
-    return _upsert_dueno('fut_attributes', dueno, datos, 'guardar atributos')
+    fila = _upsert_dueno('fut_attributes', dueno, datos, 'guardar atributos')
+
+    #  Y se guarda la foto de esta semana. Antes el historico SOLO se escribia
+    #  al pulsar «Recalcular evolucion del equipo», un boton que nadie se
+    #  acuerda de tocar: por eso habia 38 filas y todas del mismo lunes. Sin
+    #  fotos repartidas en el tiempo no hay evolucion que ensenar, por mucho
+    #  que la pantalla este bien hecha.
+    #
+    #  Es un upsert por (jugador, semana): evaluar tres veces el mismo martes
+    #  no crea tres filas, actualiza la de esa semana.
+    if fila:
+        _foto_de_esta_semana(dueno)
+    return fila
+
+
+def _foto_de_esta_semana(dueno):
+    """Deja guardado como esta el jugador esta semana.
+
+    No toca las alertas: de eso se sigue encargando el recalculo del equipo.
+    Aqui solo interesa que quede el rastro, y que quede sin que nadie tenga
+    que acordarse.
+    """
+    fila = one('fut_attributes', 'ficha para la foto', **dueno)
+    if not fila or fila.get('overall') is None:
+        return
+    _upsert_dueno('fut_attribute_history',
+                  {**dueno, 'semana': _lunes_de_esta_semana()},
+                  {'atributos': {k: fila.get(k) for k in ATRIBUTOS_18},
+                   'overall': fila['overall'], 'origen': 'automatico'},
+                  'foto semanal')
 
 
 def guardar_familias(player_id, valores):

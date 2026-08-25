@@ -132,6 +132,14 @@
 
   {# Lo demás del jugador. Desde aquí no se llegaba: para corregirle el dorsal
      o mirarle las alergias había que volver a Equipo y buscarlo otra vez. #}
+  {# El progreso, primero y en primario: es la pregunta que trae aquí al
+     entrenador —«¿está mejorando?»— y hasta ahora había que deducirla
+     mirando cuatro pantallas. #}
+  <a class="pf-btn pf-btn--primary pf-btn--block pf-mt-12"
+     href="{{ url_for('futbol.c_progreso_jugador', pid=jugador.id) }}">
+    <i data-ico="trending-up" class="pf-ico--sm"></i> Ver su progreso
+  </a>
+
   <div class="pf-row pf-mt-12" style="gap:8px">
     <a class="pf-btn pf-btn--ghost pf-grow"
        href="{{ url_for('futbol.c_medico_jugador', pid=jugador.id) }}">

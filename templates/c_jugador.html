@@ -142,6 +142,22 @@
 </div>
 {% endif %}
 
+{# El progreso en el tiempo. La ficha de arriba dice cómo está HOY; esto
+   dice de dónde viene. #}
+<a class="pf-card pf-card--link"
+   href="{{ url_for('futbol.c_progreso_jugador', pid=jugador.id) }}">
+  <div class="pf-item" style="padding:0">
+    <span class="pf-item__icon" style="background:var(--primary-soft);color:var(--primary)">
+      <i data-ico="trending-up" class="pf-ico--sm"></i>
+    </span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">Ver su progreso</span>
+      <span class="pf-item__sub">Cómo ha evolucionado esta semana, este mes o la temporada</span>
+    </span>
+    <span class="pf-item__chev"><i data-ico="chevron-right" class="pf-ico--sm"></i></span>
+  </div>
+</a>
+
 {# ── Perfil Dinámico: 18 atributos por familia ── #}
 {# TeamPlayersScreen.tsx: overall/potencial + TÉC/FÍS/MEN, aquí con el detalle
    de cada uno de los 18 (ficha_atributos, futbol/db.py). #}
