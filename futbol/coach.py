@@ -548,6 +548,21 @@ def datos_de_progreso(uid, jugador, clave='30'):
     }
 
 
+def ultimo_analisis(dueno):
+    """La ultima lectura que pidio la IA de este jugador, del periodo que sea.
+
+    Hay una fila por jugador y periodo, asi que puede haber varias. Se coge la
+    mas reciente: preguntar «¿de que periodo quieres el informe?» en una
+    pantalla de evaluar es preguntar por preguntar.
+    """
+    filas = db.rows('fut_ia_analisis', 'analisis del jugador', **dueno) or []
+    if not filas:
+        return None
+    fila = max(filas, key=lambda f: f.get('creado') or '')
+    fila['_creado'] = db.fecha_local(fila.get('creado'))
+    return fila
+
+
 @bp.route('/coach/jugador/<pid>/progreso')
 @solo_entrenador
 def c_progreso_jugador(pid):
@@ -573,7 +588,15 @@ def c_progreso_jugador(pid):
     analisis = db.one('fut_ia_analisis', 'analisis guardado',
                       periodo=clave, **datos['dueno'])
     if analisis:
-        analisis['_creado'] = db.parse_fecha(analisis.get('creado'))
+        analisis['_creado'] = db.fecha_local(analisis.get('creado'))
+    else:
+        #  Si no hay del periodo elegido pero si de otro, se ensena ese en vez
+        #  de una tarjeta vacia: el entrenador ya pago esa lectura.
+        otro = ultimo_analisis(datos['dueno'])
+        if otro:
+            otro['_de_otro_periodo'] = next(
+                (e for c, e, _ in PERIODOS if c == otro.get('periodo')), '')
+            analisis = otro
 
     return render_template('c_progreso_jugador.html',
                            tab_activa='equipo', hide_tabbar=True,
@@ -741,6 +764,13 @@ def c_evaluar(pid):
     fila = db.fila_atributos(**dueno) or {}
     perfil = {} if manual else db.perfil_jugador(pid)
 
+    analisis = ultimo_analisis(dueno)
+    pie_analisis = 'Todavía sin analizar. Mira su progreso para elegir periodo.'
+    if analisis:
+        pie_analisis = ('Sobre %s. En «Ver su progreso» puedes pedirlo de otro periodo.'
+                        % (next((e for c, e, _ in PERIODOS
+                                 if c == analisis.get('periodo')), 'un mes')).lower())
+
     return render_template('c_evaluar.html',
                            hide_tabbar=True,
                            jugador=jugador,
@@ -752,9 +782,13 @@ def c_evaluar(pid):
                            delta=delta_overall,
                            historial=historial,
                            stats=stats,
-                           # El informe lo escribe la IA (fase 6): hasta que el
-                           # proxy esté desplegado, la tarjeta lo dice y ya.
-                           reporte=None,
+                           #  La lectura de la IA. Aqui se ensena la ULTIMA que
+                           #  se pidiera, sea del periodo que sea, con su fecha
+                           #  y de que periodo era: es una pantalla de trabajo y
+                           #  lo que interesa es «que dijo la IA de este chico»,
+                           #  no elegir ventana. Para eso esta la de progreso.
+                           analisis=analisis,
+                           pie_analisis=pie_analisis,
                            actualizado=db.parse_fecha(fila.get('actualizado')),
                            niveles_fatiga=db.NIVELES_FATIGA,
                            fatiga_nivel=db.nivel_de_fatiga(ficha.get('fatiga')))

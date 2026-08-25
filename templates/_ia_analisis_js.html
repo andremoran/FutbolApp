@@ -1,0 +1,76 @@
+{# ============================================================================
+   _ia_analisis_js.html — El JS de _ia_analisis.html.
+
+   Va aparte porque tiene que ir en {% block scripts %}: profoot.js se carga al
+   final del body, así que un <script> metido en medio del contenido correría
+   antes de que exista PF y no haría nada.
+   ============================================================================ #}
+<script>
+  /*  Pedir el análisis. Tarda —la IA lee todo el periodo— así que el botón se
+      queda diciendo en qué anda: sin eso, a los cuatro segundos el entrenador
+      lo pulsa otra vez y se le gasta otro uso de la cuota.  */
+  (function () {
+    var caja  = document.getElementById('pg-ia');
+    var boton = document.getElementById('pg-ia-boton');
+    if (!caja || !boton) { return; }
+    var cuerpo = document.getElementById('pg-ia-cuerpo');
+    var fecha  = document.getElementById('pg-ia-fecha');
+    var texto  = boton.querySelector('span');
+
+    /*  Se arma con createElement y textContent, no pegando cadenas: el
+        análisis lleva nombres de jugadores y lo que escriba la IA, y eso no
+        se mete en innerHTML.  */
+    function bloque(titulo, ico, tono, puntos) {
+      if (!puntos || !puntos.length) { return []; }
+      var cab = document.createElement('div');
+      cab.className = 'pg-ia__sub';
+      cab.style.color = tono;
+      var i = document.createElement('i');
+      i.setAttribute('data-ico', ico);
+      i.className = 'pf-ico--xs';
+      cab.appendChild(i);
+      cab.appendChild(document.createTextNode(' ' + titulo));
+
+      var fuera = [cab];
+      puntos.forEach(function (p) {
+        var li = document.createElement('p');
+        li.className = 'pg-ia__li';
+        li.textContent = p;
+        fuera.push(li);
+      });
+      return fuera;
+    }
+
+    boton.addEventListener('click', function () {
+      boton.disabled = true;
+      var antes = texto.textContent;
+      texto.textContent = 'Leyendo sus datos…';
+
+      PF.api('{{ url_for("futbol.api_analisis_evolucion") }}',
+             { pid: caja.dataset.pid, periodo: caja.dataset.periodo })
+        .then(function (r) {
+          var a = r.analisis || {};
+          cuerpo.innerHTML = '';
+          var p = document.createElement('p');
+          p.className = 'pg-ia__t';
+          p.textContent = a.resumen || '';
+          cuerpo.appendChild(p);
+          []
+            .concat(bloque('Lo que va bien', 'trending-up', 'var(--primary)', a.fuerte))
+            .concat(bloque('A mejorar', 'alert-circle', '#b45309', a.mejorar))
+            .concat(bloque('Qué hacer estas semanas', 'target', '#7e6acb', a.plan))
+            .forEach(function (el) { cuerpo.appendChild(el); });
+
+          if (fecha) { fecha.textContent = new Date().toLocaleDateString('es-ES'); }
+          texto.textContent = 'Volver a analizar';
+          if (window.PF && PF.icons) { PF.icons(cuerpo); }
+          PF.toast('Analizado.');
+        })
+        .catch(function (e) {
+          texto.textContent = antes;
+          PF.toast(e.message, 'error');
+        })
+        .then(function () { boton.disabled = false; });
+    });
+  })();
+</script>

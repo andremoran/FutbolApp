@@ -905,6 +905,24 @@ def anio_de(fecha_nacimiento=None, anio_nacimiento=None):
         return None
 
 
+#  Las horas se guardan en UTC (api.ahora()). Ecuador va a UTC-5 y no cambia
+#  de hora en todo el año, asi que basta con restar cinco: sin esto, entre las
+#  19:00 y medianoche —justo cuando el entrenador repasa despues del
+#  entrenamiento— un informe de hoy sale fechado MAÑANA.
+HORAS_UTC_LOCAL = -5
+
+
+def fecha_local(s, por_defecto=None):
+    """La fecha de una marca de tiempo UTC, en la hora de aqui."""
+    if not s:
+        return por_defecto
+    try:
+        return (datetime.fromisoformat(str(s)[:19])
+                + timedelta(hours=HORAS_UTC_LOCAL)).date()
+    except Exception:
+        return parse_fecha(s, por_defecto)
+
+
 def parse_fecha(s, por_defecto=None):
     """Acepta 'YYYY-MM-DD' o ISO completo; devuelve date o `por_defecto`."""
     if not s:

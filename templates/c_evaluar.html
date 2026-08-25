@@ -222,35 +222,17 @@
 {% endif %}
 
 {# ══════════ REPORTE DE LA IA ══════════ #}
-<div class="pf-card">
-  <div class="ev-ia__cab">
-    <span class="ev-fam__ico" style="background:#ede9fe;color:#7e6acb">
-      <i data-ico="cpu" class="pf-ico--sm"></i>
-    </span>
-    <h2 class="pf-card__title">Reporte IA semanal</h2>
-    {% if reporte and reporte.rango %}<span class="ev-ia__f">{{ reporte.rango }}</span>{% endif %}
-  </div>
-
-  {% if reporte and reporte.resumen %}
-    <p class="ev-ia__t">{{ reporte.resumen }}</p>
-    {% for titulo, ico, color, puntos in [
-        ('Recomendaciones', 'target', 'var(--primary)', reporte.recomendaciones or []),
-        ('Próxima semana', 'flag', 'var(--text-sec)', reporte.proxima or [])] %}
-      {% if puntos %}
-      <div class="ev-ia__sub" style="color:{{ color }}">
-        <i data-ico="{{ ico }}" class="pf-ico--xs"></i> {{ titulo }}
-      </div>
-      {% for p in puntos %}<p class="ev-ia__li">{{ p }}</p>{% endfor %}
-      {% endif %}
-    {% endfor %}
-  {% else %}
-    <p class="ev-ia__vacio">
-      Todavía no hay informe. Lo escribe la IA a partir de la asistencia, los
-      partidos y las pruebas de la semana — está pendiente de que se despliegue
-      el servicio de IA.
-    </p>
-  {% endif %}
-</div>
+{# Esta tarjeta llevaba desde el principio diciendo «pendiente de que se
+   despliegue el servicio de IA»: la ruta pasaba `reporte=None` a pelo y no
+   habia ni quien lo escribiera ni donde guardarlo. Ahora es la misma tarjeta
+   que la pantalla de progreso, con el mismo texto y sacado de los mismos
+   numeros — que dos pantallas digan cosas distintas del mismo jugador el
+   mismo dia es peor que no decir nada. #}
+{% with pid = jugador.id, periodo = (analisis.periodo if analisis else '30'),
+        analisis = analisis, titulo = 'Reporte IA',
+        pie = pie_analisis %}
+  {% include '_ia_analisis.html' %}
+{% endwith %}
 
 {# ══════════ ESTADO FÍSICO ══════════ #}
 <div class="pf-card">
@@ -451,4 +433,5 @@
   });
 })();
 </script>
+{% include '_ia_analisis_js.html' %}
 {% endblock %}

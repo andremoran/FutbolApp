@@ -1,0 +1,72 @@
+{# ============================================================================
+   _ia_analisis.html — La tarjeta con la lectura de la IA sobre un jugador.
+
+   La misma en la pantalla de progreso y en la de evaluar: es el mismo texto,
+   sacado de los mismos numeros, y tenerlo escrito dos veces solo garantiza
+   que un dia digan cosas distintas.
+
+   Se usa así, dentro del bloque de contenido:
+     {% with pid = jugador.id, periodo = '30', analisis = analisis %}
+       {% include '_ia_analisis.html' %}
+     {% endwith %}
+
+   Y el JS que la rellena, dentro de {% block scripts %}:
+     {% include '_ia_analisis_js.html' %}
+
+   `analisis` es la fila de fut_ia_analisis, o None si nadie la ha pedido.
+   `titulo` y `pie` son opcionales.
+   ============================================================================ #}
+
+<div class="pf-card" id="pg-ia" data-pid="{{ pid }}" data-periodo="{{ periodo|default('30', true) }}">
+  <div class="pf-row" style="gap:10px;align-items:center">
+    <span class="pf-item__icon" style="background:#ede9fe;color:#7e6acb">
+      <i data-ico="cpu" class="pf-ico--sm"></i>
+    </span>
+    <h2 class="pf-card__title pf-grow" style="margin:0">
+      {{ titulo|default('Análisis de la IA', true) }}
+    </h2>
+    <span class="pg-ia__f" id="pg-ia-fecha">
+      {%- if analisis and analisis._creado %}{{ analisis._creado.strftime('%d/%m/%Y') }}{% endif -%}
+    </span>
+  </div>
+
+  <div id="pg-ia-cuerpo">
+    {% if analisis and analisis.resumen %}
+    {# Si lo que se enseña es de otro periodo hay que decirlo, o se lee un
+       informe de tres meses creyendo que es el de esta semana. #}
+    {% if analisis._de_otro_periodo %}
+    <p class="pg-ia__aviso">
+      <i data-ico="info" class="pf-ico--xs"></i>
+      Este análisis es de otro periodo: {{ analisis._de_otro_periodo|lower }}.
+    </p>
+    {% endif %}
+    <p class="pg-ia__t">{{ analisis.resumen }}</p>
+    {% for titulo_b, ico, tono, clave in [
+        ('Lo que va bien', 'trending-up', 'var(--primary)', 'fuerte'),
+        ('A mejorar', 'alert-circle', '#b45309', 'mejorar'),
+        ('Qué hacer estas semanas', 'target', '#7e6acb', 'plan')] %}
+    {% set puntos = (analisis.puntos or {}).get(clave) %}
+    {% if puntos %}
+    <div class="pg-ia__sub" style="color:{{ tono }}">
+      <i data-ico="{{ ico }}" class="pf-ico--xs"></i> {{ titulo_b }}
+    </div>
+    {% for p in puntos %}<p class="pg-ia__li">{{ p }}</p>{% endfor %}
+    {% endif %}
+    {% endfor %}
+    {% else %}
+    {# Sin análisis todavía. Se dice lo que va a leer, no «no hay datos». #}
+    <p class="pg-ia__vacio">
+      La IA puede leer de una vez todo lo del jugador —los 18 atributos, las
+      pruebas, los partidos y la asistencia— y decirte qué va bien, qué no y
+      qué tocar las próximas semanas.
+    </p>
+    {% endif %}
+  </div>
+
+  <button type="button" class="pf-btn pf-btn--primary pf-btn--block pf-mt-12"
+          id="pg-ia-boton">
+    <i data-ico="cpu" class="pf-ico--sm"></i>
+    <span>{{ 'Volver a analizar' if analisis and analisis.resumen else 'Analizar con IA' }}</span>
+  </button>
+  {% if pie %}<p class="pg-pie" style="text-align:center">{{ pie }}</p>{% endif %}
+</div>

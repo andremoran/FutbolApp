@@ -112,20 +112,6 @@
 
   .pg-mini { flex: none; width: 54px; color: var(--text-muted); }
 
-  .pg-pie { margin: 8px 0 0; font-size: 11.5px; color: var(--text-muted);
-            line-height: 1.5; }
-
-  /*  La lectura de la IA. Mismo aire que el reporte de la pantalla de evaluar.  */
-  .pg-ia__f { font-size: 11.5px; color: var(--text-muted); flex: none; }
-  .pg-ia__t { font-size: 13.5px; line-height: 1.65; margin: 14px 0 0; }
-  .pg-ia__sub { display: flex; align-items: center; gap: 6px; font-size: 12.5px;
-                font-weight: 800; margin: 16px 0 6px; }
-  .pg-ia__li { font-size: 12.5px; line-height: 1.6; margin: 0 0 5px;
-               padding-left: 14px; position: relative; }
-  .pg-ia__li::before { content: '•'; position: absolute; left: 3px;
-                       color: var(--text-muted); }
-  .pg-ia__vacio { font-size: 12.5px; color: var(--text-sec); line-height: 1.65;
-                  margin: 12px 0 0; }
 </style>
 {% endblock %}
 
@@ -318,51 +304,10 @@
 </div>
 
 {# ══════════ LA LECTURA DE LA IA ══════════ #}
-<div class="pf-card" id="pg-ia" data-pid="{{ jugador.id }}" data-periodo="{{ periodo }}">
-  <div class="pf-row" style="gap:10px;align-items:center">
-    <span class="pf-item__icon" style="background:#ede9fe;color:#7e6acb">
-      <i data-ico="cpu" class="pf-ico--sm"></i>
-    </span>
-    <h2 class="pf-card__title pf-grow" style="margin:0">Análisis de la IA</h2>
-    {% if analisis and analisis._creado %}
-    <span class="pg-ia__f" id="pg-ia-fecha">{{ analisis._creado.strftime('%d/%m/%Y') }}</span>
-    {% else %}<span class="pg-ia__f" id="pg-ia-fecha"></span>{% endif %}
-  </div>
-
-  <div id="pg-ia-cuerpo">
-    {% if analisis and analisis.resumen %}
-    <p class="pg-ia__t">{{ analisis.resumen }}</p>
-    {% for titulo, ico, tono, clave in [
-        ('Lo que va bien', 'trending-up', 'var(--primary)', 'fuerte'),
-        ('A mejorar', 'alert-circle', '#b45309', 'mejorar'),
-        ('Qué hacer estas semanas', 'target', '#7e6acb', 'plan')] %}
-    {% set puntos = (analisis.puntos or {}).get(clave) %}
-    {% if puntos %}
-    <div class="pg-ia__sub" style="color:{{ tono }}">
-      <i data-ico="{{ ico }}" class="pf-ico--xs"></i> {{ titulo }}
-    </div>
-    {% for p in puntos %}<p class="pg-ia__li">{{ p }}</p>{% endfor %}
-    {% endif %}
-    {% endfor %}
-    {% else %}
-    {# Sin analisis todavia. Se dice lo que va a leer, no «no hay datos». #}
-    <p class="pg-ia__vacio">
-      La IA puede leer de una vez todo lo de esta pantalla —los 18 atributos,
-      las pruebas, los partidos y la asistencia— y decirte qué va bien, qué no
-      y qué tocar las próximas semanas.
-    </p>
-    {% endif %}
-  </div>
-
-  <button type="button" class="pf-btn pf-btn--primary pf-btn--block pf-mt-12"
-          id="pg-ia-boton">
-    <i data-ico="cpu" class="pf-ico--sm"></i>
-    <span>{{ 'Volver a analizar' if analisis and analisis.resumen else 'Analizar con IA' }}</span>
-  </button>
-  <p class="pg-pie" style="text-align:center">
-    Analiza el periodo que tengas elegido: {{ etiqueta_periodo|lower }}.
-  </p>
-</div>
+{% with pid = jugador.id, periodo = periodo, analisis = analisis,
+        pie = 'Analiza el periodo que tengas elegido: ' + etiqueta_periodo|lower + '.' %}
+  {% include '_ia_analisis.html' %}
+{% endwith %}
 
 {# ══════════ COMPETICIÓN ══════════ #}
 {% if competicion and competicion.partidos %}
@@ -446,73 +391,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-  /*  Pedir el análisis. Tarda —la IA lee todo el periodo— así que el botón se
-      queda diciendo en qué anda: sin eso, a los cuatro segundos el entrenador
-      lo pulsa otra vez y se le gasta otro uso de la cuota.  */
-  (function () {
-    var caja   = document.getElementById('pg-ia');
-    var boton  = document.getElementById('pg-ia-boton');
-    if (!caja || !boton) { return; }
-    var cuerpo = document.getElementById('pg-ia-cuerpo');
-    var fecha  = document.getElementById('pg-ia-fecha');
-    var texto  = boton.querySelector('span');
-
-    /*  Se arma con createElement y textContent, no pegando cadenas: el
-        analisis lleva nombres de jugadores y lo que escriba la IA, y eso no
-        se mete en innerHTML.  */
-    function bloque(titulo, ico, tono, puntos) {
-      if (!puntos || !puntos.length) { return []; }
-      var cab = document.createElement('div');
-      cab.className = 'pg-ia__sub';
-      cab.style.color = tono;
-      var i = document.createElement('i');
-      i.setAttribute('data-ico', ico);
-      i.className = 'pf-ico--xs';
-      cab.appendChild(i);
-      cab.appendChild(document.createTextNode(' ' + titulo));
-
-      var fuera = [cab];
-      puntos.forEach(function (p) {
-        var li = document.createElement('p');
-        li.className = 'pg-ia__li';
-        li.textContent = p;
-        fuera.push(li);
-      });
-      return fuera;
-    }
-
-    boton.addEventListener('click', function () {
-      boton.disabled = true;
-      var antes = texto.textContent;
-      texto.textContent = 'Leyendo sus datos…';
-
-      PF.api('{{ url_for("futbol.api_analisis_evolucion") }}',
-             { pid: caja.dataset.pid, periodo: caja.dataset.periodo })
-        .then(function (r) {
-          var a = r.analisis || {};
-          cuerpo.innerHTML = '';
-          var p = document.createElement('p');
-          p.className = 'pg-ia__t';
-          p.textContent = a.resumen || '';
-          cuerpo.appendChild(p);
-          []
-            .concat(bloque('Lo que va bien', 'trending-up', 'var(--primary)', a.fuerte))
-            .concat(bloque('A mejorar', 'alert-circle', '#b45309', a.mejorar))
-            .concat(bloque('Qué hacer estas semanas', 'target', '#7e6acb', a.plan))
-            .forEach(function (el) { cuerpo.appendChild(el); });
-
-          if (fecha) { fecha.textContent = new Date().toLocaleDateString('es-ES'); }
-          texto.textContent = 'Volver a analizar';
-          if (window.PF && PF.icons) { PF.icons(cuerpo); }
-          PF.toast('Analizado.');
-        })
-        .catch(function (e) {
-          texto.textContent = antes;
-          PF.toast(e.message, 'error');
-        })
-        .then(function () { boton.disabled = false; });
-    });
-  })();
-</script>
+{% include '_ia_analisis_js.html' %}
 {% endblock %}
