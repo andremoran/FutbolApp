@@ -36,14 +36,21 @@ def _dia(v):
     return None
 
 
-def _paso_redondo(bruto):
+def _paso_redondo(bruto, paso_min=0.0):
     """El salto entre marcas del eje, redondeado a algo que se lea bien.
 
     Un eje con marcas en 3,7 · 7,4 · 11,1 es tecnicamente correcto y no lo
     entiende nadie. Se busca el 1, 2, 5 o 10 mas cercano por arriba.
+
+    Y el salto tiene que ser MULTIPLO de lo que la etiqueta puede escribir.
+    Sin eso, un salto de 2,5 con etiquetas sin decimales daba un eje
+    «-10 · -8 · -5 · -2 · 0»: las marcas estan bien repartidas pero los
+    numeros que se leen no, y parece que la grafica esta mal hecha.
     """
     if bruto <= 0:
-        return 1.0
+        return max(1.0, paso_min)
+    bruto = max(bruto, paso_min)
+
     escala = 1.0
     while bruto >= 10:
         bruto /= 10.0
@@ -51,9 +58,17 @@ def _paso_redondo(bruto):
     while bruto < 1:
         bruto *= 10.0
         escala /= 10.0
+
+    def _sirve(cand):
+        if not paso_min:
+            return True
+        veces = cand / paso_min
+        return abs(veces - round(veces)) < 1e-9
+
     for tope in (1, 2, 2.5, 5, 10):
-        if bruto <= tope:
-            return tope * escala
+        cand = tope * escala
+        if bruto <= tope and _sirve(cand):
+            return cand
     return 10 * escala
 
 
@@ -65,9 +80,9 @@ def _rango(lo, hi, marcas=4, paso_min=1.0):
     """
     if hi == lo:
         lo, hi = lo - 1, hi + 1
-    #  Nunca por debajo de lo que el propio numero puede distinguir: con
-    #  decimales=0 y paso 0,5 el eje sale «49 · 50 · 50 · 50 · 51».
-    paso = max(_paso_redondo((hi - lo) / float(marcas)), paso_min)
+    #  Nunca por debajo de lo que el propio numero puede distinguir, ni un
+    #  salto que la etiqueta no sepa escribir entero.
+    paso = _paso_redondo((hi - lo) / float(marcas), paso_min)
     base = paso * int(lo / paso) - (paso if lo < 0 and lo % paso else 0)
     while base > lo:
         base -= paso

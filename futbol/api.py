@@ -819,6 +819,27 @@ def api_analisis_evolucion():
          'creado': ahora()},
         'guardar analisis')
 
+    #  Y se apunta el uso. El cupo se cuenta mirando `fut_ia_chat`
+    #  (roles.ia_usados_hoy), asi que sin esta fila la comprobacion de arriba
+    #  era decorativa: en el plan gratuito se podian pedir analisis sin
+    #  limite, y cada uno es una llamada a Gemini que se paga.
+    #  A diferencia del historial del chat, esta fila NO es un extra: es el
+    #  contador. Aun asi no se pone obligatoria — el analisis ya esta hecho y
+    #  pagado, y tirar la peticion por no poder apuntarlo seria peor. Lo que
+    #  si se hace es mirar si salio, para que un fallo continuado se vea en el
+    #  log en vez de convertirse en IA gratis sin que nadie se entere.
+    apuntado = db.insert('fut_ia_chat', {
+        'user_id': current_user.id,
+        'rol': getattr(current_user, 'role', 'especialista'),
+        'pregunta': 'Análisis de evolución de %s (%s)'
+                    % (jugador.get('nombre') or 'un jugador', periodo),
+        'respuesta': lectura.get('resumen') or '',
+        'creado': ahora(),
+    })
+    if not apuntado:
+        logger.warning('IA: no pude apuntar el uso del análisis de %s; '
+                       'este no le ha gastado cupo a %s', pid, current_user.id)
+
     return jsonify({'ok': True, 'analisis': lectura,
                     'guardado': bool(fila),
                     'restantes': (restantes - 1) if restantes is not None else None})

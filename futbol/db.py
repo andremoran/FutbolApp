@@ -913,9 +913,16 @@ HORAS_UTC_LOCAL = -5
 
 
 def fecha_local(s, por_defecto=None):
-    """La fecha de una marca de tiempo UTC, en la hora de aqui."""
+    """La fecha de una marca de tiempo UTC, en la hora de aqui.
+
+    Solo desplaza lo que trae HORA. Un '2026-08-24' pelado es ya una fecha del
+    calendario —el dia de un partido, no un instante— y restarle cinco horas
+    lo dejaba en el 23.
+    """
     if not s:
         return por_defecto
+    if 'T' not in str(s) and ' ' not in str(s).strip():
+        return parse_fecha(s, por_defecto)
     try:
         return (datetime.fromisoformat(str(s)[:19])
                 + timedelta(hours=HORAS_UTC_LOCAL)).date()
