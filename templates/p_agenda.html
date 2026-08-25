@@ -72,13 +72,38 @@
         <span class="pf-item__sub" style="white-space:normal">{{ e.descripcion }}</span>
         {% endif %}
 
-        {# Confirmar asistencia — el gesto que el entrenador espera del jugador #}
-        <span style="display:flex;gap:6px;margin-top:9px" data-asist="{{ e.id }}">
-          {% for clave, texto in [('asiste','Voy'), ('duda','Quizá'), ('falta','No voy')] %}
-          <button type="button" class="pf-asist-btn {{ 'is-on' if e._asistencia == clave }}"
-                  data-estado="{{ clave }}" data-evento="{{ e.id }}">{{ texto }}</button>
+        {# Avisar de si va o no. Es un AVISO, no la asistencia: esa la marca el
+           entrenador después. Si ya pasó lista, se enseña su marca y se quitan
+           los botones, que ya no cambian nada. #}
+        {% if e._asistencia and e._asistencia != 'pendiente' %}
+        <span class="ag-marcado">
+          Tu entrenador te marcó:
+          <b>{% if e._asistencia == 'presente' %}presente
+             {%- elif e._asistencia == 'tarde' %}tarde
+             {%- elif e._asistencia == 'justificado' %}falta justificada
+             {%- else %}ausente{% endif %}</b>
+        </span>
+        {% else %}
+        <span style="display:flex;gap:6px;margin-top:9px;flex-wrap:wrap" data-asist="{{ e.id }}">
+          {% for clave, texto, pide in [('ire','Voy',false),
+                                        ('tarde','Llegaré tarde',true),
+                                        ('no_ire','No puedo',true)] %}
+          <button type="button" class="pf-asist-btn {{ 'is-on' if e._aviso == clave }}"
+                  data-aviso="{{ clave }}" data-pide="{{ 1 if pide else 0 }}"
+                  data-evento="{{ e.id }}">{{ texto }}</button>
           {% endfor %}
         </span>
+
+        {# El motivo. Aparece solo al elegir «tarde» o «no puedo»: sin él el
+           entrenador tiene que preguntar igual, y con él ya lo sabe. #}
+        <span class="ag-motivo" data-motivo="{{ e.id }}"
+              {% if e._aviso not in ('tarde', 'no_ire') %}hidden{% endif %}>
+          <input class="pf-input" type="text" maxlength="300"
+                 placeholder="¿Por qué? Salgo tarde del colegio…"
+                 value="{{ e._aviso_motivo }}">
+          <button type="button" class="pf-btn pf-btn--primary">Avisar</button>
+        </span>
+        {% endif %}
       </span>
     </div>
     {% endfor %}
@@ -110,28 +135,79 @@
     padding: 6px 12px; border-radius: 100px; font-size: 12px; font-weight: 700;
     background: var(--border-soft); color: var(--text-sec);
     border: 1px solid transparent; transition: all .15s;
+    position: relative;
   }
+  /*  Median 31 px de alto y son de los botones que más se tocan de la app. La
+      píldora se queda igual —agrandarla descoloca la lista— y lo que se estira
+      es la zona que responde al dedo, hasta los 44 recomendados. Los 6-7 px
+      que sobresalen por arriba y por abajo caben en el hueco entre eventos. */
+  .pf-asist-btn::after { content: ''; position: absolute; inset: -7px -2px; }
   .pf-asist-btn.is-on { background: var(--primary); color: #fff; }
+  .ag-motivo { display: flex; gap: 6px; margin-top: 8px; }
+  .ag-motivo[hidden] { display: none; }
+  .ag-motivo .pf-input { flex: 1; min-width: 0; padding: 9px 11px; font-size: 13px; }
+  .ag-motivo .pf-btn { flex: none; padding: 9px 14px; font-size: 13px; }
+  .ag-marcado { display: block; margin-top: 9px; font-size: 12.5px; color: var(--text-sec); }
   .pf-asist-btn:active { transform: scale(.95); }
 </style>
 {% endblock %}
 
 {% block scripts %}
 <script>
+  /*  El aviso del jugador. «Voy» se manda solo; «llegaré tarde» y «no puedo»
+      abren el motivo, porque el servidor lo exige — y lo exige porque un
+      aviso sin motivo obliga al entrenador a preguntar igual.
+
+      Antes estos botones mandaban el aviso a pelo y el jugador solo veía
+      «Cuéntale a tu entrenador el motivo»: la agenda se quedó atrás cuando se
+      separó el aviso de la asistencia.                                      */
+  function cajaDe(evento) {
+    return document.querySelector('[data-motivo="' + evento + '"]');
+  }
+
+  function mandar(evento, aviso, motivo) {
+    return PF.api('{{ url_for("futbol.api_asistencia") }}',
+                  { event_id: evento, aviso: aviso, motivo: motivo || '' });
+  }
+
   document.querySelectorAll('.pf-asist-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
-      var estado = btn.dataset.estado, evento = btn.dataset.evento;
-      PF.api('{{ url_for("futbol.api_asistencia") }}', { event_id: evento, estado: estado })
-        .then(function () {
-          // Solo un botón activo por evento
-          document.querySelectorAll('[data-asist="' + evento + '"] .pf-asist-btn')
-            .forEach(function (b) { b.classList.toggle('is-on', b === btn); });
-          PF.toast(estado === 'asiste' ? 'Confirmaste tu asistencia'
-                 : estado === 'falta'  ? 'Avisaste que no vas'
-                                       : 'Marcado como "quizá"');
-        })
-        .catch(function (e) { PF.toast(e.message, 'error'); });
+      var aviso = btn.dataset.aviso, evento = btn.dataset.evento;
+      var caja = cajaDe(evento);
+
+      document.querySelectorAll('[data-asist="' + evento + '"] .pf-asist-btn')
+        .forEach(function (b) { b.classList.toggle('is-on', b === btn); });
+
+      if (btn.dataset.pide === '1') {
+        if (caja) { caja.hidden = false; caja.querySelector('input').focus(); }
+        return;
+      }
+      if (caja) { caja.hidden = true; }
+      mandar(evento, aviso)
+        .then(function () { PF.toast('Avisaste que vas'); })
+        .catch(function (e) { btn.classList.remove('is-on'); PF.toast(e.message, 'error'); });
     });
+  });
+
+  document.querySelectorAll('.ag-motivo').forEach(function (caja) {
+    var evento = caja.dataset.motivo;
+    var campo = caja.querySelector('input');
+    var boton = caja.querySelector('button');
+
+    function enviar() {
+      var elegido = document.querySelector(
+        '[data-asist="' + evento + '"] .pf-asist-btn.is-on');
+      if (!elegido) { PF.toast('Elige primero una opción.', 'error'); return; }
+      if (!campo.value.trim()) { campo.focus(); PF.toast('Escribe el motivo.', 'error'); return; }
+      boton.disabled = true;
+      mandar(evento, elegido.dataset.aviso, campo.value.trim())
+        .then(function () { PF.toast('Avisado. Tu entrenador ya lo ve.'); })
+        .catch(function (e) { PF.toast(e.message, 'error'); })
+        .then(function () { boton.disabled = false; });
+    }
+
+    boton.addEventListener('click', enviar);
+    campo.addEventListener('keydown', function (e) { if (e.key === 'Enter') enviar(); });
   });
 </script>
 {% endblock %}

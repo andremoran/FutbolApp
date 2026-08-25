@@ -221,10 +221,13 @@ def agenda():
     hasta = (date.today() + timedelta(days=60)).isoformat()
     eventos = db.eventos_para_jugador(uid, desde, hasta)
 
-    mi_asistencia = {}
+    #  Dos cosas distintas: lo que el jugador AVISO y lo que el entrenador
+    #  MARCO. La segunda manda y solo aparece cuando ya paso lista.
+    mi_asistencia, mi_aviso = {}, {}
     if eventos:
         for a in db.asistencia_de([e['id'] for e in eventos], uid):
             mi_asistencia[a['event_id']] = a.get('estado')
+            mi_aviso[a['event_id']] = (a.get('aviso'), a.get('aviso_motivo') or '')
 
     hoy = date.today()
     for e in eventos:
@@ -233,6 +236,7 @@ def agenda():
         e['_pasado'] = bool(f and f < hoy)
         e['_hoy'] = bool(f and f == hoy)
         e['_asistencia'] = mi_asistencia.get(e['id'])
+        e['_aviso'], e['_aviso_motivo'] = mi_aviso.get(e['id'], (None, ''))
 
     return render_template('p_agenda.html',
                            tab_activa='agenda',
