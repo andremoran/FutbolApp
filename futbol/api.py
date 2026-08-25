@@ -755,3 +755,70 @@ def api_ia():
     })
     return jsonify({'ok': True, 'respuesta': respuesta,
                     'restantes': (restantes - 1) if restantes is not None else None})
+
+@bp.route('/api/analisis-evolucion', methods=['POST'])
+@api
+def api_analisis_evolucion():
+    """La lectura de la IA sobre como va un jugador.
+
+    No se genera al abrir la pantalla a proposito: tarda segundos y gasta
+    cuota, y una pantalla que tarda cinco segundos en abrir deja de abrirse.
+    La pide el entrenador cuando la quiere, y se guarda para no repetirla.
+    """
+    import roles
+    from .coach import datos_de_progreso, PERIODOS
+    from .ia import analizar_evolucion
+
+    if getattr(current_user, 'role', '') not in ('especialista', 'asistente'):
+        return jsonify({'error': 'Solo el cuerpo técnico puede pedir esto.'}), 403
+
+    datos_body = body()
+    pid = (datos_body.get('pid') or '').strip()
+    periodo = (datos_body.get('periodo') or '30').strip()
+    if periodo not in [c for c, _, _ in PERIODOS]:
+        periodo = '30'
+
+    uid = db.equipo_id(current_user.id)
+    jugador = next((x for x in db.plantilla_completa(uid)
+                    if str(x['id']) == str(pid)), None)
+    if not jugador:
+        return jsonify({'error': 'Ese jugador no es de tu equipo.'}), 404
+
+    #  Mismo cupo que el chat: en el plan gratuito la IA no esta cerrada, esta
+    #  racionada. Se comprueba aqui y no al abrir la pantalla, para que pueda
+    #  leer el analisis que ya pidio.
+    restantes = roles.ia_restantes(current_user)
+    if restantes is not None and restantes <= 0:
+        return jsonify({
+            'error': f'Gastaste tus {roles.IA_MENSAJES_GRATIS} usos de IA de hoy. '
+                     'Vuelven mañana, o pásate a Pro y pregunta sin límite.',
+            'pro': True, 'agotado': True,
+            'url': url_for('futbol.planes')}), 402
+
+    datos = datos_de_progreso(uid, jugador, periodo)
+    if not datos['evaluado']:
+        return jsonify({'error': 'Primero evalúalo: sin una sola evaluación no '
+                                 'hay nada que analizar.'}), 400
+
+    lectura = analizar_evolucion(datos)
+    if not lectura:
+        return jsonify({'error': 'La IA no contestó a tiempo. Vuelve a '
+                                 'intentarlo en un momento.'}), 503
+
+    #  Una fila por jugador y periodo: pedirlo dos veces actualiza la lectura,
+    #  no deja dos versiones que se contradicen.
+    fila = db._upsert_dueno(
+        'fut_ia_analisis',
+        dict(datos['dueno'], periodo=periodo),
+        {'coach_id': uid, 'creado_por': current_user.id,
+         'resumen': lectura.get('resumen'),
+         'puntos': {k: lectura.get(k) or [] for k in ('fuerte', 'mejorar', 'plan')},
+         'cifras': {'overall': datos['resumen'].get('overall'),
+                    'delta': datos['resumen'].get('delta'),
+                    'fotos': datos['resumen'].get('fotos')},
+         'creado': ahora()},
+        'guardar analisis')
+
+    return jsonify({'ok': True, 'analisis': lectura,
+                    'guardado': bool(fila),
+                    'restantes': (restantes - 1) if restantes is not None else None})

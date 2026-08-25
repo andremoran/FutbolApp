@@ -890,6 +890,17 @@ def _gemini(prompt):
     return _gemini_partes([{'text': prompt}])
 
 
+def _sin_clave(e):
+    """El error de Gemini, sin la clave dentro.
+
+    `requests` mete la URL completa en el mensaje de la excepcion y la URL
+    lleva `?key=...`. Un 503 de Gemini no es nada raro, asi que sin esto la
+    clave acaba repetida por todo el log — y los logs se comparten, se pegan
+    en un ticket y se miran por encima del hombro.
+    """
+    return re.sub(r'key=[\w\-]+', 'key=OCULTA', str(e))
+
+
 def _gemini_partes(partes, max_tokens=700, temperatura=0.7, limpiar=True,
                    presupuesto=None, timeout_req=20):
     """El mismo cliente, pero admitiendo audio ademas de texto.
@@ -949,7 +960,10 @@ def _gemini_partes(partes, max_tokens=700, temperatura=0.7, limpiar=True,
             if texto:
                 return texto
         except Exception as e:
-            logger.warning('IA %s falló: %s', modelo, e)
+            #  El mensaje de requests trae la URL entera, y la URL lleva la
+            #  clave (`?key=AIza...`). Tal cual, cada fallo de Gemini
+            #  escribia la clave en el log del servidor. Se recorta.
+            logger.warning('IA %s falló: %s', modelo, _sin_clave(e))
             continue
     return None
 
@@ -1052,6 +1066,185 @@ def _partir_respuesta(salida):
 
     return (limpio[it + len(MARCA_T):ia].strip(),
             limpio[ia + len(MARCA_A):].strip())
+
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  La lectura de la IA sobre un jugador
+# ═══════════════════════════════════════════════════════════════════════════
+
+INSTRUCCION_EVOLUCION = """Eres el analista del cuerpo tecnico. Te dan los numeros de UN jugador y como han cambiado en un periodo, y escribes para su entrenador.
+
+Contesta EXACTAMENTE con estas cuatro marcas, en este orden y sin markdown:
+
+RESUMEN:
+Tres o cuatro lineas: como va, que es lo que mas ha cambiado y si el conjunto sube, se estanca o baja. Habla del jugador por su nombre.
+
+FUERTE:
+- De dos a cuatro cosas que estan yendo bien, cada una en una linea que empiece por guion. Cita el numero que lo sostiene.
+
+MEJORAR:
+- De dos a cuatro cosas flojas o que han bajado, mismo formato y citando el numero.
+
+PLAN:
+- De dos a cuatro acciones concretas para las proximas semanas, en imperativo y del tamano de un entrenamiento («dos series de X los martes»), no consejos generales.
+
+Reglas que no se saltan:
+- Solo los datos que te doy. Si algo no aparece, no existe: no rellenes.
+- Los 18 atributos van de 1 a 100 y son la valoracion del entrenador, no una medida objetiva; las pruebas fisicas si son medidas.
+- Un cambio de menos de 3 puntos en un atributo es ruido, no una tendencia: no construyas nada sobre eso.
+- Si el periodo tiene una sola evaluacion, dilo y no inventes evolucion.
+- Nada de diagnosticar lesiones: si hay molestias, que pase por el fisio."""
+
+_MARCAS_EV = ('RESUMEN:', 'FUERTE:', 'MEJORAR:', 'PLAN:')
+
+
+def _trocear_evolucion(salida):
+    """Reparte la respuesta en sus cuatro apartados.
+
+    Si el modelo se salta el formato —pasa— se devuelve todo como resumen en
+    vez de tirarlo: una lectura mal repartida sigue sirviendo, una pantalla
+    vacia no.
+    """
+    limpio = re.sub(r'[*_`#]+', '', salida or '').strip()
+    if not limpio:
+        return None
+
+    arriba = limpio.upper()
+    cortes = []
+    for marca in _MARCAS_EV:
+        i = arriba.find(marca)
+        cortes.append(i if i >= 0 else None)
+
+    if cortes[0] is None and all(c is None for c in cortes):
+        return {'resumen': limpio, 'fuerte': [], 'mejorar': [], 'plan': []}
+
+    trozos = {}
+    puestos = [(i, n) for n, i in zip(_MARCAS_EV, cortes) if i is not None]
+    puestos.sort()
+    for orden, (i, marca) in enumerate(puestos):
+        fin = puestos[orden + 1][0] if orden + 1 < len(puestos) else len(limpio)
+        trozos[marca] = limpio[i + len(marca):fin].strip()
+
+    def puntos(txt):
+        salida = []
+        for linea in (txt or '').splitlines():
+            linea = linea.strip().lstrip('-•·').strip()
+            if linea:
+                salida.append(linea)
+        return salida[:4]
+
+    return {
+        'resumen': ' '.join(puntos(trozos.get('RESUMEN:'))) or limpio[:400],
+        'fuerte': puntos(trozos.get('FUERTE:')),
+        'mejorar': puntos(trozos.get('MEJORAR:')),
+        'plan': puntos(trozos.get('PLAN:')),
+    }
+
+
+def _cifras_en_texto(d):
+    """Los numeros del jugador, en el texto mas corto que se entienda.
+
+    Va aparte de la llamada para poder leerlo: si el analisis dice algo raro,
+    lo primero que hay que poder mirar es que se le conto.
+    """
+    j = d.get('jugador') or {}
+    r = d.get('resumen') or {}
+    fuera = []
+
+    fuera.append('JUGADOR: %s%s%s' % (
+        j.get('nombre') or 'sin nombre',
+        ', %s' % j.get('posicion') if j.get('posicion') else '',
+        ', %s anos' % j.get('edad') if j.get('edad') else ''))
+    fuera.append('PERIODO: %s' % (d.get('etiqueta_periodo') or ''))
+
+    if r.get('overall') is not None:
+        fuera.append('VALORACION GLOBAL: %s de 100%s' % (
+            r['overall'],
+            ' (%+g desde la semana del %s)' % (r['delta'], r['desde'])
+            if r.get('delta') is not None and r.get('desde') else
+            ' (sin nada con que compararla)'))
+    #  Las del periodo, no las de toda la vida: si se le dice «5» cuando en
+    #  la ultima semana solo hubo una, escribe una evolucion que no existe.
+    fuera.append('EVALUACIONES DENTRO DEL PERIODO: %d (en total guardadas: %d)'
+                 % (r.get('en_periodo') or 0, r.get('fotos') or 0))
+
+    familias = [f for f in (d.get('familias') or []) if f.get('media') is not None]
+    if familias:
+        fuera.append('POR FAMILIA (media de 1 a 100): ' + ' · '.join(
+            '%s %g%s' % (f['titulo'], f['media'],
+                         ' (%+g)' % f['delta'] if f.get('delta') is not None else '')
+            for f in familias))
+
+    movidos = d.get('movidos') or []
+    if movidos:
+        fuera.append('ATRIBUTOS QUE SE MOVIERON: ' + ' · '.join(
+            '%s %s (%+g)' % (a['etiqueta'], a['hoy'], a['delta']) for a in movidos))
+
+    tests = d.get('tests') or []
+    if tests:
+        fuera.append('PRUEBAS FISICAS:')
+        for t in tests[:8]:
+            if t.get('veces', 0) > 1:
+                fuera.append('  - %s: %g -> %g %s%s%s' % (
+                    t['nombre'], t['primera'], t['ultima'], t.get('unidad') or '',
+                    ' (en estas bajar es mejorar)' if t.get('menor_mejor') else '',
+                    ', nivel %s' % t['nivel'] if t.get('nivel') else ''))
+            else:
+                fuera.append('  - %s: %g %s, una sola marca%s' % (
+                    t['nombre'], t['ultima'], t.get('unidad') or '',
+                    ', nivel %s' % t['nivel'] if t.get('nivel') else ''))
+    else:
+        fuera.append('PRUEBAS FISICAS: ninguna tomada en el periodo')
+
+    c = d.get('competicion')
+    if c and c.get('partidos'):
+        fuera.append('EN PARTIDO: %d jugados, %d de titular, %d minutos, '
+                     '%d goles, %d asistencias, %d jugadas clave'
+                     % (c['partidos'], c.get('titularidades') or 0,
+                        c.get('minutos') or 0, c.get('goles') or 0,
+                        c.get('asistencias') or 0, c.get('jugadas_clave') or 0))
+    else:
+        fuera.append('EN PARTIDO: no jugo ninguno en el periodo')
+
+    a = d.get('asistencia')
+    if a:
+        fuera.append('ASISTENCIA: vino a %d de %d sesiones (%d%%), '
+                     '%d tarde, %d faltas sin justificar'
+                     % (a['vino'], a['total'], a['pct'],
+                        a.get('tarde') or 0, a.get('faltas') or 0))
+    else:
+        fuera.append('ASISTENCIA: el entrenador no paso lista en el periodo')
+
+    lesiones = d.get('lesiones') or []
+    if lesiones:
+        fuera.append('LESIONES EN EL PERIODO: ' + ' · '.join(
+            '%s%s%s' % (l.get('zona') or 'lesion',
+                        ' %s' % l.get('tipo') if l.get('tipo') else '',
+                        ' (%s)' % l.get('estado') if l.get('estado') else '')
+            for l in lesiones[:5]))
+
+    return chr(10).join(fuera)
+
+
+def analizar_evolucion(datos):
+    """La lectura de la IA sobre como va un jugador.
+
+    Recibe lo MISMO que pinta la pantalla de progreso (`coach.datos_de_progreso`)
+    para que las dos cuenten la misma historia: si la IA se lo calculara por su
+    lado, acabarian diciendo cosas distintas del mismo jugador el mismo dia.
+
+    Devuelve {resumen, fuerte, mejorar, plan} o None si no hay clave o Gemini
+    no contesta — quien llama avisa, no inventa un analisis de relleno.
+    """
+    texto = _cifras_en_texto(datos)
+    partes = [{'text': INSTRUCCION_EVOLUCION + chr(10) * 2 + 'DATOS:' + chr(10) + texto}]
+    salida = _gemini_partes(partes, max_tokens=1100, temperatura=0.5,
+                            limpiar=False, presupuesto=PRESUPUESTO_VOZ_S,
+                            timeout_req=PRESUPUESTO_VOZ_S)
+    if not salida:
+        return None
+    return _trocear_evolucion(salida)
 
 
 def _respaldo(user, pregunta):

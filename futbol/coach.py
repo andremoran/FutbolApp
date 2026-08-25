@@ -286,6 +286,16 @@ PERIODOS = [
     ('todo', 'Desde el principio', None),
 ]
 
+#  Las cuatro lineas del perfil. Los colores son los mismos que usa la
+#  pantalla de evaluar para cada familia: si alli el fisico es gris, aqui
+#  tambien, o hay que volver a aprenderse la leyenda en cada pantalla.
+LINEAS_PERFIL = [
+    ('overall', 'Global',  '#0f172a',        3),
+    ('tecnica', 'Técnico', '#047857',        2),
+    ('fisico',  'Físico',  '#475569',        2),
+    ('mental',  'Mental',  '#7e6acb',        2),
+]
+
 
 def _dias_del_periodo(clave):
     for c, _, d in PERIODOS:
@@ -305,33 +315,30 @@ def _delta(ahora, antes):
     return round(ahora - antes, 1)
 
 
-@bp.route('/coach/jugador/<pid>/progreso')
-@solo_entrenador
-def c_progreso_jugador(pid):
-    """Como ha evolucionado un jugador, con todo lo que la app sabe de el.
+def _media_de(foto, claves):
+    """La media de una familia dentro de una foto semanal."""
+    vs = [v for v in (((foto or {}).get('atributos') or {}).get(k) for k in claves)
+          if v is not None]
+    return round(sum(vs) / float(len(vs)), 1) if vs else None
 
-    Responde a «¿esta mejorando?» sin que el entrenador tenga que ir juntando
-    cuatro pantallas: su ficha dice como esta HOY, y esto dice de donde viene.
 
-    Todo se compara contra un momento del pasado que el elige —una semana, un
-    mes, la temporada— y cada bloque cuenta su propio cambio.
+def datos_de_progreso(uid, jugador, clave='30'):
+    """Todo lo que la app sabe de como le ha ido a un jugador en un periodo.
+
+    Lo usan la pantalla y el analisis de la IA. Que sea UNA funcion no es
+    limpieza: si cada uno se calculara sus numeros, la pantalla diria «+9» y
+    la IA hablaria de otro jugador el mismo dia.
     """
     from datetime import date, timedelta
     from . import evaluaciones as ev
+    from . import graficas
     from . import tests_catalogo as cat
 
-    uid = db.equipo_id(current_user.id)
-
-    #  El jugador, tenga cuenta o no. `plantilla_completa` evita el fallo de
-    #  siempre: buscar solo entre los registrados y no encontrar a nadie.
-    jugador = next((x for x in db.plantilla_completa(uid) if str(x['id']) == str(pid)), None)
-    if not jugador:
-        abort(404)
+    pid = jugador['id']
     dueno = db.dueno_filtro(
         player_id=None if jugador['es_manual'] else pid,
         manual_player_id=pid if jugador['es_manual'] else None)
 
-    clave = request.args.get('periodo', '30')
     dias = _dias_del_periodo(clave)
     desde = (date.today() - timedelta(days=dias)) if dias else None
     desde_iso = desde.isoformat() if desde else '0000-01-01'
@@ -373,20 +380,34 @@ def c_progreso_jugador(pid):
     overall_hoy = ((hoy or {}).get('overall') if hoy
                    else (ficha.get('overall') if evaluado else None))
 
-    #  La linea que se dibuja: la foto de referencia mas las del periodo. No
-    #  todo el historial: si el numero de arriba dice «+9 en un mes» y la linea
-    #  arranca hace un año, el entrenador ve dos cosas que no cuadran.
+    #  Lo que se dibuja: la foto de referencia mas las del periodo. No todo el
+    #  historial: si el numero de arriba dice «+9 en un mes» y la linea arranca
+    #  hace un año, el entrenador ve dos cosas que no cuadran.
     a_dibujar = list(dentro)
     if antes is not None and (not dentro or antes is not dentro[0]):
         a_dibujar = [antes] + a_dibujar
+
+    familias_claves = {'tecnica': db.ATRIBUTOS_TECNICOS,
+                       'fisico': db.ATRIBUTOS_FISICOS,
+                       'mental': db.ATRIBUTOS_MENTALES}
+    series = []
+    for cl, nombre, color, grosor in LINEAS_PERFIL:
+        puntos = []
+        for f in a_dibujar:
+            v = f.get('overall') if cl == 'overall' else _media_de(f, familias_claves[cl])
+            if v is not None:
+                puntos.append({'fecha': f.get('semana'), 'valor': v})
+        if puntos:
+            series.append({'nombre': nombre, 'color': color,
+                           'grosor': grosor, 'puntos': puntos})
+    grafica = graficas.multi(series)
 
     resumen = {
         'overall': overall_hoy,
         'delta': _delta(overall_hoy, (antes or {}).get('overall')),
         'desde': (antes or {}).get('semana'),
         'fotos': len(historial),
-        'curva': [{'fecha': db.parse_fecha(h.get('semana')), 'valor': h.get('overall')}
-                  for h in a_dibujar if h.get('overall') is not None],
+        'en_periodo': len(dentro),
     }
 
     #  Las tres familias, cada una en un numero. Es la lectura que se quiere de
@@ -437,6 +458,7 @@ def c_progreso_jugador(pid):
         p['marcas'].append(m)
 
     tests = []
+    lineas_pruebas = []
     for p in pruebas.values():
         primera, ultima = p['marcas'][0], p['marcas'][-1]
         a, b = primera.get('_valor'), ultima.get('_valor')
@@ -457,18 +479,36 @@ def c_progreso_jugador(pid):
             'menor_mejor': p['menor_mejor'],
             'fecha_primera': primera.get('fecha'), 'fecha_ultima': ultima.get('fecha'),
             'nivel': (ultima.get('_nivel_meta') or {}).get('etiqueta'),
-            'serie': [{'fecha': x.get('fecha'), 'valor': x.get('_valor')}
-                      for x in p['marcas'] if isinstance(x.get('_valor'), (int, float))],
         })
+
+        #  Y la linea de la grafica comun. Segundos y metros no caben en el
+        #  mismo eje, asi que cada prueba se dibuja como CUANTO ha mejorado
+        #  respecto a su primera marca: eso si es comparable, y de paso el cero
+        #  significa lo mismo para todas.
+        if isinstance(a, (int, float)) and a and len(numeros) > 1:
+            signo = -1 if p['menor_mejor'] else 1
+            lineas_pruebas.append({
+                'nombre': p['nombre'],
+                'puntos': [{'fecha': x.get('fecha'),
+                            'valor': round(signo * (x['_valor'] - a) / abs(a) * 100, 1)}
+                           for x in p['marcas']
+                           if isinstance(x.get('_valor'), (int, float))],
+            })
     tests.sort(key=lambda t: -t['veces'])
+
+    #  Colores de la paleta, en orden, para que dos pruebas no salgan iguales.
+    PALETA = ['#047857', '#2563eb', '#f59e0b', '#7e6acb', '#ef4444', '#0891b2']
+    for i, l in enumerate(lineas_pruebas):
+        l['color'] = PALETA[i % len(PALETA)]
+    grafica_pruebas = graficas.multi(lineas_pruebas[:6])
 
     # ─── Competicion y compromiso, dentro del periodo ───────────────────────
     partidos = [m for m in (db.rows('fut_matches', 'partidos progreso', coach_id=uid) or [])
                 if (m.get('fecha') or '') >= desde_iso]
-    #  Ojo con el `or None`: `totales_de_partidos` entiende None como «trae
-    #  tu los partidos», o sea TODOS. Con una lista vacia devuelve {}, que es
-    #  lo que se quiere aqui — si no, «esta semana» acababa ensenando los goles
-    #  de toda la temporada.
+    #  Ojo con un `or None` aqui: `totales_de_partidos` entiende None como
+    #  «traelos tu», o sea TODOS. Con una lista vacia devuelve {}, que es lo
+    #  que se quiere — si no, «esta semana» acaba ensenando los goles de toda
+    #  la temporada.
     competicion = db.totales_de_partidos(uid, ids={pid}, partidos=partidos).get(pid)
 
     columna = 'manual_player_id' if jugador['es_manual'] else 'player_id'
@@ -497,15 +537,48 @@ def c_progreso_jugador(pid):
     for l in lesiones:
         l['_fecha'] = db.parse_fecha(l.get('fecha'))
 
+    return {
+        'jugador': jugador, 'dueno': dueno, 'evaluado': evaluado,
+        'periodo': clave,
+        'etiqueta_periodo': next((e for c, e, _ in PERIODOS if c == clave), ''),
+        'resumen': resumen, 'atributos': atributos, 'familias': familias,
+        'movidos': movidos, 'grafica': grafica, 'grafica_pruebas': grafica_pruebas,
+        'tests': tests, 'competicion': competicion, 'asistencia': asistencia,
+        'lesiones': lesiones,
+    }
+
+
+@bp.route('/coach/jugador/<pid>/progreso')
+@solo_entrenador
+def c_progreso_jugador(pid):
+    """Como ha evolucionado un jugador, con todo lo que la app sabe de el.
+
+    Responde a «¿esta mejorando?» sin que el entrenador tenga que ir juntando
+    cuatro pantallas: su ficha dice como esta HOY, y esto dice de donde viene.
+    """
+    uid = db.equipo_id(current_user.id)
+
+    #  El jugador, tenga cuenta o no. `plantilla_completa` evita el fallo de
+    #  siempre: buscar solo entre los registrados y no encontrar a nadie.
+    jugador = next((x for x in db.plantilla_completa(uid) if str(x['id']) == str(pid)), None)
+    if not jugador:
+        abort(404)
+
+    clave = request.args.get('periodo', '30')
+    datos = datos_de_progreso(uid, jugador, clave)
+
+    #  La lectura de la IA, si ya se pidio alguna vez para este periodo. No se
+    #  genera aqui: cuesta segundos y cuota, y abrir una pantalla no puede
+    #  costar eso. La pide el entrenador con un boton.
+    analisis = db.one('fut_ia_analisis', 'analisis guardado',
+                      periodo=clave, **datos['dueno'])
+    if analisis:
+        analisis['_creado'] = db.parse_fecha(analisis.get('creado'))
+
     return render_template('c_progreso_jugador.html',
                            tab_activa='equipo', hide_tabbar=True,
-                           jugador=jugador, periodos=PERIODOS, periodo=clave,
-                           etiqueta_periodo=next((e for c, e, _ in PERIODOS if c == clave), ''),
-                           resumen=resumen, atributos=atributos, tests=tests,
-                           familias=familias, movidos=movidos,
-                           competicion=competicion, asistencia=asistencia,
-                           lesiones=lesiones,
-                           es_pro=roles.es_pro(current_user))
+                           periodos=PERIODOS, analisis=analisis,
+                           es_pro=roles.es_pro(current_user), **datos)
 
 
 def _valoracion_media(coach_id, pid, manual):

@@ -1,0 +1,57 @@
+{# ============================================================================
+   _grafica_multi.html — Varias líneas en un mismo eje.
+
+   La hermana mayor de _grafica.html: aquélla dibuja UNA serie sin ejes, para
+   meterla dentro de una tarjeta; ésta dibuja varias, con eje, rejilla y
+   leyenda, para cuando lo que importa es comparar unas con otras.
+
+   Las cuentas están en futbol/graficas.py — aquí sólo se pintan coordenadas.
+
+   Se usa así:
+     {% with g = mi_grafica %}{% include '_grafica_multi.html' %}{% endwith %}
+
+   `g` es lo que devuelve graficas.multi(...), o None si no hay dos puntos que
+   unir. Cuando es None esta plantilla no pinta nada: quien la incluye tiene
+   que decir con palabras por qué todavía no hay línea.
+   ============================================================================ #}
+
+{% if g %}
+<div class="gm">
+  <svg class="gm__svg" viewBox="0 0 {{ g.ancho }} {{ g.alto }}"
+       preserveAspectRatio="xMidYMid meet" role="img"
+       aria-label="Evolución de {{ g.lineas|map(attribute='nombre')|join(', ') }}">
+
+    {# La rejilla, primero y muy suave: sirve para leer alturas, no para mirarla #}
+    {% for t in g.yticks %}
+    <line class="gm__rejilla" x1="{{ g.x0 }}" y1="{{ t.y }}" x2="{{ g.x1 }}" y2="{{ t.y }}"></line>
+    <text class="gm__etq" x="{{ g.x0 - 6 }}" y="{{ t.y }}"
+          text-anchor="end" dominant-baseline="central">{{ t.etiqueta }}</text>
+    {% endfor %}
+
+    {# El suelo, un poco más marcado que la rejilla #}
+    <line class="gm__eje" x1="{{ g.x0 }}" y1="{{ g.y1 }}" x2="{{ g.x1 }}" y2="{{ g.y1 }}"></line>
+
+    {% for t in g.xticks %}
+    <text class="gm__etq" x="{{ t.x }}" y="{{ g.y1 + 14 }}"
+          text-anchor="{{ 'start' if loop.first else ('end' if loop.last else 'middle') }}">{{ t.etiqueta }}</text>
+    {% endfor %}
+
+    {% for l in g.lineas %}
+    <path class="gm__linea" d="{{ l.d }}"
+          style="stroke:{{ l.color }};stroke-width:{{ l.grosor }}"></path>
+    {# Sólo el punto final lleva marca: con cuatro líneas, un círculo en cada
+       toma convierte la gráfica en una sopa de puntos. #}
+    <circle class="gm__punta" cx="{{ l.ultimo.x }}" cy="{{ l.ultimo.y }}" r="3.2"
+            style="stroke:{{ l.color }}"></circle>
+    {% endfor %}
+  </svg>
+
+  <div class="gm__leyenda">
+    {% for l in g.lineas %}
+    <span class="gm__item">
+      <span class="gm__punto" style="background:{{ l.color }}"></span>{{ l.nombre }}
+    </span>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}

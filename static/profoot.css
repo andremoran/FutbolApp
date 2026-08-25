@@ -1028,3 +1028,16 @@ a.pf-avatar--xl::after   { inset: 0; }
   background: linear-gradient(90deg, var(--primary), var(--success, #10b981));
   transition: width .4s ease;
 }
+
+/* ── Gráfica de varias líneas (_grafica_multi.html) ────────────────────── */
+.gm__svg      { width: 100%; height: auto; display: block; overflow: visible; }
+.gm__rejilla  { stroke: var(--border-soft); stroke-width: 1; }
+.gm__eje      { stroke: var(--border); stroke-width: 1; }
+.gm__etq      { font-size: 9px; fill: var(--text-muted); }
+.gm__linea    { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.gm__punta    { fill: #fff; stroke-width: 2.5; }
+.gm__leyenda  { display: flex; flex-wrap: wrap; justify-content: center;
+                gap: 6px 14px; margin-top: 10px; }
+.gm__item     { display: inline-flex; align-items: center; gap: 5px;
+                font-size: 11.5px; color: var(--text-sec); font-weight: 600; }
+.gm__punto    { width: 9px; height: 9px; border-radius: 50%; flex: none; }
