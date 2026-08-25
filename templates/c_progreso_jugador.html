@@ -160,9 +160,10 @@
   <div class="pf-alerta pf-alerta--info pf-mt-12">
     <i data-ico="info" class="pf-ico--xs"></i>
     <span>
-      Solo hay una foto guardada de este jugador. La evolución aparece a
-      partir de la segunda evaluación: cada vez que le evalúes se guarda cómo
-      estaba esa semana.
+      {% if resumen.fotos %}Solo hay una foto guardada de este jugador. La
+      evolución{% else %}Todavía no hay ninguna foto guardada. La evolución
+      {% endif %} aparece a partir de la segunda evaluación: cada vez que le
+      evalúes se guarda cómo estaba esa semana.
     </span>
   </div>
   {% else %}
@@ -178,13 +179,13 @@
     {% for f in familias %}
     <div class="pg-fam3">
       <svg class="pg-anillo" viewBox="0 0 44 44" role="img"
-           aria-label="{{ f.titulo }}: {{ f.media if f.media is not none else 'sin datos' }} de 10">
+           aria-label="{{ f.titulo }}: {{ f.media if f.media is not none else 'sin datos' }} de 100">
         <circle class="pg-anillo__f" cx="22" cy="22" r="19"></circle>
         <circle class="pg-anillo__r" cx="22" cy="22" r="19" pathLength="100"
                 transform="rotate(-90 22 22)"
-                style="stroke:{{ f.tono }};stroke-dasharray:{{ ((f.media or 0) * 10)|round(1) }} 100"></circle>
+                style="stroke:{{ f.tono }};stroke-dasharray:{{ (f.media or 0)|round(1) }} 100"></circle>
         <text class="pg-anillo__v" x="22" y="22" text-anchor="middle"
-              dominant-baseline="central">{{ '%g'|format(f.media) if f.media is not none else '–' }}</text>
+              dominant-baseline="central">{{ f.media|round|int if f.media is not none else '–' }}</text>
       </svg>
       <div class="pg-fam3__t">{{ f.titulo }}</div>
       {{ flecha(f.delta) }}
@@ -220,7 +221,10 @@
     <div class="pg-fila">
       <span class="pg-fila__n">{{ a.etiqueta }}</span>
       <span class="pg-barra">
-        <span class="pg-barra__r" style="width:{{ (a.hoy or 0) * 10 }}%"></span>
+        {# Los 18 van en escala 1-100 (db.py: ESCALA_MIN/ESCALA_MAX), asi que
+           el valor ES el porcentaje. Multiplicarlo por 10 dejaba TODAS las
+           barras llenas: un 70 pedia «width:700%». #}
+        <span class="pg-barra__r" style="width:{{ a.hoy or 0 }}%"></span>
       </span>
       <span class="pg-fila__v">{{ a.hoy if a.hoy is not none else '–' }}</span>
       {{ flecha(a.delta) }}

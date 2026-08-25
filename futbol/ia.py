@@ -80,14 +80,18 @@ def _seccion_mi_asistencia(uid):
     ser la explicacion de la primera: al que falta tres semanas seguidas no le
     hace falta que la IA le adivine por que no juega.
     """
-    marcas = db.q(
+    filas = db.q(
         lambda: db.sb().table('fut_attendance').select('estado')
         .eq('player_id', uid).execute().data or [], [], 'mi asistencia')
+    #  Solo lo que marco el entrenador. Desde que el jugador puede AVISAR de
+    #  que no va, hay filas con `estado` en NULL que son avisos y no sesiones:
+    #  contarlas hundia el porcentaje que la IA le lee al jugador.
+    marcas = [m for m in filas if m.get('estado') and m['estado'] != 'pendiente']
     if not marcas:
         return []
 
     from collections import Counter
-    c = Counter((m.get('estado') or 'sin marcar') for m in marcas)
+    c = Counter(m['estado'] for m in marcas)
     total = len(marcas)
     vino = c.get('presente', 0) + c.get('tarde', 0)
     partes = ['Asistencia a entrenamientos: vino a %d de %d sesiones (%d%%)'

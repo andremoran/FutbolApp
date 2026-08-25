@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Vigila los cuatro fallos que ya mordieron una vez, para que no vuelvan.
+"""Vigila los fallos que ya mordieron una vez, para que no vuelvan.
 
 Son fallos de los que no se ven: la pantalla no revienta, simplemente enseña
 menos de lo que hay. Por eso estuvieron meses ahí y por eso conviene una
@@ -379,9 +379,77 @@ def auditar_contexto_ia_con_datos():
          fdb.rows, fdb.totales_de_partidos) = reales
 
 
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  8. La escala de los 18 atributos
+# ═══════════════════════════════════════════════════════════════════════════
+def auditar_escala_atributos():
+    """Los 18 van de 1 a 100, y mas de una vez se han pintado como si fueran
+    de 1 a 10.
+
+    Cuesta verlo porque no revienta nada: la barra simplemente pide
+    «width:700%» y sale llena, igual que la del jugador de al lado. Con datos
+    de prueba pequeños (un 6, un 8) hasta parece que funciona. Solo se nota
+    mirando a un equipo entero y viendo que TODOS son perfectos.
+    """
+    for f in sorted((WEB / 'templates').glob('*.html')):
+        texto = f.read_text(encoding='utf-8')
+        for m in re.finditer(r'(width|stroke-dasharray)\s*:\s*\{\{([^}]*)\}\}', texto):
+            cuerpo = m.group(2)
+            if re.search(r'\*\s*10\b', cuerpo):
+                linea = texto[:m.start()].count('\n') + 1
+                aviso('escala de los 18',
+                      'templates/%s:%d pinta «%s» multiplicando por 10. Si el '
+                      'valor es uno de los 18 atributos ya viene en 1-100 y la '
+                      'barra saldra siempre llena.'
+                      % (f.name, linea, m.group(1)))
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  9. Los avisos del jugador no son asistencia
+# ═══════════════════════════════════════════════════════════════════════════
+def auditar_asistencia_sin_avisos():
+    """Desde que el jugador puede AVISAR de que no va, `fut_attendance` tiene
+    filas con `estado` en NULL que no son sesiones: son avisos.
+
+    Quien cuente `len(filas)` como total le hunde el porcentaje a un jugador
+    por avisar, que es exactamente lo contrario de lo que se buscaba. Se
+    comprueba con filas inventadas: tres marcadas y dos que son solo aviso.
+    El total tiene que ser 3.
+    """
+    import futbol.ia as ia
+    import futbol.db as fdb
+
+    inventadas = [{'estado': 'presente'}, {'estado': 'presente'},
+                  {'estado': 'ausente'},
+                  {'estado': None}, {'estado': None}]
+    real = fdb.q
+    fdb.q = lambda fn, por_defecto=None, ctx='': inventadas
+    try:
+        texto = ' '.join(ia._seccion_mi_asistencia('jugador-inventado') or [])
+    except Exception as e:
+        aviso('avisos contados como asistencia',
+              'la seccion de asistencia de la IA revienta (%s: %s)'
+              % (type(e).__name__, e))
+        texto = ''
+    finally:
+        fdb.q = real
+
+    m = re.search(r'vino a (\d+) de (\d+)', texto)
+    if not m:
+        aviso('avisos contados como asistencia',
+              'la seccion de asistencia de la IA ya no dice «vino a X de Y»; '
+              'si cambio el texto, actualiza esta comprobacion')
+    elif m.group(2) != '3':
+        aviso('avisos contados como asistencia',
+              'con 3 sesiones marcadas y 2 avisos sueltos, la IA dice «de %s». '
+              'Esta contando los avisos como sesiones.' % m.group(2))
+
+
 for comprobacion in (auditar_dueno, auditar_manuales, auditar_una_fila,
                      auditar_dos_duenyos, auditar_escrituras_mudas,
-                     auditar_html_donde_va_json, auditar_contexto_ia_con_datos):
+                     auditar_html_donde_va_json, auditar_contexto_ia_con_datos,
+                     auditar_escala_atributos, auditar_asistencia_sin_avisos):
     comprobacion()
 
 print('Auditoría de los patrones conocidos')

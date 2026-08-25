@@ -348,13 +348,18 @@ def c_progreso_jugador(pid):
                  dentro[0] if dentro else None)
     hoy = historial[-1] if historial else None
 
+    #  `ficha_atributos` rellena los huecos con 50 para no dejar pantallas en
+    #  blanco, y avisa de ello en `_tiene_perfil`. Aqui ese 50 no vale: seria
+    #  ensenar el «progreso» de alguien a quien nadie ha evaluado nunca.
+    evaluado = bool(ficha.get('_tiene_perfil'))
+
     def _valor(foto, k):
         return ((foto or {}).get('atributos') or {}).get(k)
 
     atributos = []
     for k in db.ATRIBUTOS_18:
         v_hoy = _valor(hoy, k)
-        if v_hoy is None:
+        if v_hoy is None and evaluado:
             v_hoy = ficha.get(k)
         atributos.append({
             'clave': k,
@@ -365,7 +370,8 @@ def c_progreso_jugador(pid):
             'delta': _delta(v_hoy, _valor(antes, k)),
         })
 
-    overall_hoy = (hoy or {}).get('overall') if hoy else ficha.get('overall')
+    overall_hoy = ((hoy or {}).get('overall') if hoy
+                   else (ficha.get('overall') if evaluado else None))
 
     #  La linea que se dibuja: la foto de referencia mas las del periodo. No
     #  todo el historial: si el numero de arriba dice «+9 en un mes» y la linea
@@ -459,8 +465,11 @@ def c_progreso_jugador(pid):
     # ─── Competicion y compromiso, dentro del periodo ───────────────────────
     partidos = [m for m in (db.rows('fut_matches', 'partidos progreso', coach_id=uid) or [])
                 if (m.get('fecha') or '') >= desde_iso]
-    competicion = db.totales_de_partidos(uid, ids={pid},
-                                         partidos=partidos or None).get(pid)
+    #  Ojo con el `or None`: `totales_de_partidos` entiende None como «trae
+    #  tu los partidos», o sea TODOS. Con una lista vacia devuelve {}, que es
+    #  lo que se quiere aqui — si no, «esta semana» acababa ensenando los goles
+    #  de toda la temporada.
+    competicion = db.totales_de_partidos(uid, ids={pid}, partidos=partidos).get(pid)
 
     columna = 'manual_player_id' if jugador['es_manual'] else 'player_id'
     marcas_asis = db.q(

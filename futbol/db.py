@@ -597,7 +597,9 @@ def ficha_atributos(player_id=None, manual_player_id=None):
 def guardar_atributos(player_id=None, manual_player_id=None, **campos):
     """Upsert de la ficha de un jugador (con o sin cuenta).
 
-    `campos` puede traer cualquiera de los 18 (escala 1-10), `potencial`
+    `campos` puede traer cualquiera de los 18 (escala 1-100, la misma que
+    ESCALA_MIN/ESCALA_MAX: este comentario decia 1-10 y ya costo un fallo de
+    barras que salian todas llenas), `potencial`
     (0-100) y los campos de `_CAMPOS_ESTADO`. El overall y las tres medias por
     familia (que alimentan tecnica/fisico/mental, los 4 de siempre) se
     recalculan siempre a partir de lo que quede guardado. Si es la primera
