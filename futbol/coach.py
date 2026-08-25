@@ -318,6 +318,7 @@ def c_progreso_jugador(pid):
     """
     from datetime import date, timedelta
     from . import evaluaciones as ev
+    from . import tests_catalogo as cat
 
     uid = db.equipo_id(current_user.id)
 
@@ -365,14 +366,47 @@ def c_progreso_jugador(pid):
         })
 
     overall_hoy = (hoy or {}).get('overall') if hoy else ficha.get('overall')
+
+    #  La linea que se dibuja: la foto de referencia mas las del periodo. No
+    #  todo el historial: si el numero de arriba dice «+9 en un mes» y la linea
+    #  arranca hace un año, el entrenador ve dos cosas que no cuadran.
+    a_dibujar = list(dentro)
+    if antes is not None and (not dentro or antes is not dentro[0]):
+        a_dibujar = [antes] + a_dibujar
+
     resumen = {
         'overall': overall_hoy,
         'delta': _delta(overall_hoy, (antes or {}).get('overall')),
         'desde': (antes or {}).get('semana'),
         'fotos': len(historial),
-        'serie': [{'semana': h.get('semana'), 'overall': h.get('overall')}
-                  for h in historial if h.get('overall') is not None],
+        'curva': [{'fecha': db.parse_fecha(h.get('semana')), 'valor': h.get('overall')}
+                  for h in a_dibujar if h.get('overall') is not None],
     }
+
+    #  Las tres familias, cada una en un numero. Es la lectura que se quiere de
+    #  un golpe —«fisicamente mejor, mentalmente igual»— y que leer 18 filas no
+    #  da: al llegar a la fila doce ya no te acuerdas de la tres.
+    familias = []
+    for fam, titulo, ico, tono, fondo in (
+            ('tecnica', 'Técnico', 'target', 'var(--primary)', 'var(--primary-soft)'),
+            ('fisico', 'Físico', 'zap', '#475569', '#f1f5f9'),
+            ('mental', 'Mental', 'cpu', '#7e6acb', '#ede9fe')):
+        suyos = [a for a in atributos if a['familia'] == fam]
+        ahora = [a['hoy'] for a in suyos if a['hoy'] is not None]
+        antano = [_valor(antes, a['clave']) for a in suyos]
+        antano = [v for v in antano if v is not None]
+        media = round(sum(ahora) / float(len(ahora)), 1) if ahora else None
+        familias.append({
+            'clave': fam, 'titulo': titulo, 'icono': ico, 'tono': tono, 'fondo': fondo,
+            'media': media,
+            'delta': _delta(media, round(sum(antano) / float(len(antano)), 1)
+                            if antano else None),
+        })
+
+    #  Y lo que de verdad se movio. Los atributos que no cambiaron son ruido en
+    #  una pantalla que trata justamente del cambio.
+    movidos = sorted([a for a in atributos if a['delta']],
+                     key=lambda a: -abs(a['delta']))[:6]
 
     # ─── Las pruebas: primera contra ultima del periodo ─────────────────────
     if jugador['es_manual']:
@@ -388,7 +422,11 @@ def c_progreso_jugador(pid):
         p = pruebas.setdefault(m.get('test_clave'), {
             'nombre': m.get('test_nombre') or m.get('test_clave'),
             'unidad': m.get('_unidad') or '',
-            'menor_mejor': m.get('_menor_mejor'),
+            #  Si en esta prueba bajar es mejorar. Sale de la direccion del
+            #  campo principal: `enriquecer()` NO trae ningun `_menor_mejor`,
+            #  y darlo por hecho hacia que un sprint mas lento saliera con
+            #  flecha verde.
+            'menor_mejor': (m.get('_principal') or {}).get('direccion') == cat.MENOR,
             'marcas': []})
         p['marcas'].append(m)
 
@@ -401,7 +439,13 @@ def c_progreso_jugador(pid):
             #  En una prueba de tiempo, bajar es mejorar. Se normaliza aqui
             #  para que la pantalla no tenga que saber de que va cada prueba.
             mejora = round((a - b) if p['menor_mejor'] else (b - a), 2)
+        #  La minilinea. En una prueba de tiempo se dibuja del reves, para que
+        #  «mejorar» sea siempre subir: una linea que baja mientras el jugador
+        #  mejora es justo lo que hace dudar al que la mira.
+        numeros = [x.get('_valor') for x in p['marcas']
+                   if isinstance(x.get('_valor'), (int, float))]
         tests.append({
+            'datos': [-v for v in numeros] if p['menor_mejor'] else numeros,
             'nombre': p['nombre'], 'unidad': p['unidad'], 'veces': len(p['marcas']),
             'primera': a, 'ultima': b, 'mejora': mejora,
             'menor_mejor': p['menor_mejor'],
@@ -449,6 +493,7 @@ def c_progreso_jugador(pid):
                            jugador=jugador, periodos=PERIODOS, periodo=clave,
                            etiqueta_periodo=next((e for c, e, _ in PERIODOS if c == clave), ''),
                            resumen=resumen, atributos=atributos, tests=tests,
+                           familias=familias, movidos=movidos,
                            competicion=competicion, asistencia=asistencia,
                            lesiones=lesiones,
                            es_pro=roles.es_pro(current_user))

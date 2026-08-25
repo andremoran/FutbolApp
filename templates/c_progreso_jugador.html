@@ -74,6 +74,43 @@
               padding: 10px; text-align: center; }
   .pg-cifra__v { font-size: 20px; font-weight: 800; letter-spacing: -.5px; }
   .pg-cifra__e { font-size: 11px; color: var(--text-sec); margin-top: 2px; }
+
+  /*  La curva es lo primero que se mira, asi que se le da sitio: el alto por
+      defecto de .pf-grafica son 128 px y aqui manda el viewBox del include.  */
+  .pg-curva .pf-grafica { height: 152px; }
+
+  /*  Los tres anillos. Un numero por familia: es lo que se lee de un golpe.  */
+  .pg-fams { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+             margin-top: 16px; }
+  .pg-fam3 { text-align: center; min-width: 0; }
+  .pg-anillo { width: 100%; max-width: 66px; height: auto; display: block;
+               margin: 0 auto 5px; }
+  .pg-anillo__f { fill: none; stroke: var(--border-soft); stroke-width: 5; }
+  .pg-anillo__r { fill: none; stroke-width: 5; stroke-linecap: round; }
+  .pg-anillo__v { font-size: 14px; font-weight: 800; fill: var(--text);
+                  letter-spacing: -.5px; }
+  .pg-fam3__t { font-size: 11.5px; font-weight: 700; color: var(--text-sec);
+                margin-bottom: 4px; }
+
+  /*  Lo que se movio, en fichas. Se lee de pasada.  */
+  .pg-movidos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+  .pg-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 12px;
+             font-weight: 600; padding: 5px 9px; border-radius: 100px;
+             background: var(--border-soft); color: var(--text-sec); }
+  .pg-chip b { font-weight: 800; }
+  .pg-chip--sube { background: var(--primary-soft); color: #047857; }
+  .pg-chip--baja { background: var(--danger-bg); color: #991b1b; }
+
+  /*  El detalle de los 18, plegado. Sigue estando entero, pero no de entrada.  */
+  .pg-todos { margin-top: 16px; border-top: 1px solid var(--border-soft);
+              padding-top: 4px; }
+  .pg-todos > summary { display: flex; align-items: center; gap: 8px; cursor: pointer;
+                        list-style: none; padding: 10px 0; font-size: 13px;
+                        font-weight: 700; color: var(--text-sec); }
+  .pg-todos > summary::-webkit-details-marker { display: none; }
+  .pg-todos[open] > summary .pf-item__chev { transform: rotate(180deg); }
+
+  .pg-mini { flex: none; width: 54px; color: var(--text-muted); }
 </style>
 {% endblock %}
 
@@ -107,6 +144,16 @@
   <p style="margin:6px 0 0;font-size:12px;color:var(--text-muted)">
     Comparado con la semana del {{ resumen.desde }}
   </p>
+  {% endif %}
+
+  {# La curva. Es lo primero que se mira y contesta la pregunta sin leer un
+     solo número: ¿sube o no sube? #}
+  {% if resumen.curva|length >= 2 %}
+  <div class="pg-curva pf-mt-12">
+    {% with serie = resumen.curva, alto = 152, pie = 'evaluaciones' %}
+      {% include '_grafica.html' %}
+    {% endwith %}
+  </div>
   {% elif resumen.fotos <= 1 %}
   {# Sin dos fotos no hay evolución que enseñar, y decirlo es más honesto que
      pintar un cero que se lee como «no ha mejorado». #}
@@ -118,24 +165,70 @@
       estaba esa semana.
     </span>
   </div>
+  {% else %}
+  <div class="pf-alerta pf-alerta--info pf-mt-12">
+    <i data-ico="info" class="pf-ico--xs"></i>
+    <span>Sin evaluaciones dentro de este periodo. Prueba con uno más largo.</span>
+  </div>
   {% endif %}
 
-  {% for fam, titulo in [('tecnica', 'Técnica'), ('fisico', 'Físico'), ('mental', 'Mental')] %}
-  {% set delfam = atributos | selectattr('familia', 'equalto', fam) | list %}
-  {% if delfam %}
-  <div class="pg-fam">{{ titulo }}</div>
-  {% for a in delfam %}
-  <div class="pg-fila">
-    <span class="pg-fila__n">{{ a.etiqueta }}</span>
-    <span class="pg-barra">
-      <span class="pg-barra__r" style="width:{{ (a.hoy or 0) * 10 }}%"></span>
-    </span>
-    <span class="pg-fila__v">{{ a.hoy if a.hoy is not none else '–' }}</span>
-    {{ flecha(a.delta) }}
+  {# Las tres familias en tres números. Mismos colores e iconos que la pantalla
+     de evaluar, para que se lean como lo mismo. #}
+  <div class="pg-fams">
+    {% for f in familias %}
+    <div class="pg-fam3">
+      <svg class="pg-anillo" viewBox="0 0 44 44" role="img"
+           aria-label="{{ f.titulo }}: {{ f.media if f.media is not none else 'sin datos' }} de 10">
+        <circle class="pg-anillo__f" cx="22" cy="22" r="19"></circle>
+        <circle class="pg-anillo__r" cx="22" cy="22" r="19" pathLength="100"
+                transform="rotate(-90 22 22)"
+                style="stroke:{{ f.tono }};stroke-dasharray:{{ ((f.media or 0) * 10)|round(1) }} 100"></circle>
+        <text class="pg-anillo__v" x="22" y="22" text-anchor="middle"
+              dominant-baseline="central">{{ '%g'|format(f.media) if f.media is not none else '–' }}</text>
+      </svg>
+      <div class="pg-fam3__t">{{ f.titulo }}</div>
+      {{ flecha(f.delta) }}
+    </div>
+    {% endfor %}
   </div>
-  {% endfor %}
+
+  {# Y solo lo que cambió. Los atributos que siguen igual no cuentan nada en
+     una pantalla que trata precisamente del cambio. #}
+  {% if movidos %}
+  <div class="pg-movidos">
+    {% for a in movidos %}
+    <span class="pg-chip {{ 'pg-chip--sube' if a.delta > 0 else 'pg-chip--baja' }}">
+      <i data-ico="{{ 'trending-up' if a.delta > 0 else 'trending-down' }}" class="pf-ico--xs"></i>
+      {{ a.etiqueta }} <b>{{ '+' if a.delta > 0 }}{{ a.delta }}</b>
+    </span>
+    {% endfor %}
+  </div>
   {% endif %}
-  {% endfor %}
+
+  {# El detalle entero, plegado: quien lo quiera lo tiene a un toque, y quien
+     no, no se come 18 filas de números nada más entrar. #}
+  <details class="pg-todos">
+    <summary>
+      <span class="pf-grow">Ver los 18 atributos uno a uno</span>
+      <i data-ico="chevron-down" class="pf-ico--sm pf-item__chev"></i>
+    </summary>
+    {% for f in familias %}
+    {% set delfam = atributos | selectattr('familia', 'equalto', f.clave) | list %}
+    {% if delfam %}
+    <div class="pg-fam">{{ f.titulo }}</div>
+    {% for a in delfam %}
+    <div class="pg-fila">
+      <span class="pg-fila__n">{{ a.etiqueta }}</span>
+      <span class="pg-barra">
+        <span class="pg-barra__r" style="width:{{ (a.hoy or 0) * 10 }}%"></span>
+      </span>
+      <span class="pg-fila__v">{{ a.hoy if a.hoy is not none else '–' }}</span>
+      {{ flecha(a.delta) }}
+    </div>
+    {% endfor %}
+    {% endif %}
+    {% endfor %}
+  </details>
 
   {% else %}
   <div class="pf-empty" style="padding:20px 8px">
@@ -172,7 +265,17 @@
           {%- if t.nivel %} · {{ t.nivel }}{% endif -%}
         </span>
       </span>
-      {% if t.veces > 1 %}{{ flecha(t.mejora) }}{% endif %}
+      {% if t.veces > 1 %}
+      {# La silueta de la prueba. Dibujada de modo que subir sea mejorar
+         siempre, también en las de tiempo. #}
+      <span class="pg-mini">
+        {% with datos = t.datos, alto = 24,
+                color = ('var(--primary)' if (t.mejora or 0) > 0 else 'var(--danger)') %}
+          {% include '_spark.html' %}
+        {% endwith %}
+      </span>
+      {{ flecha(t.mejora) }}
+      {% endif %}
     </div>
   </div>
   {% endfor %}

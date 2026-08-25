@@ -57,7 +57,7 @@
 
   <div class="pf-row pf-row--between" style="font-size:11px;color:var(--text-muted);margin-top:2px">
     <span>{{ '%g'|format(vmin) }}</span>
-    <span>{{ pts|length }} tomas</span>
+    <span>{{ pts|length }} {{ pie|default('tomas', true) }}</span>
     <span>{{ '%g'|format(vmax) }}</span>
   </div>
 {% elif pts|length == 1 %}
