@@ -1,0 +1,188 @@
+{% extends '_shell.html' %}
+{% block title %}Microciclos · ProFoot{% endblock %}
+
+{# La semana de partido a partido. Un microciclo se arma una vez, se revisa
+   contra la guía de periodización y se vuelca al calendario. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_calendario') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Planificación</div>{% endblock %}
+{% block hero_title %}Microciclos{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  {{ micros|length }} semana{{ '' if micros|length == 1 else 's' }} planificada{{ '' if micros|length == 1 else 's' }}
+</div>
+{% endblock %}
+
+{% block head %}
+<style>
+  /* Selector de rotación del alta rápida: una fila de pastillas con los días
+     entre partido y partido. Es la primera decisión y manda sobre todo lo demás. */
+  .mn-rot     { display: flex; gap: 6px; flex-wrap: wrap; }
+  .mn-rot__b  { padding: 9px 14px; border-radius: var(--r-lg); background: #fff;
+                border: 1.5px solid var(--border); font-size: 14px; font-weight: 800;
+                color: var(--text-sec); }
+  .mn-rot__b[aria-pressed="true"] { border-color: var(--primary);
+                background: var(--primary-faint); color: var(--primary); }
+  .mn-rot__d  { display: block; font-size: 10px; font-weight: 700;
+                text-transform: uppercase; letter-spacing: .4px; margin-top: 1px; }
+
+  /* Tarjeta de un microciclo guardado */
+  .mn-item    { display: block; background: #fff; border: 1px solid var(--border-soft);
+                border-radius: var(--r-xl); padding: 13px 14px; margin-bottom: 10px;
+                box-shadow: var(--sh-sm); }
+  .mn-item__t { font-size: 15px; font-weight: 800; letter-spacing: -.2px; }
+  .mn-item__s { font-size: 12px; color: var(--text-sec); margin-top: 2px; }
+  /* Mini gráfica de la semana dentro de la tarjeta: se reconoce el microciclo
+     por su forma antes de leer el nombre. */
+  .mn-mini    { display: flex; align-items: flex-end; gap: 2px; height: 30px;
+                width: 96px; flex: none; }
+  .mn-mini__b { flex: 1; border-radius: 2px; min-height: 3px; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ══════════ GUÍA ══════════ #}
+<a class="pf-card pf-card--link" href="{{ url_for('futbol.c_microciclo_guia') }}"
+   style="display:flex;align-items:center;gap:12px">
+  <span class="pf-item__icon"><i data-ico="book-open" class="pf-ico--sm"></i></span>
+  <span class="pf-grow">
+    <span class="pf-item__title">Guía de periodización</span>
+    <span class="pf-item__sub">Los 11 principios y la forma de cada semana</span>
+  </span>
+  <span class="pf-item__chev"><i data-ico="chevron-right" class="pf-ico--sm"></i></span>
+</a>
+
+{# ══════════ NUEVO ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Nueva semana</h2></div>
+  <p class="t-body-sm c-sec" style="margin:2px 0 12px">
+    Elige cuántos días separan un partido del siguiente. La semana nace con la
+    carga y la capacidad de cada día ya puestas.
+  </p>
+
+  <div class="pf-field">
+    <label class="pf-label">Días entre partidos</label>
+    <div class="mn-rot" role="group" aria-label="Rotación" id="m-rot">
+      {% for r in rotaciones %}
+      <button type="button" class="mn-rot__b" data-r="{{ r }}"
+              aria-pressed="{{ 'true' if r == 7 else 'false' }}">
+        {{ r }}<span class="mn-rot__d">días</span>
+      </button>
+      {% endfor %}
+    </div>
+    <p class="t-body-sm c-sec" id="m-rot-aviso" style="margin:9px 0 0">
+      {{ avisos_rotacion[7] }}
+    </p>
+  </div>
+
+  <div class="pf-field">
+    <label class="pf-label" for="m-nombre">Nombre</label>
+    <input class="pf-input" id="m-nombre" maxlength="120"
+           placeholder="Ej: Microciclo 7 — jornada 12">
+  </div>
+
+  <div class="pf-field">
+    <label class="pf-label" for="m-desde">Primer día (el siguiente al partido)</label>
+    <input class="pf-input" id="m-desde" type="date" value="{{ hoy }}">
+  </div>
+
+  <button class="pf-btn pf-btn--primary pf-btn--block" id="m-crear">
+    <i data-ico="plus" class="pf-ico--sm"></i> Crear microciclo
+  </button>
+</div>
+
+{# ══════════ LISTA ══════════ #}
+{% if micros %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Guardados</h2>
+    <span class="pf-card__badge">{{ micros|length }}</span>
+  </div>
+
+  <div style="margin-top:12px">
+    {% for m in micros %}
+    <a class="mn-item" href="{{ url_for('futbol.c_microciclo', mid=m.id) }}">
+      <div class="pf-row pf-row--between" style="align-items:flex-start">
+        <div class="pf-grow">
+          <div class="mn-item__t">{{ m.nombre }}</div>
+          <div class="mn-item__s">
+            {% if m._desde %}{{ m._desde.strftime('%d/%m') }}
+              {%- if m._hasta %} – {{ m._hasta.strftime('%d/%m') }}{% endif %} ·
+            {% endif %}
+            rotación de {{ m._rotacion }} días ·
+            {{ m._escritos }}/{{ m._dias|length }} día{{ '' if m._dias|length == 1 else 's' }} escrito{{ '' if m._escritos == 1 else 's' }}
+          </div>
+          {% if m.lugar %}
+          <div class="mn-item__s"><i data-ico="map-pin" class="pf-ico--xs"
+               style="vertical-align:-2px"></i> {{ m.lugar }}</div>
+          {% endif %}
+        </div>
+
+        {# La forma de la semana, en pequeño #}
+        <div class="mn-mini" aria-hidden="true">
+          {% for d in m._dias %}
+          <span class="mn-mini__b"
+                style="height:{{ d._carga.alto }}%;background:{{ d._carga.color }}"></span>
+          {% endfor %}
+        </div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% else %}
+<div class="pf-card">
+  <div class="pf-empty">
+    <div class="pf-empty__icon"><i data-ico="grid" class="pf-ico--xxl"></i></div>
+    <h3 class="t-h3" style="margin:14px 0 4px">Todavía no hay ninguna semana</h3>
+    <p class="t-body-sm c-sec" style="max-width:34ch">
+      Crea tu primer microciclo arriba. Puedes empezar por la semana de 7 días,
+      que es la que cabe entera.
+    </p>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var AVISOS = {{ avisos_rotacion|tojson }};
+  var rot = 7;
+
+  var cont = document.getElementById('m-rot');
+  var aviso = document.getElementById('m-rot-aviso');
+
+  cont.addEventListener('click', function (e) {
+    var b = e.target.closest('.mn-rot__b');
+    if (!b) return;
+    cont.querySelectorAll('.mn-rot__b').forEach(function (x) {
+      x.setAttribute('aria-pressed', String(x === b));
+    });
+    rot = parseInt(b.dataset.r, 10);
+    aviso.textContent = AVISOS[rot] || '';
+  });
+
+  var btn = document.getElementById('m-crear');
+  btn.addEventListener('click', function () {
+    btn.disabled = true;
+    PF.api('{{ url_for("futbol.api_microciclo_nuevo") }}', {
+      rotacion: rot,
+      nombre: document.getElementById('m-nombre').value,
+      desde: document.getElementById('m-desde').value
+    }).then(function (r) {
+      location.href = r.redirect;
+    }).catch(function (err) {
+      btn.disabled = false;
+      PF.toast(err.message, 'error');
+    });
+  });
+})();
+</script>
+{% endblock %}

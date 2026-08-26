@@ -17,7 +17,8 @@ def registrar_futbol(app, supabase):
 
     # Import diferido: los módulos de rutas importan `bp` de aquí.
     from . import (auth, player, coach, api, account, mental, social,   # noqa: F401
-                   evaluaciones, calendario, equipo, salud)             # noqa: F401
+                   evaluaciones, calendario, equipo, salud,             # noqa: F401
+                   microciclos)                                         # noqa: F401
 
     app.register_blueprint(bp)
     return bp

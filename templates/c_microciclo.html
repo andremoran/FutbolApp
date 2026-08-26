@@ -1,0 +1,519 @@
+{% extends '_shell.html' %}
+{% block title %}{{ micro.nombre }} · ProFoot{% endblock %}
+
+{# El planificador de la semana. Arriba la forma de la carga, debajo los días
+   uno a uno para escribir, y al lado lo que la evidencia dice de cada día.
+
+   En móvil los días son una lista que se despliega; en escritorio, además, se
+   ve la planilla entera en rejilla (la que el club imprime). #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_microciclos') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_actions %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_microciclo_guia') }}" aria-label="Guía de periodización">
+  <i data-ico="book-open" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Microciclo</div>{% endblock %}
+{% block hero_title %}{{ micro.nombre }}{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">
+  Rotación de {{ micro._rotacion }} días
+  {%- if micro._desde %} · {{ micro._desde.strftime('%d/%m') }}
+    {%- if micro._hasta %} – {{ micro._hasta.strftime('%d/%m') }}{% endif %}
+  {%- endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+
+{# ══════════ 1. LA FORMA DE LA SEMANA ══════════ #}
+{# La gráfica es lo primero a propósito: de un vistazo se ve si la semana sube
+   y baja como debe — recuperar, cargar, afinar — o si está plana. #}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Carga de la semana</h2>
+    <span class="pf-card__badge">{{ micro._escritos }}/{{ micro._dias|length }}</span>
+  </div>
+
+  <div class="mc-graf" id="m-graf" style="margin-top:14px">
+    {% for d in micro._dias %}
+    <button type="button" class="mc-graf__col" data-ir="{{ loop.index0 }}"
+            aria-label="Ir a {{ d.md }}">
+      <span class="mc-graf__md" data-md>{{ d.md }}</span>
+      <span class="mc-graf__barra" data-barra
+            style="height:{{ d._carga.alto }}%;background:{{ d._carga.color }}"></span>
+      <span class="mc-graf__dia">{{ d.etiqueta.split(' ')[0][:3] if d.etiqueta else '' }}</span>
+    </button>
+    {% endfor %}
+  </div>
+
+  {# Franja de fases: recuperación / adquisición / afinamiento / partido #}
+  <div class="mc-fases">
+    {% for d in micro._dias %}
+    <span class="mc-fases__t" style="background:{{ d._fase.color }}"
+          title="{{ d._fase.etiqueta }}">{{ d._fase.etiqueta[:3] }}</span>
+    {% endfor %}
+  </div>
+
+  {% if micro._aviso %}
+  <p class="t-body-sm c-sec" style="margin:12px 0 0">
+    <i data-ico="info" class="pf-ico--xs" style="vertical-align:-2px"></i>
+    {{ micro._aviso }}
+  </p>
+  {% endif %}
+</div>
+
+{# ══════════ 2. LO QUE DICE LA GUÍA DE ESTA SEMANA ══════════ #}
+{# No son los once principios: son solo los que este microciclo se está
+   saltando. Es la diferencia entre un manual y un ayudante. #}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Revisión</h2>
+    <a class="t-caption c-prim" href="{{ url_for('futbol.c_microciclo_guia') }}">Ver guía</a>
+  </div>
+
+  <div id="m-revision" style="margin-top:12px">
+    {% if avisos %}
+      {% for a in avisos %}
+      <div class="mc-rev mc-rev--{{ a.nivel }}">
+        <i data-ico="{{ 'alert-triangle' if a.nivel == 'alerta' else ('alert-circle' if a.nivel == 'aviso' else 'info') }}"
+           class="pf-ico--sm mc-rev__ico"></i>
+        <span><span class="mc-rev__n">Principio {{ a.principio }}.</span> {{ a.texto }}</span>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="mc-rev mc-rev--bien">
+        <i data-ico="check-circle" class="pf-ico--sm mc-rev__ico"></i>
+        <span>La semana cumple con los principios que se pueden comprobar aquí.</span>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+{# ══════════ 3. CABECERA DE LA PLANILLA ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Datos de la semana</h2></div>
+
+  <div class="pf-field pf-mt-12">
+    <label class="pf-label" for="m-nombre">Nombre</label>
+    <input class="pf-input" id="m-nombre" maxlength="120" value="{{ micro.nombre }}">
+  </div>
+
+  <div class="pf-field">
+    <label class="pf-label" for="m-lugar">Complejo / sede</label>
+    <input class="pf-input" id="m-lugar" maxlength="120"
+           value="{{ micro.lugar or '' }}" placeholder="Ej: Complejo Euclides Palacios">
+  </div>
+
+  <div class="pf-field" style="margin-bottom:0">
+    <label class="pf-label" for="m-rotacion">Días entre partidos</label>
+    <select class="pf-select" id="m-rotacion">
+      {% for r in rotaciones %}
+      <option value="{{ r }}" {{ 'selected' if r == micro._rotacion }}>{{ r }} días</option>
+      {% endfor %}
+    </select>
+  </div>
+</div>
+
+{# ══════════ 4. LOS DÍAS ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Días</h2></div>
+  <p class="t-body-sm c-sec" style="margin:2px 0 12px">
+    Toca un día para escribirlo. Cada uno lleva el consejo de la evidencia para
+    esa posición de la semana.
+  </p>
+
+  <div id="m-dias">
+    {% for d in micro._dias %}
+    <div class="mc-dia" data-dia="{{ loop.index0 }}"
+         data-md="{{ d.md }}" data-fecha="{{ d.fecha }}" data-etiqueta="{{ d.etiqueta }}">
+
+      <button type="button" class="mc-dia__cab" data-abrir>
+        <span class="mc-dia__marca" data-marca style="background:{{ d._carga.color }}"></span>
+        <span class="mc-dia__grow">
+          <span class="mc-dia__md" style="color:{{ d._fase.color }}">{{ d.md }}</span>
+          <span class="mc-dia__fecha">{{ d.etiqueta or d.fecha }}</span>
+          <span class="mc-dia__cap" data-resumen>
+            {{ d.capacidad or 'Sin capacidad' }} · {{ d._carga.etiqueta }}
+          </span>
+        </span>
+        <span class="mc-dia__punto" data-punto
+              style="background:{{ 'var(--primary)' if d._escrito else 'var(--border)' }}"></span>
+        <span class="mc-dia__chev"><i data-ico="chevron-right" class="pf-ico--sm"></i></span>
+      </button>
+
+      <div class="mc-dia__cuerpo pf-hide" data-cuerpo>
+
+        {# El consejo de la evidencia para este día #}
+        {% if d._foco %}
+        <div class="mc-tip">
+          <i data-ico="info" class="pf-ico--sm mc-tip__ico"></i>
+          <span>
+            <span class="mc-tip__t">{{ d._foco }}</span>
+            <span class="mc-tip__d">{{ d._detalle }}</span>
+          </span>
+        </div>
+        {% endif %}
+
+        {# Carga del día #}
+        <div class="mc-campo">
+          <div class="mc-campo__lab">Carga del día</div>
+          <div class="mc-cargas" role="group" aria-label="Carga">
+            {% for clave, etiqueta, color, alto in cargas %}
+            <button type="button" class="mc-carga" data-carga="{{ clave }}"
+                    data-color="{{ color }}" data-alto="{{ alto }}"
+                    aria-pressed="{{ 'true' if clave == d._carga_clave else 'false' }}"
+                    style="{{ 'color:' ~ color if clave == d._carga_clave else '' }}">
+              <span class="mc-carga__pt" style="background:{{ color }}"></span>{{ etiqueta }}
+            </button>
+            {% endfor %}
+          </div>
+        </div>
+
+        {# Capacidad física #}
+        <div class="mc-campo">
+          <div class="mc-campo__lab">Capacidad física</div>
+          <select class="pf-select" data-campo="capacidad">
+            <option value="">— sin definir —</option>
+            {% for c in capacidades %}
+            <option value="{{ c }}" {{ 'selected' if c == d.capacidad }}>{{ c }}</option>
+            {% endfor %}
+            {# Una capacidad escrita a mano que no esté en la lista no se pierde #}
+            {% if d.capacidad and d.capacidad not in capacidades %}
+            <option value="{{ d.capacidad }}" selected>{{ d.capacidad }}</option>
+            {% endif %}
+          </select>
+        </div>
+
+        {# Lugar / hora / duración #}
+        <div class="mc-meta">
+          <input data-campo="lugar" maxlength="80" placeholder="Lugar"
+                 value="{{ d.lugar or '' }}">
+          <input data-campo="hora" type="time" value="{{ d.hora or '' }}">
+          <input data-campo="duracion" type="number" min="0" max="300" step="5"
+                 placeholder="min" value="{{ d.duracion or '' }}">
+        </div>
+
+        {# Los siete bloques de contenido #}
+        {% for clave, etiqueta in campos %}
+        <div class="mc-campo">
+          <div class="mc-campo__lab">
+            {%- for bclave, betiqueta, bico, bcolor in bloques -%}
+              {%- if bclave == clave %}<span class="mc-campo__pt" style="background:{{ bcolor }}"></span>{% endif -%}
+            {%- endfor -%}
+            {{ etiqueta }}
+          </div>
+          <textarea data-campo="{{ clave }}" maxlength="600"
+                    rows="{{ 3 if clave in ('fisico', 'tecnico', 'tactico') else 2 }}"
+                    placeholder="{{ 'Ej: activación, movilidad articular, rondos' if clave == 'inicial'
+                                    else ('Ej: estiramiento y flexibilidad, feedback' if clave == 'final' else '') }}"
+                    >{{ d[clave] or '' }}</textarea>
+        </div>
+        {% endfor %}
+
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+{# ══════════ 5. LA PLANILLA EN REJILLA (solo escritorio) ══════════ #}
+{# Es la vista que el cuerpo técnico reconoce: días en columnas, capacidades en
+   filas. Se refresca sola al escribir arriba. No se edita aquí — escribir en
+   una rejilla de siete columnas no funciona ni con ratón. #}
+<div class="pf-card mc-tabla-envol-card" style="display:none" id="m-tabla-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Planilla</h2>
+    <button class="t-caption c-prim" id="m-copiar" type="button">Copiar como texto</button>
+  </div>
+  <div class="mc-tabla-envol" style="margin-top:12px">
+    <table class="mc-tabla" id="m-tabla">
+      <thead>
+        <tr>
+          <th>Día</th>
+          {% for d in micro._dias %}
+          <th>{{ d.etiqueta or d.fecha }}<br><span class="mc-tabla__md">{{ d.md }}</span></th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        <tr><th>Capacidad</th>
+          {% for d in micro._dias %}<td data-celda="{{ loop.index0 }}-capacidad"></td>{% endfor %}
+        </tr>
+        <tr><th>Lugar</th>
+          {% for d in micro._dias %}<td data-celda="{{ loop.index0 }}-lugar"></td>{% endfor %}
+        </tr>
+        <tr><th>Hora</th>
+          {% for d in micro._dias %}<td data-celda="{{ loop.index0 }}-hora"></td>{% endfor %}
+        </tr>
+        {% for clave, etiqueta in campos %}
+        <tr><th>{{ etiqueta }}</th>
+          {% for d in micro._dias %}<td data-celda="{{ loop.index0 }}-{{ clave }}"></td>{% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{# ══════════ 6. PIE DE LA PLANILLA ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Notas de la semana</h2></div>
+
+  <div class="pf-field pf-mt-12">
+    <label class="pf-label" for="m-recom">Recomendaciones y requerimientos</label>
+    <textarea class="pf-input pf-textarea" id="m-recom" maxlength="1200"
+              placeholder="Ej: se requiere hielo el jueves para la recuperación">{{ micro.recomendaciones or '' }}</textarea>
+  </div>
+
+  <div class="pf-field">
+    <label class="pf-label" for="m-obs">Observaciones</label>
+    <textarea class="pf-input pf-textarea" id="m-obs" maxlength="1200"
+              placeholder="Ej: fecha libre de torneo, ajuste en la parte física">{{ micro.observaciones or '' }}</textarea>
+  </div>
+
+  <div class="pf-field" style="margin-bottom:0">
+    <label class="pf-label" for="m-cuerpo">Cuerpo técnico</label>
+    <input class="pf-input" id="m-cuerpo" maxlength="300"
+           value="{{ micro.cuerpo_tecnico or '' }}"
+           placeholder="DT. · AT. · PF.">
+  </div>
+</div>
+
+{# ══════════ 7. ACCIONES ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Acciones</h2></div>
+  <div style="margin-top:12px;display:flex;flex-direction:column;gap:9px">
+    <button class="pf-btn pf-btn--secondary pf-btn--block" id="m-agendar">
+      <i data-ico="calendar" class="pf-ico--sm"></i> Volcar la semana al calendario
+    </button>
+    <button class="pf-btn pf-btn--ghost pf-btn--block" id="m-borrar"
+            style="color:var(--danger)">
+      <i data-ico="trash-2" class="pf-ico--sm"></i> Borrar microciclo
+    </button>
+  </div>
+</div>
+
+<p class="mc-fuente">
+  La guía de periodización resume <b>{{ fuente.titulo }}</b> — {{ fuente.autores }}.
+  {{ fuente.publicacion }}. Publicado bajo {{ fuente.licencia }}.
+</p>
+
+{# ══════════ GUARDAR ══════════ #}
+<div class="mc-guardar">
+  <button class="pf-btn pf-btn--primary pf-btn--block" id="m-guardar">
+    <i data-ico="save" class="pf-ico--sm"></i> Guardar microciclo
+  </button>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var ID = {{ micro.id|tojson }};
+  var CAMPOS = {{ campos|map(attribute=0)|list|tojson }};
+  var ETIQUETAS = {{ dict(campos)|tojson }};
+
+  var dias = Array.prototype.slice.call(document.querySelectorAll('#m-dias .mc-dia'));
+
+  /* ─── Leer un día del DOM ─────────────────────────────────────────────
+     La fuente de la verdad es el propio formulario: no se mantiene un
+     objeto en paralelo que pueda desincronizarse de lo que se ve. */
+  function leerDia(el) {
+    var d = {
+      md: el.dataset.md,
+      fecha: el.dataset.fecha,
+      etiqueta: el.dataset.etiqueta,
+      carga: (el.querySelector('.mc-carga[aria-pressed="true"]') || {}).dataset
+             ? el.querySelector('.mc-carga[aria-pressed="true"]').dataset.carga : 'baja'
+    };
+    el.querySelectorAll('[data-campo]').forEach(function (c) {
+      d[c.dataset.campo] = c.value;
+    });
+    d.duracion = parseInt(d.duracion, 10) || 0;
+    return d;
+  }
+
+  function leerTodo() {
+    return {
+      id: ID,
+      nombre: document.getElementById('m-nombre').value,
+      lugar: document.getElementById('m-lugar').value,
+      rotacion: parseInt(document.getElementById('m-rotacion').value, 10),
+      recomendaciones: document.getElementById('m-recom').value,
+      observaciones: document.getElementById('m-obs').value,
+      cuerpo_tecnico: document.getElementById('m-cuerpo').value,
+      dias: dias.map(leerDia)
+    };
+  }
+
+  /* ─── Abrir y cerrar un día ───────────────────────────────────────────── */
+  dias.forEach(function (el) {
+    el.querySelector('[data-abrir]').addEventListener('click', function () {
+      var cuerpo = el.querySelector('[data-cuerpo]');
+      var abierto = !cuerpo.classList.contains('pf-hide');
+      cuerpo.classList.toggle('pf-hide', abierto);
+      el.classList.toggle('is-abierto', !abierto);
+    });
+
+    /* Carga: pinta la barra de la gráfica y la marca lateral al vuelo, para
+       que la forma de la semana se vea cambiar mientras se decide. */
+    el.querySelectorAll('.mc-carga').forEach(function (b) {
+      b.addEventListener('click', function () {
+        el.querySelectorAll('.mc-carga').forEach(function (x) {
+          x.setAttribute('aria-pressed', 'false');
+          x.style.color = '';
+        });
+        b.setAttribute('aria-pressed', 'true');
+        b.style.color = b.dataset.color;
+
+        var i = el.dataset.dia;
+        el.querySelector('[data-marca]').style.background = b.dataset.color;
+        var col = document.querySelector('#m-graf [data-ir="' + i + '"]');
+        if (col) {
+          var barra = col.querySelector('[data-barra]');
+          barra.style.height = b.dataset.alto + '%';
+          barra.style.background = b.dataset.color;
+        }
+        refrescar(el);
+      });
+    });
+
+    el.querySelectorAll('[data-campo]').forEach(function (c) {
+      c.addEventListener('input', function () { refrescar(el); });
+      c.addEventListener('change', function () { refrescar(el); });
+    });
+  });
+
+  /* Resumen de la cabecera + punto de "escrito" + celda de la planilla */
+  function refrescar(el) {
+    var d = leerDia(el);
+    var carga = el.querySelector('.mc-carga[aria-pressed="true"]');
+    el.querySelector('[data-resumen]').textContent =
+      (d.capacidad || 'Sin capacidad') + ' · ' + (carga ? carga.textContent.trim() : '');
+
+    var escrito = CAMPOS.some(function (k) { return (d[k] || '').trim(); });
+    el.querySelector('[data-punto]').style.background =
+      escrito ? 'var(--primary)' : 'var(--border)';
+
+    pintarTabla(el.dataset.dia, d);
+  }
+
+  /* ─── La planilla de escritorio ───────────────────────────────────────── */
+  function pintarTabla(i, d) {
+    ['capacidad', 'lugar', 'hora'].concat(CAMPOS).forEach(function (k) {
+      var td = document.querySelector('[data-celda="' + i + '-' + k + '"]');
+      if (!td) return;
+      var v = (d[k] || '').trim();
+      td.textContent = v || '—';
+      td.classList.toggle('mc-tabla__vacio', !v);
+    });
+  }
+
+  /* La rejilla solo existe en pantalla ancha: en móvil ni se pinta. */
+  function tablaVisible() {
+    var card = document.getElementById('m-tabla-card');
+    var ancho = window.matchMedia('(min-width: 1024px)').matches;
+    card.style.display = ancho ? '' : 'none';
+    if (ancho) dias.forEach(function (el) { pintarTabla(el.dataset.dia, leerDia(el)); });
+  }
+  window.addEventListener('resize', tablaVisible);
+  tablaVisible();
+  dias.forEach(refrescar);
+
+  /* ─── Ir a un día desde la gráfica ────────────────────────────────────── */
+  document.getElementById('m-graf').addEventListener('click', function (e) {
+    var col = e.target.closest('[data-ir]');
+    if (!col) return;
+    var el = dias[parseInt(col.dataset.ir, 10)];
+    if (!el) return;
+    var cuerpo = el.querySelector('[data-cuerpo]');
+    if (cuerpo.classList.contains('pf-hide')) {
+      cuerpo.classList.remove('pf-hide');
+      el.classList.add('is-abierto');
+    }
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+
+  /* ─── Guardar ─────────────────────────────────────────────────────────── */
+  var bg = document.getElementById('m-guardar');
+  bg.addEventListener('click', function () {
+    bg.disabled = true;
+    PF.api('{{ url_for("futbol.api_microciclo") }}', leerTodo())
+      .then(function (r) {
+        PF.toast(r.mensaje);
+        bg.disabled = false;
+        if (r.avisos) pintarRevision(r.avisos);
+      })
+      .catch(function (err) { bg.disabled = false; PF.toast(err.message, 'error'); });
+  });
+
+  /* La revisión se rehace con lo que responde el servidor, que es quien tiene
+     las reglas. Así no hay dos versiones de los principios, una por lado. */
+  function pintarRevision(avisos) {
+    var cont = document.getElementById('m-revision');
+    if (!avisos.length) {
+      cont.innerHTML = '<div class="mc-rev mc-rev--bien">' +
+        '<i data-ico="check-circle" class="pf-ico--sm mc-rev__ico"></i>' +
+        '<span>La semana cumple con los principios que se pueden comprobar aquí.</span></div>';
+    } else {
+      cont.innerHTML = avisos.map(function (a) {
+        var ico = a.nivel === 'alerta' ? 'alert-triangle'
+                : (a.nivel === 'aviso' ? 'alert-circle' : 'info');
+        var t = document.createElement('span');
+        t.textContent = a.texto;
+        return '<div class="mc-rev mc-rev--' + a.nivel + '">' +
+               '<i data-ico="' + ico + '" class="pf-ico--sm mc-rev__ico"></i>' +
+               '<span><span class="mc-rev__n">Principio ' + a.principio + '.</span> ' +
+               t.innerHTML + '</span></div>';
+      }).join('');
+    }
+    PF.icons(cont);
+  }
+
+  /* ─── Volcar al calendario ────────────────────────────────────────────── */
+  document.getElementById('m-agendar').addEventListener('click', function () {
+    /* Se guarda primero: agendar lee de la base, no del formulario, y si no
+       se guarda antes se volcaría la versión anterior. */
+    PF.api('{{ url_for("futbol.api_microciclo") }}', leerTodo())
+      .then(function () {
+        return PF.api('/api/microciclo/' + ID + '/agendar', {});
+      })
+      .then(function (r) {
+        PF.toast(r.mensaje);
+        setTimeout(function () { location.href = r.redirect; }, 900);
+      })
+      .catch(function (err) { PF.toast(err.message, 'error'); });
+  });
+
+  /* ─── Borrar ──────────────────────────────────────────────────────────── */
+  document.getElementById('m-borrar').addEventListener('click', function () {
+    if (!confirm('¿Borrar este microciclo? No se puede deshacer.')) return;
+    PF.api('/api/microciclo/' + ID, null, 'DELETE')
+      .then(function () { location.href = '{{ url_for("futbol.c_microciclos") }}'; })
+      .catch(function (err) { PF.toast(err.message, 'error'); });
+  });
+
+  /* ─── Copiar la planilla como texto ───────────────────────────────────── */
+  var bc = document.getElementById('m-copiar');
+  if (bc) bc.addEventListener('click', function () {
+    var t = document.getElementById('m-nombre').value + '\n';
+    dias.forEach(function (el) {
+      var d = leerDia(el);
+      t += '\n' + d.md + ' — ' + (d.etiqueta || d.fecha);
+      if (d.capacidad) t += ' (' + d.capacidad + ')';
+      t += '\n';
+      CAMPOS.forEach(function (k) {
+        if ((d[k] || '').trim()) t += '  ' + ETIQUETAS[k] + ': ' + d[k].trim() + '\n';
+      });
+    });
+    PF.copy(t, 'Planilla copiada');
+  });
+})();
+</script>
+{% endblock %}

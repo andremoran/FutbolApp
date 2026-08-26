@@ -1,0 +1,173 @@
+{% extends '_shell.html' %}
+{% block title %}Guía de periodización · ProFoot{% endblock %}
+
+{# Los 11 principios de periodización del microciclo, resumidos en reglas que
+   se puedan aplicar el lunes por la mañana. Arriba, la forma que toma la
+   semana según los días que haya entre partido y partido. #}
+
+{% block hero_back %}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_microciclos') }}" aria-label="Volver">
+  <i data-ico="arrow-left" class="pf-ico--sm"></i>
+</a>
+{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">Microciclos</div>{% endblock %}
+{% block hero_title %}Guía de periodización{% endblock %}
+{% block hero_subtitle %}
+<div class="pf-hero__subtitle">11 principios para planificar la semana</div>
+{% endblock %}
+
+{% block head %}
+<style>
+  /* Filtro entre principios de evidencia e inferidos */
+  .gu-segs  { display: flex; gap: 6px; margin-bottom: 12px; }
+  .gu-seg   { flex: 1; padding: 8px 10px; border-radius: var(--r-lg);
+              border: 1.5px solid var(--border); background: #fff;
+              font-size: 12.5px; font-weight: 700; color: var(--text-sec); }
+  .gu-seg[aria-pressed="true"] { border-color: var(--primary);
+              background: var(--primary-faint); color: var(--primary); }
+
+  /* Leyenda de fases */
+  .gu-leyenda { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+  .gu-ley     { display: inline-flex; align-items: center; gap: 5px;
+                font-size: 11.5px; font-weight: 700; color: var(--text-sec); }
+  .gu-ley__pt { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+
+  /* Tabla de qué toca cada día */
+  .gu-dia     { display: flex; gap: 10px; align-items: flex-start;
+                padding: 11px 0; border-top: 1px solid var(--border-soft); }
+  .gu-dia:first-child { border-top: none; }
+  .gu-dia__md { font-size: 11px; font-weight: 900; letter-spacing: .3px;
+                padding: 3px 8px; border-radius: var(--r-full); color: #fff;
+                flex: none; min-width: 52px; text-align: center; }
+  .gu-dia__t  { font-size: 13px; font-weight: 700; }
+  .gu-dia__d  { font-size: 12px; color: var(--text-sec); line-height: 1.55;
+                margin-top: 3px; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ══════════ 1. LA FORMA DE LA SEMANA ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">La forma de la semana</h2></div>
+  <p class="t-body-sm c-sec" style="margin:2px 0 0">
+    Toda semana tiene tres fases: se recupera, se carga y se afina. Cuando hay
+    menos días entre partidos, lo primero que se cae es una de las sesiones
+    duras de mitad de ciclo.
+  </p>
+
+  <div class="gu-leyenda">
+    {% for clave, etiqueta, color in fases %}
+    <span class="gu-ley"><span class="gu-ley__pt" style="background:{{ color }}"></span>{{ etiqueta }}</span>
+    {% endfor %}
+  </div>
+</div>
+
+{% for f in formas %}
+<div class="pf-card" style="padding-top:12px">
+  <div class="mc-forma" style="border:none;padding:0;margin:0">
+    <div class="mc-forma__cab">
+      <span class="mc-forma__t">Rotación de {{ f.rotacion }} días</span>
+      <span class="pf-pill pf-pill--muted">{{ f.dias|length }} jornadas</span>
+    </div>
+
+    <div class="mc-forma__graf">
+      {% for d in f.dias %}
+      <div class="mc-forma__col" title="{{ d.md }} — {{ d.foco }}">
+        <span class="mc-forma__b" style="height:{{ d.carga.alto }}%;background:{{ d.carga.color }}"></span>
+        <span class="mc-forma__md">{{ d.md }}</span>
+      </div>
+      {% endfor %}
+    </div>
+
+    <p class="mc-forma__pie">{{ f.aviso }}</p>
+  </div>
+</div>
+{% endfor %}
+
+{# ══════════ 2. QUÉ TOCA CADA DÍA ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Qué toca cada día</h2></div>
+  <div style="margin-top:6px">
+    {% for md, g in dias_md.items() %}
+    <div class="gu-dia">
+      <span class="gu-dia__md" style="background:{{ {'recuperacion':'#93c5fd','adquisicion':'#10b981','afinamiento':'#f59e0b','partido':'#047857'}[g.fase] }}">{{ md }}</span>
+      <div class="pf-grow">
+        <div class="gu-dia__t">{{ g.foco }}</div>
+        <div class="gu-dia__d">{{ g.detalle }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+{# ══════════ 3. LOS 11 PRINCIPIOS ══════════ #}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">Los 11 principios</h2></div>
+  <p class="t-body-sm c-sec" style="margin:2px 0 12px">
+    Los nueve primeros salen de estudios con datos. Los dos últimos los deducen
+    los autores desde la lógica del juego.
+  </p>
+
+  <div class="gu-segs" role="group" aria-label="Filtrar principios" id="g-segs">
+    <button type="button" class="gu-seg" data-f="todos" aria-pressed="true">Todos</button>
+    <button type="button" class="gu-seg" data-f="evidencia" aria-pressed="false">Con evidencia</button>
+    <button type="button" class="gu-seg" data-f="inferido" aria-pressed="false">Inferidos</button>
+  </div>
+
+  <div id="g-lista">
+    {% for p in principios %}
+    <article class="mc-prin" data-tipo="{{ p.tipo }}" style="border-left-color:{{ p.color }}">
+      <div class="mc-prin__cab">
+        <span class="mc-prin__ico" style="background:{{ p.color }}">
+          <i data-ico="{{ p.icono }}" class="pf-ico--sm"></i>
+        </span>
+        <div class="pf-grow">
+          <div class="mc-prin__n">
+            Principio {{ p.n }}{% if p.tipo == 'inferido' %} · inferido{% endif %}
+          </div>
+          <h3 class="mc-prin__t">{{ p.titulo }}</h3>
+        </div>
+        <span class="mc-prin__clave" style="background:{{ p.color }}">{{ p.clave }}</span>
+      </div>
+
+      <p class="mc-prin__r">{{ p.resumen }}</p>
+      <p class="mc-prin__d">{{ p.detalle }}</p>
+      <div class="mc-prin__a">
+        <i data-ico="check-circle" class="pf-ico--xs" style="flex:none;margin-top:2px;color:{{ p.color }}"></i>
+        <span><b>En tu semana:</b> {{ p.aplica }}</span>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+</div>
+
+<p class="mc-fuente">
+  Resumen propio de <b>{{ fuente.titulo }}</b> — {{ fuente.autores }}.
+  {{ fuente.publicacion }}. Publicado bajo {{ fuente.licencia }}
+  ({{ fuente.url }}). Las cifras citadas son las de los estudios que recoge
+  el artículo; la redacción y los ejemplos de aplicación son de ProFoot.
+</p>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var segs = document.getElementById('g-segs');
+  var lista = document.getElementById('g-lista');
+
+  segs.addEventListener('click', function (e) {
+    var b = e.target.closest('.gu-seg');
+    if (!b) return;
+    segs.querySelectorAll('.gu-seg').forEach(function (x) {
+      x.setAttribute('aria-pressed', String(x === b));
+    });
+    var f = b.dataset.f;
+    lista.querySelectorAll('.mc-prin').forEach(function (art) {
+      art.style.display = (f === 'todos' || art.dataset.tipo === f) ? '' : 'none';
+    });
+  });
+})();
+</script>
+{% endblock %}

@@ -95,6 +95,17 @@
         <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
       </a>
 
+      <a class="pf-sheet__link" href="{{ url_for('futbol.c_microciclos') }}">
+        <span class="pf-sheet__emoji">🗓️</span>
+        <span class="pf-grow">
+          <span class="pf-sheet__label" style="display:block">
+            Microciclos {% if not fut_es_pro %}<span class="pf-pro">Pro</span>{% endif %}
+          </span>
+          <span class="pf-sheet__desc">Planifica la semana de partido a partido</span>
+        </span>
+        <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+      </a>
+
       <a class="pf-sheet__link" href="{{ url_for('futbol.c_evolucion') }}">
         <span class="pf-sheet__emoji">📈</span>
         <span class="pf-grow">
