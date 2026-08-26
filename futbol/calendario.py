@@ -437,6 +437,26 @@ def c_calendario():
     etiqueta_semana = (
         f'{lunes.day} – {dias_semana[6].day} {MESES[dias_semana[6].month - 1]}')
 
+    #  El pie de la planilla: año, mes, qué semana del año es y el objetivo.
+    #  El objetivo no se escribe aquí — es el microciclo que cubre estos días,
+    #  si lo hay. Así la agenda y la planificación semanal dejan de ser dos
+    #  papeles distintos que hablan de la misma semana.
+    fin = dias_semana[6]
+    micro = db.q(
+        lambda: db.sb().table('fut_microcycles')
+        .select('id,nombre,rotacion')
+        .eq('coach_id', uid)
+        .lte('desde', fin.isoformat())
+        .gte('hasta', lunes.isoformat())
+        .order('desde', desc=True).limit(1).execute().data or [],
+        [], 'microciclo de la semana')
+    pie_semana = {
+        'anio': lunes.year,
+        'mes': MESES[lunes.month - 1],
+        'numero': lunes.isocalendar()[1],
+        'micro': micro[0] if micro else None,
+    }
+
     return render_template(
         'c_calendario.html',
         tab_activa='agenda',
@@ -451,6 +471,7 @@ def c_calendario():
         vista=vista,
         semana=semana,
         etiqueta_semana=etiqueta_semana,
+        pie_semana=pie_semana,
         semana_ant=(lunes - timedelta(days=7)).isoformat(),
         semana_sig=(lunes + timedelta(days=7)).isoformat(),
         analisis=analisis_semana(amplio),

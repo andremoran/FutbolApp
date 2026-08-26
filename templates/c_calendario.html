@@ -32,16 +32,57 @@
                    font-weight: 700; color: var(--text-sec); }
   .cal-toggle__b.on { background: var(--primary); color: #fff; }
 
-  /* ── Tira de la semana (weekStrip) ── */
-  .cal-tira { display: flex; gap: 4px; padding: 14px 16px 0; }
-  .cal-tira__d { flex: 1; display: flex; flex-direction: column; align-items: center;
-                 gap: 4px; padding: 8px 0; border-radius: var(--r-lg); }
-  .cal-tira__wd { font-size: 10px; font-weight: 800; color: var(--text-sec); }
-  .cal-tira__n { font-size: 15px; font-weight: 700; color: var(--text);
-                 width: 32px; height: 32px; border-radius: 16px;
-                 display: flex; align-items: center; justify-content: center; }
-  .cal-tira__d.es-hoy { background: var(--primary-soft); }
-  .cal-tira__d.es-hoy .cal-tira__n { background: var(--primary); color: #fff; }
+  /* ── La semana entera, como la planilla que se cuelga ── */
+  .cal-rej { padding: 0; overflow: hidden; }
+  .cal-rej__scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .cal-rej__grid { display: grid; grid-template-columns: repeat(7, minmax(124px, 1fr));
+                   min-width: 100%; }
+  .cal-rej__col { border-left: 1px solid var(--border-soft); min-width: 0; }
+  .cal-rej__col:first-child { border-left: none; }
+  .cal-rej__col.es-hoy { background: var(--primary-faint); }
+
+  .cal-rej__cab { display: flex; flex-direction: column; align-items: center; gap: 1px;
+                  padding: 11px 6px 9px; text-decoration: none;
+                  border-bottom: 1px solid var(--border); }
+  .cal-rej__wd { font-size: 10.5px; font-weight: 800; letter-spacing: .3px;
+                 text-transform: uppercase; color: var(--text-sec); }
+  .cal-rej__n { font-size: 17px; font-weight: 800; color: var(--text);
+                line-height: 1.15; }
+  .cal-rej__col.es-hoy .cal-rej__wd,
+  .cal-rej__col.es-hoy .cal-rej__n { color: var(--primary); }
+
+  /*  Las rayas del fondo son las de la planilla impresa: dan la sensación de
+      pauta sin dibujar una tabla, y un día vacío no se ve roto.  */
+  .cal-rej__celda {
+    min-height: 232px; padding: 8px 6px; display: flex; flex-direction: column; gap: 6px;
+    background-image: repeating-linear-gradient(
+      to bottom, transparent 0 43px, var(--border-soft) 43px 44px);
+  }
+
+  .cal-chip { display: block; width: 100%; text-align: left; border: none;
+              border-left: 3px solid var(--c, var(--primary));
+              background: color-mix(in srgb, var(--c, #047857) 9%, transparent);
+              border-radius: 7px; padding: 6px 7px; cursor: pointer; }
+  .cal-chip:active { transform: scale(.97); }
+  .cal-chip__cab { display: flex; align-items: center; gap: 4px; }
+  .cal-chip__e { font-size: 11px; }
+  .cal-chip__h { font-size: 10.5px; font-weight: 800; color: var(--c, var(--primary)); }
+  .cal-chip__t { display: block; font-size: 12px; font-weight: 700; color: var(--text);
+                 line-height: 1.3; margin-top: 1px;
+                 display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+                 overflow: hidden; }
+  .cal-chip__l { display: block; font-size: 10.5px; color: var(--text-sec);
+                 white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .cal-rej__pie { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline;
+                  padding: 11px 14px; border-top: 1px solid var(--border);
+                  font-size: 12px; color: var(--text-sec); }
+  .cal-rej__pie b { font-weight: 800; color: var(--text-muted); font-size: 10.5px;
+                    text-transform: uppercase; letter-spacing: .3px; margin-right: 3px; }
+  .cal-rej__obj { flex: 1; min-width: 0; }
+  .cal-rej__obj a { color: var(--primary); font-weight: 700; text-decoration: none; }
+  .cal-rej__sin { color: var(--text-muted) !important; font-weight: 600 !important;
+                  text-decoration: underline !important; }
 
   /* ── Un día de la semana ── */
   .cal-dia__cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -91,6 +132,10 @@
   <a class="cal-barra__b" href="{{ url_for('futbol.c_planes') }}"
      aria-label="Planes de sesión" title="Planes de sesión">
     <i data-ico="clipboard" class="pf-ico--sm"></i>
+  </a>
+  <a class="cal-barra__b" href="{{ url_for('futbol.c_microciclos') }}"
+     aria-label="Microciclos" title="Planificación semanal">
+    <i data-ico="grid" class="pf-ico--sm"></i>
   </a>
   <a class="cal-barra__b" href="{{ url_for('futbol.c_observaciones') }}"
      aria-label="Observaciones" title="Observaciones">
@@ -175,14 +220,56 @@
 {% endif %}
 
 {% if vista == 'semana' %}
-{# ══════════ TIRA DE LA SEMANA ══════════ #}
-<div class="cal-tira">
-  {% for d in semana %}
-  <a class="cal-tira__d {{ 'es-hoy' if d.hoy }}" href="#dia-{{ d.iso }}">
-    <span class="cal-tira__wd">{{ d.inicial }}</span>
-    <span class="cal-tira__n">{{ d.dia }}</span>
-  </a>
-  {% endfor %}
+{# ══════════ LA SEMANA ENTERA, COMO LA PLANILLA ══════════ #}
+{# Siete columnas de lunes a domingo, que es como se piensa una semana de
+   trabajo y como se cuelga en el vestuario. En un móvil no caben siete
+   columnas legibles, así que la retícula se desplaza DENTRO de su caja: la
+   página no se arrastra y las columnas siguen siendo anchas para leerse. #}
+<div class="pf-card cal-rej">
+  <div class="cal-rej__scroll">
+    <div class="cal-rej__grid">
+      {% for d in semana %}
+      <div class="cal-rej__col {{ 'es-hoy' if d.hoy }}">
+        <a class="cal-rej__cab" href="#dia-{{ d.iso }}">
+          <span class="cal-rej__wd">{{ d.nombre }}</span>
+          <span class="cal-rej__n">{{ d.dia }}</span>
+        </a>
+        <div class="cal-rej__celda">
+          {% for e in d.eventos %}
+          <button class="cal-chip" type="button" onclick="verEvento('{{ e.id }}')"
+                  style="--c:{{ e._color }}"
+                  title="{{ e.titulo }}{% if e.hora %} · {{ e.hora[:5] }}{% endif %}">
+            <span class="cal-chip__cab">
+              <span class="cal-chip__e">{{ e._meta.emoji }}</span>
+              {%- if e.hora %}<span class="cal-chip__h">{{ e.hora[:5] }}</span>{% endif -%}
+            </span>
+            <span class="cal-chip__t">{{ e.titulo }}</span>
+            {% if e.lugar %}<span class="cal-chip__l">{{ e.lugar }}</span>{% endif %}
+          </button>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  {# El pie de la planilla. El objetivo de la semana no se escribe aquí: es el
+     microciclo que cubre estos días, si hay uno. #}
+  <div class="cal-rej__pie">
+    <span><b>Año</b> {{ pie_semana.anio }}</span>
+    <span><b>Mes</b> {{ pie_semana.mes }}</span>
+    <span><b>Semana</b> {{ pie_semana.numero }}</span>
+    <span class="cal-rej__obj">
+      <b>Objetivo</b>
+      {% if pie_semana.micro %}
+      <a href="{{ url_for('futbol.c_microciclo', mid=pie_semana.micro.id) }}">
+        {{ pie_semana.micro.nombre }}</a>
+      {% else %}
+      <a href="{{ url_for('futbol.c_microciclos') }}" class="cal-rej__sin">
+        planificar la semana</a>
+      {% endif %}
+    </span>
+  </div>
 </div>
 
 {# ══════════ LOS SIETE DÍAS ══════════ #}
@@ -528,6 +615,18 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+  /*  La retícula se abre enseñando HOY. En el móvil solo caben tres columnas
+      a la vez, y abrir siempre en lunes obliga a arrastrar todos los días
+      para ver en qué anda uno.  */
+  (function () {
+    var caja = document.querySelector('.cal-rej__scroll');
+    var hoy = caja && caja.querySelector('.cal-rej__col.es-hoy');
+    if (!caja || !hoy) { return; }
+    var centro = hoy.offsetLeft - (caja.clientWidth - hoy.offsetWidth) / 2;
+    caja.scrollLeft = Math.max(0, centro);
+  })();
+</script>
 <script>
 const EVENTOS  = {{ eventos_json|tojson }};
 const PROXIMOS = {{ proximos_json|tojson }};
