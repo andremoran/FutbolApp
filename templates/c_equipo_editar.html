@@ -50,10 +50,86 @@
   }
   .nv-preview i { color: #0f766e; }
   .nv-preview p { flex: 1; margin: 0; font-size: 12px; color: #134e4a; line-height: 17px; }
+
+  /* ─── A quién entrenas ────────────────────────────────────────────────────
+     Es la decisión de más arriba de toda la cuenta: de ella cuelgan la
+     periodización, el vocabulario y los objetivos. Por eso ocupa una tarjeta
+     entera y con más aire que el resto, en vez de ser un desplegable más. */
+  .sg-opt {
+    display: flex; align-items: flex-start; gap: 11px; width: 100%; text-align: left;
+    padding: 13px; margin-bottom: 8px;
+    border: 1.5px solid var(--border); border-radius: 12px; background: #fff;
+  }
+  .sg-opt[aria-pressed="true"] { border-width: 2px; padding: 12px; }
+  .sg-opt__ico {
+    width: 34px; height: 34px; flex: none; border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .sg-opt__l { font-size: 13.5px; font-weight: 800; color: var(--text); display: block; }
+  .sg-opt__lema { font-size: 11.5px; font-weight: 700; display: block; margin-top: 1px; }
+  .sg-opt__d { font-size: 11.5px; color: var(--text-sec); line-height: 16px;
+               display: block; margin-top: 4px; }
+  .sg-opt__check { color: var(--primary); display: none; flex: none; margin-top: 2px; }
+  .sg-opt[aria-pressed="true"] .sg-opt__check { display: flex; }
+
+  /* Lo que va a cambiar si pulsa guardar. Se pinta en vivo al elegir: cambiar
+     de segmento no es un ajuste cosmético y conviene que lo vea antes. */
+  .sg-real { background: #f8fafc; border-radius: 10px; padding: 11px 12px;
+             margin-top: 12px; }
+  .sg-real__t { font-size: 10px; font-weight: 800; letter-spacing: 1px;
+                color: var(--text-sec); margin: 0 0 5px; }
+  .sg-real__p { margin: 0; font-size: 12px; color: #334155; line-height: 17px; }
+  .sg-obj { margin: 9px 0 0; padding: 0; list-style: none; }
+  .sg-obj li { font-size: 12px; color: #334155; line-height: 17px;
+               padding-left: 15px; position: relative; margin-bottom: 3px; }
+  .sg-obj li::before { content: '·'; position: absolute; left: 5px; font-weight: 900; }
 </style>
 {% endblock %}
 
 {% block content %}
+
+{# ══════════ A QUIÉN ENTRENAS ══════════
+   Va la primera porque manda sobre todo lo demás: la periodización que se le
+   ofrece, cómo se llaman las filas de la planilla, qué avisos recibe y contra
+   qué baremo se mide su equipo por defecto. #}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">A quién entrenas</h2></div>
+  <p class="nv-intro">
+    Es la decisión más importante de tu cuenta. No cambia el aspecto de la app:
+    cambia <strong>el plan que te propone</strong>. Un colegio y un club
+    profesional no pueden entrenar igual, y darles la misma planilla no es
+    darles más — es darles algo que no se puede cumplir.
+  </p>
+
+  <div id="sg-opciones">
+    {% for s in segmentos %}
+    <button class="sg-opt" type="button" data-seg="{{ s.clave }}"
+            data-color="{{ s.color }}"
+            style="{{ 'border-color:' ~ s.color if s.clave == segmento_actual }}"
+            aria-pressed="{{ 'true' if s.clave == segmento_actual else 'false' }}">
+      <span class="sg-opt__ico" style="background:{{ s.fondo }};color:{{ s.color }}">
+        <i data-ico="{{ s.icono }}" class="pf-ico--sm"></i>
+      </span>
+      <span class="pf-grow">
+        <span class="sg-opt__l">{{ s.etiqueta }}</span>
+        <span class="sg-opt__lema" style="color:{{ s.color }}">{{ s.lema }}</span>
+        <span class="sg-opt__d">{{ s.descripcion }}</span>
+      </span>
+      <i data-ico="check" class="pf-ico--sm sg-opt__check"></i>
+    </button>
+    {% endfor %}
+  </div>
+
+  <div class="sg-real">
+    <p class="sg-real__t">TU REALIDAD, SEGÚN ESTA ELECCIÓN</p>
+    <p class="sg-real__p" id="sg-realidad">—</p>
+    <ul class="sg-obj" id="sg-objetivos"></ul>
+  </div>
+
+  <button class="pf-btn pf-btn--primary pf-btn--block pf-mt-16" type="button" id="btn-segmento">
+    <i data-ico="check" class="pf-ico--sm"></i> Guardar
+  </button>
+</div>
 
 <div class="pf-card">
   <div class="pf-card__head"><h2 class="pf-card__title">Datos del equipo</h2></div>
@@ -78,6 +154,22 @@
     No es lo mismo un Yo-Yo de un sub-15 amateur que el de un jugador del
     Liverpool — y el sistema lo respeta.
   </p>
+
+  {# Si no elige nada no se queda sin baremo: se le aplica el que le toca por
+     su perfil. Decirlo aquí quita la duda de «¿contra qué me están midiendo?»
+     sin obligarle a configurar nada — y es la verdad de lo que hace
+     `evaluaciones.contexto_de`. #}
+  {% if ctx_nivel == 'general' %}
+  <div class="nv-preview" style="background:{{ segmento_meta.fondo }};margin:0 0 14px">
+    <i data-ico="info" class="pf-ico--xs" style="color:{{ segmento_meta.color }}"></i>
+    <p style="color:{{ segmento_meta.color }}">
+      Mientras no elijas, a tus jugadores adultos se les compara como
+      <b>{{ nivel_sugerido_etiqueta }}</b>, que es lo que corresponde a
+      {{ segmento_meta.corta|lower }}. A los de categorías de formación se les
+      compara por su edad.
+    </p>
+  </div>
+  {% endif %}
 
   <p class="nv-sec">NIVEL COMPETITIVO</p>
   <div id="nv-niveles">
@@ -119,6 +211,11 @@
     y va ligado a tu cuenta, así que no se puede cambiar desde aquí. Si necesitas
     uno nuevo, pídeselo al administrador de la plataforma.
   </p>
+  <p style="font-size:12px;color:var(--text-sec);line-height:1.55;margin:10px 0 0">
+    Quien entre con ese código queda en <strong>{{ segmento_meta.corta }}</strong>
+    automáticamente: el jugador no elige nada, hereda lo que tengas puesto aquí
+    arriba.
+  </p>
 </div>
 
 <div style="height:24px"></div>
@@ -126,6 +223,56 @@
 
 {% block scripts %}
 <script>
+/* ─── A quién entrenas ─────────────────────────────────────────────────────
+   La realidad y los objetivos se pintan en vivo al elegir, ANTES de guardar.
+   Cambiar de segmento cambia la periodización entera; que el entrenador vea
+   qué está eligiendo evita el «no era esto» dos semanas después. */
+(function () {
+  var META = {{ segmentos_json|tojson }};
+  var cont = document.getElementById('sg-opciones');
+  var realidad = document.getElementById('sg-realidad');
+  var objetivos = document.getElementById('sg-objetivos');
+  var elegido = '{{ segmento_actual }}';
+
+  function pintar() {
+    var m = META[elegido];
+    if (!m) return;
+    realidad.textContent = m.realidad;
+    objetivos.innerHTML = '';
+    m.objetivos.forEach(function (o) {
+      var li = document.createElement('li');
+      li.innerHTML = '<strong>' + o[0] + '.</strong> ' + o[1];
+      objetivos.appendChild(li);
+    });
+  }
+
+  cont.addEventListener('click', function (e) {
+    var b = e.target.closest('.sg-opt');
+    if (!b) return;
+    elegido = b.dataset.seg;
+    cont.querySelectorAll('.sg-opt').forEach(function (x) {
+      var activo = x === b;
+      x.setAttribute('aria-pressed', String(activo));
+      x.style.borderColor = activo ? x.dataset.color : '';
+    });
+    pintar();
+  });
+  pintar();
+
+  document.getElementById('btn-segmento').addEventListener('click', function () {
+    var btn = this;
+    btn.disabled = true;
+    PF.api('{{ url_for("futbol.api_equipo_segmento") }}', { segmento: elegido })
+      .then(function (r) {
+        PF.toast(r.mensaje, 'success');
+        /* Recarga a propósito: media pantalla (y media app) cambia de palabras
+           con el segmento, y dejarla con las viejas confunde más que ayuda. */
+        setTimeout(function () { location.reload(); }, 900);
+      })
+      .catch(function (err) { PF.toast(err.message, 'error'); btn.disabled = false; });
+  });
+})();
+
 document.getElementById('btn-equipo').addEventListener('click', function () {
   var nombre = document.getElementById('eq-nombre').value.trim();
   if (!nombre) { document.getElementById('eq-nombre').focus(); return; }

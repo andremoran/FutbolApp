@@ -773,12 +773,19 @@ def _contexto_entrenador(user):
     jugadores = db.jugadores_del_entrenador(uid)
     manuales = db.rows('fut_manual_players', 'ia manuales', coach_id=uid, activo=True) or []
 
+    from . import segmentos as seg
+
     edad = equipo.get('categoria_edad') or 'general'
     nivel = equipo.get('nivel') or 'general'
+    quien = seg.meta(seg.de_equipo(equipo))
     partes = [
         f"Entrenador: {getattr(user, 'name', '') or 'entrenador'}"
         + (' (asistente tecnico del equipo)' if uid != user.id else ''),
         f"Equipo: {equipo.get('nombre') or 'sin nombre'}",
+        #  El segmento también va en los DATOS, no solo en las instrucciones:
+        #  así el modelo lo puede citar («para un equipo de colegio…») en vez de
+        #  limitarse a obedecerlo en silencio.
+        f"Tipo de equipo: {quien['etiqueta']} — {quien['sesiones_semana']} sesiones por semana",
         f"Categoria de referencia: {edad.replace('_', '-')}, nivel {nivel}",
         f"Plantilla: {len(jugadores) + len(manuales)} jugadores "
         f"({len(jugadores)} con cuenta, {len(manuales)} apuntados a mano)",
@@ -858,6 +865,8 @@ def _contexto_entrenador(user):
 
 
 def _prompt(user, pregunta):
+    from . import segmentos as seg
+
     es_coach = getattr(user, 'role', '') == 'especialista'
     if es_coach:
         rol = ("Eres el asistente técnico de un ENTRENADOR de fútbol. Aconsejas sobre "
@@ -869,14 +878,29 @@ def _prompt(user, pregunta):
                "entrenamiento, técnica, hábitos, descanso, alimentación y mentalidad.")
         contexto = _contexto_jugador(user)
 
+    #  A quién le está hablando. Sin esto el asistente le contesta a un profesor
+    #  de colegio con protocolos de élite —doble sesión, gimnasio, control de
+    #  carga por GPS—, que es un consejo correcto para un club y una tontería
+    #  para él. Y basta UNA respuesta así para que deje de preguntar.
+    #
+    #  Va como restricción explícita y no como matiz: los modelos siguen mucho
+    #  mejor un «NUNCA propongas X» que un «ten en cuenta que».
+    guia = seg.guia_ia(seg.del_usuario(user))
+    quien = ('\nA QUIÉN ACONSEJAS:\n' + guia['quien'] + '\n')
+    limites = ('\nLÍMITES DE TUS CONSEJOS (respétalos siempre):\n' + guia['nunca'] + '\n'
+               if guia['nunca'] else '')
+
     return (
-        f"{rol}\n\n"
+        f"{rol}\n"
+        f"{quien}{limites}\n"
         "Reglas de tu respuesta:\n"
         "- Responde SIEMPRE en español, tuteando, con tono cercano y directo.\n"
         "- Máximo 180 palabras. Ve al grano.\n"
         "- Apóyate en los datos reales que te doy; cita cifras concretas cuando ayuden.\n"
         "- Da consejos accionables, no generalidades.\n"
         "- No inventes datos que no estén en el contexto.\n"
+        "- Ajusta SIEMPRE el consejo a quién aconsejas: lo que sirve en un club "
+        "profesional puede ser imposible o contraproducente en otro sitio.\n"
         "- Si te preguntan por dolor, lesión o síntomas médicos, recomienda consultar "
         "al médico o fisioterapeuta del club; no diagnostiques.\n"
         "- Nada de markdown ni asteriscos: texto corrido con saltos de línea.\n\n"

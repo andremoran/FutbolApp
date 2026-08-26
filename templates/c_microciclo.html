@@ -17,11 +17,13 @@
   <i data-ico="book-open" class="pf-ico--sm"></i>
 </a>
 {% endblock %}
-{% block hero_label %}<div class="pf-hero__label">Microciclo</div>{% endblock %}
+{% block hero_label %}
+<div class="pf-hero__label">{{ palabras.microciclo }} · {{ segmento.corta }}</div>
+{% endblock %}
 {% block hero_title %}{{ micro.nombre }}{% endblock %}
 {% block hero_subtitle %}
 <div class="pf-hero__subtitle">
-  Rotación de {{ micro._rotacion }} días
+  Semana de {{ micro._rotacion }} días
   {%- if micro._desde %} · {{ micro._desde.strftime('%d/%m') }}
     {%- if micro._hasta %} – {{ micro._hasta.strftime('%d/%m') }}{% endif %}
   {%- endif %}
@@ -110,7 +112,7 @@
   </div>
 
   <div class="pf-field" style="margin-bottom:0">
-    <label class="pf-label" for="m-rotacion">Días entre partidos</label>
+    <label class="pf-label" for="m-rotacion">{{ modelo.nombre_rotacion }}</label>
     <select class="pf-select" id="m-rotacion">
       {% for r in rotaciones %}
       <option value="{{ r }}" {{ 'selected' if r == micro._rotacion }}>{{ r }} días</option>
@@ -293,20 +295,26 @@
     </button>
     <button class="pf-btn pf-btn--ghost pf-btn--block" id="m-borrar"
             style="color:var(--danger)">
-      <i data-ico="trash-2" class="pf-ico--sm"></i> Borrar microciclo
+      <i data-ico="trash-2" class="pf-ico--sm"></i> Borrar {{ palabras.microciclo|lower }}
     </button>
   </div>
 </div>
 
+{# Las fuentes del modelo. Son varias en semipro y en colegio, donde la guía no
+   sale de un solo artículo sino de juntar lo que hay: prevención, desarrollo a
+   largo plazo, sueño y abandono. Se citan todas, que es lo honesto. #}
 <p class="mc-fuente">
-  La guía de periodización resume <b>{{ fuente.titulo }}</b> — {{ fuente.autores }}.
-  {{ fuente.publicacion }}. Publicado bajo {{ fuente.licencia }}.
+  {{ palabras.guia }} — resumen propio de:
+  {% for f in fuentes %}
+    <b>{{ f.titulo }}</b> ({{ f.autores }}, {{ f.publicacion }})
+    {%- if f.licencia %}, {{ f.licencia }}{% endif %}{{ '.' if loop.last else '; ' }}
+  {% endfor %}
 </p>
 
 {# ══════════ GUARDAR ══════════ #}
 <div class="mc-guardar">
   <button class="pf-btn pf-btn--primary pf-btn--block" id="m-guardar">
-    <i data-ico="save" class="pf-ico--sm"></i> Guardar microciclo
+    <i data-ico="save" class="pf-ico--sm"></i> Guardar {{ palabras.microciclo|lower }}
   </button>
 </div>
 
@@ -493,7 +501,7 @@
 
   /* ─── Borrar ──────────────────────────────────────────────────────────── */
   document.getElementById('m-borrar').addEventListener('click', function () {
-    if (!confirm('¿Borrar este microciclo? No se puede deshacer.')) return;
+    if (!confirm('¿Borrar esta semana? No se puede deshacer.')) return;
     PF.api('/api/microciclo/' + ID, null, 'DELETE')
       .then(function () { location.href = '{{ url_for("futbol.c_microciclos") }}'; })
       .catch(function (err) { PF.toast(err.message, 'error'); });

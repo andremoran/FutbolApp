@@ -372,6 +372,34 @@ def api_equipo_guardar():
     return jsonify({'ok': True, 'equipo': datos})
 
 
+@bp.route('/api/equipo/segmento', methods=['POST'])
+@api
+def api_equipo_segmento():
+    """Cambia a quién entrena este equipo: profesional, semipro o colegio.
+
+    Lo escribe SIEMPRE el principal (`db.equipo_id`), nunca quien pulsa: si lo
+    cambiara un asistente sobre su propia fila, el equipo acabaría con dos
+    segmentos distintos según quién mirara la pantalla.
+
+    Es una decisión reversible y no destruye nada — los microciclos ya escritos
+    guardan su propio segmento y se siguen leyendo con el modelo con el que se
+    planificaron (ver sql/schema_v14_segmentos.sql).
+    """
+    from . import segmentos as seg
+
+    if not es_coach():
+        return jsonify({'error': 'Solo el entrenador configura el equipo.'}), 403
+
+    pedido = (body().get('segmento') or '').strip().lower()
+    if pedido not in seg.CLAVES:
+        return jsonify({'error': 'Ese tipo de equipo no existe.'}), 400
+
+    clave = seg.guardar(db.equipo_id(current_user.id), pedido)
+    meta = seg.meta(clave)
+    return jsonify({'ok': True, 'segmento': clave,
+                    'mensaje': 'Listo. Tu planificación pasa a %s.' % meta['corta'].lower()})
+
+
 @bp.route('/api/perfil_jugador', methods=['POST'])
 @api
 def api_perfil_jugador():

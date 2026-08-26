@@ -78,6 +78,16 @@ def contexto_de(jugador, coach_id=None):
             fecha_nacimiento=(jugador or {}).get('fecha_nacimiento'))
     if nivel == 'general' and edad != 'general':
         nivel = cat.nivel_sugerido(edad)
+        #  Para las categorías de formación la edad ya dice bastante (un sub-14
+        #  es formativo lo entrene quien lo entrene) y ese respaldo se respeta
+        #  tal cual. Donde la edad no informa de nada es en el adulto: ahí
+        #  `nivel_sugerido` devolvía `amateur` para todo el mundo, así que un
+        #  club profesional que nunca tocó «Nivel del equipo» estaba midiendo a
+        #  sus jugadores contra el baremo de una liga barrial. Quien sí lo sabe
+        #  es el segmento.
+        if nivel == 'amateur' and coach_id:
+            from . import segmentos as seg
+            nivel = seg.nivel_sugerido(seg.del_entrenador(coach_id))
     return edad, nivel
 
 
@@ -600,6 +610,8 @@ def c_eval_catalogo():
     if fuera:
         return fuera
 
+    from . import segmentos as seg
+
     uid = db.equipo_id(current_user.id)
     todas = catalogo_completo(uid)
 
@@ -609,6 +621,23 @@ def c_eval_catalogo():
         usos[r.get('test_clave')] = usos.get(r.get('test_clave'), 0) + 1
     for t in todas:
         t['_usos'] = usos.get(t['clave'], 0)
+
+    #  La batería del segmento. 58 pruebas avaladas son una biblioteca para un
+    #  club y un muro para un profesor de colegio: ve «VO2máx directo», entiende
+    #  que esto no es para él y no vuelve — aunque catorce de ellas se las pueda
+    #  tomar mañana con una cinta métrica. Así que se le dice cuáles son las
+    #  suyas y en qué orden, sin esconderle ninguna.
+    segmento = seg.del_entrenador(uid)
+    orden_bateria = {c: i for i, c in enumerate(seg.bateria(segmento))}
+    avisar = seg.avisa_material(segmento)
+    for t in todas:
+        t['_bateria'] = orden_bateria.get(t['clave'])
+        #  El aviso de material NO oculta la prueba: la marca. Un colegio con un
+        #  convenio universitario puede tener acceso a un analizador de gases, y
+        #  decidirlo es suyo, no nuestro.
+        t['_material'] = avisar and t['clave'] in seg.PRUEBAS_CON_MATERIAL
+    recomendadas = sorted((t for t in todas if t['_bateria'] is not None),
+                          key=lambda t: t['_bateria'])
 
     #  El filtrado y la búsqueda van en el navegador, no aquí: son 58 pruebas y
     #  recargar la página por cada letra tecleada se nota. El `?c=` se sigue
@@ -621,6 +650,8 @@ def c_eval_catalogo():
                            tab_activa='equipo', hide_tabbar=True,
                            categorias=cat.CATEGORIAS,
                            pruebas=todas,
+                           recomendadas=recomendadas,
+                           segmento=seg.meta(segmento),
                            conteos=conteos,
                            filtro=request.args.get('c') or '',
                            n_pruebas=len(todas),

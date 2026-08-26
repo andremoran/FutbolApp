@@ -215,19 +215,9 @@
 {# ══════════ PRIMEROS PASOS ══════════ #}
 {# Igual que SetupChecklist.tsx: se marca solo con datos reales y desaparece
    cuando los tres están hechos. #}
-{% set pasos = [
-    {'et': 'Agregá tu primer jugador',
-     'pista': 'Sumá jugadores manualmente o con el código de equipo',
-     'hecho': n_jugadores > 0, 'ico': 'user-plus',
-     'url': url_for('futbol.c_equipo')},
-    {'et': 'Evaluá a un jugador',
-     'pista': 'Cargá su ficha técnica, física y mental',
-     'hecho': hay_evaluacion, 'ico': 'clipboard',
-     'url': url_for('futbol.c_evaluaciones')},
-    {'et': 'Programá un entrenamiento',
-     'pista': 'Creá tu primer evento en la agenda',
-     'hecho': hay_evento, 'ico': 'calendar',
-     'url': url_for('futbol.c_calendario')}] %}
+{# Los pasos ya no se escriben aquí: los arma la vista según el segmento del
+   equipo, porque el camino más corto hasta «esto ya me sirve» es distinto en
+   un colegio y en un club. Ver futbol/segmentos.py › PASOS. #}
 {% set hechos = pasos | selectattr('hecho') | list | length %}
 
 {% if hechos < pasos | length %}
@@ -237,7 +227,7 @@
     <div class="pf-grow">
       <div class="cd-pasos__t">Primeros pasos</div>
       <div class="cd-pasos__s">
-        {{ hechos }} de {{ pasos | length }} completados · configurá tu equipo
+        {{ hechos }} de {{ pasos | length }} completados · {{ segmento.corta|lower }}
       </div>
     </div>
     <div class="cd-pasos__pct">{{ (hechos * 100 / pasos | length) | round | int }}%</div>
@@ -245,6 +235,19 @@
 
   <div class="cd-pasos__via">
     <i style="width:{{ (hechos * 100 / pasos | length) | round | int }}%"></i>
+  </div>
+
+  {# El objetivo del segmento, una sola línea, y solo aquí: quien todavía está
+     configurando es quien necesita saber para qué sirve esto. Cuando termina
+     los pasos, la tarjeta entera desaparece y el lema con ella. #}
+  <div style="display:flex;align-items:flex-start;gap:8px;background:{{ segmento.fondo }};
+              border-radius:10px;padding:10px 11px">
+    <i data-ico="{{ segmento.icono }}" class="pf-ico--sm"
+       style="flex:none;margin-top:1px;color:{{ segmento.color }}"></i>
+    <span style="font-size:12.5px;line-height:17px;color:{{ segmento.color }}">
+      <b>{{ segmento.lema }}.</b>
+      <span style="opacity:.85">{{ objetivos[0][1] }}</span>
+    </span>
   </div>
 
   <div>

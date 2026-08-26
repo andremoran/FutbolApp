@@ -1,19 +1,24 @@
 {% extends '_shell.html' %}
-{% block title %}Guía de periodización · ProFoot{% endblock %}
+{% block title %}{{ palabras.guia }} · ProFoot{% endblock %}
 
-{# Los 11 principios de periodización del microciclo, resumidos en reglas que
-   se puedan aplicar el lunes por la mañana. Arriba, la forma que toma la
-   semana según los días que haya entre partido y partido. #}
+{# Los principios de periodización del segmento, resumidos en reglas que se
+   puedan aplicar el lunes por la mañana. Arriba, la forma que toma la semana.
+
+   TODO lo de esta pantalla sale del modelo del segmento: un colegio y un club
+   profesional abren la misma URL y no leen ni un párrafo en común. Ver
+   futbol/microciclo_modelos.py. #}
 
 {% block hero_back %}
 <a class="pf-hero__btn" href="{{ url_for('futbol.c_microciclos') }}" aria-label="Volver">
   <i data-ico="arrow-left" class="pf-ico--sm"></i>
 </a>
 {% endblock %}
-{% block hero_label %}<div class="pf-hero__label">Microciclos</div>{% endblock %}
-{% block hero_title %}Guía de periodización{% endblock %}
+{% block hero_label %}<div class="pf-hero__label">{{ segmento.etiqueta }}</div>{% endblock %}
+{% block hero_title %}{{ modelo.titulo }}{% endblock %}
 {% block hero_subtitle %}
-<div class="pf-hero__subtitle">11 principios para planificar la semana</div>
+<div class="pf-hero__subtitle">
+  {{ principios|length }} principios para planificar la semana
+</div>
 {% endblock %}
 
 {% block head %}
@@ -47,14 +52,35 @@
 
 {% block content %}
 
+{# ══════════ 0. QUÉ SE PERSIGUE AQUÍ ══════════
+   Va antes que la periodización a propósito: el plan es una consecuencia del
+   objetivo, y en formación el objetivo NO es el mismo que en un club. #}
+<div class="pf-card" style="border-left:4px solid {{ segmento.color }}">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Qué persigue esta guía</h2>
+  </div>
+  <p class="t-body-sm" style="margin:2px 0 10px;color:{{ segmento.color }};font-weight:800">
+    {{ segmento.lema }}
+  </p>
+  <p class="t-body-sm c-sec" style="margin:0 0 12px">{{ segmento.realidad }}</p>
+
+  <div style="margin-top:6px">
+    {% for titulo, porque in objetivos %}
+    <div class="gu-dia">
+      <span class="gu-dia__md" style="background:{{ segmento.color }}">{{ loop.index }}</span>
+      <div class="pf-grow">
+        <div class="gu-dia__t">{{ titulo }}</div>
+        <div class="gu-dia__d">{{ porque }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
 {# ══════════ 1. LA FORMA DE LA SEMANA ══════════ #}
 <div class="pf-card">
   <div class="pf-card__head"><h2 class="pf-card__title">La forma de la semana</h2></div>
-  <p class="t-body-sm c-sec" style="margin:2px 0 0">
-    Toda semana tiene tres fases: se recupera, se carga y se afina. Cuando hay
-    menos días entre partidos, lo primero que se cae es una de las sesiones
-    duras de mitad de ciclo.
-  </p>
+  <p class="t-body-sm c-sec" style="margin:2px 0 0">{{ modelo.intro }}</p>
 
   <div class="gu-leyenda">
     {% for clave, etiqueta, color in fases %}
@@ -67,7 +93,7 @@
 <div class="pf-card" style="padding-top:12px">
   <div class="mc-forma" style="border:none;padding:0;margin:0">
     <div class="mc-forma__cab">
-      <span class="mc-forma__t">Rotación de {{ f.rotacion }} días</span>
+      <span class="mc-forma__t">{{ modelo.nombre_rotacion }}: {{ f.rotacion }}</span>
       <span class="pf-pill pf-pill--muted">{{ f.dias|length }} jornadas</span>
     </div>
 
@@ -91,7 +117,7 @@
   <div style="margin-top:6px">
     {% for md, g in dias_md.items() %}
     <div class="gu-dia">
-      <span class="gu-dia__md" style="background:{{ {'recuperacion':'#93c5fd','adquisicion':'#10b981','afinamiento':'#f59e0b','partido':'#047857'}[g.fase] }}">{{ md }}</span>
+      <span class="gu-dia__md" style="background:{{ modelo.fase_meta[g.fase].color }}">{{ md }}</span>
       <div class="pf-grow">
         <div class="gu-dia__t">{{ g.foco }}</div>
         <div class="gu-dia__d">{{ g.detalle }}</div>
@@ -101,12 +127,16 @@
   </div>
 </div>
 
-{# ══════════ 3. LOS 11 PRINCIPIOS ══════════ #}
+{# ══════════ 3. LOS PRINCIPIOS ══════════ #}
+{% set con_evidencia = principios|selectattr('tipo', 'equalto', 'evidencia')|list|length %}
+{% set inferidos = principios|length - con_evidencia %}
 <div class="pf-card">
-  <div class="pf-card__head"><h2 class="pf-card__title">Los 11 principios</h2></div>
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Los {{ principios|length }} principios</h2>
+  </div>
   <p class="t-body-sm c-sec" style="margin:2px 0 12px">
-    Los nueve primeros salen de estudios con datos. Los dos últimos los deducen
-    los autores desde la lógica del juego.
+    {{ con_evidencia }} salen de estudios con datos. {{ inferidos }} se deducen de
+    la lógica del juego y de cómo es de verdad esta categoría.
   </p>
 
   <div class="gu-segs" role="group" aria-label="Filtrar principios" id="g-segs">
@@ -142,12 +172,33 @@
   </div>
 </div>
 
-<p class="mc-fuente">
-  Resumen propio de <b>{{ fuente.titulo }}</b> — {{ fuente.autores }}.
-  {{ fuente.publicacion }}. Publicado bajo {{ fuente.licencia }}
-  ({{ fuente.url }}). Las cifras citadas son las de los estudios que recoge
-  el artículo; la redacción y los ejemplos de aplicación son de ProFoot.
-</p>
+{# ══════════ 4. DE DÓNDE SALE ══════════
+   Se citan TODAS las fuentes del modelo. En semipro y en colegio no hay un
+   artículo único que lo diga todo: la guía junta prevención, desarrollo a
+   largo plazo, sueño y abandono, y hay que poder ir a comprobar cada pieza. #}
+<div class="pf-card">
+  <div class="pf-card__head"><h2 class="pf-card__title">De dónde sale</h2></div>
+  <p class="t-body-sm c-sec" style="margin:2px 0 10px">
+    Las cifras citadas son las de estos trabajos. La redacción, el orden y los
+    ejemplos de aplicación son de ProFoot.
+  </p>
+  <div style="margin-top:4px">
+    {% for f in fuentes %}
+    <div class="gu-dia">
+      <span class="gu-dia__md" style="background:var(--text-sec)">{{ loop.index }}</span>
+      <div class="pf-grow">
+        <div class="gu-dia__t">{{ f.titulo }}</div>
+        <div class="gu-dia__d">
+          {{ f.autores }}. {{ f.publicacion }}.
+          {%- if f.licencia %} {{ f.licencia }}.{% endif %}
+          {%- if f.url %} {{ f.url }}.{% endif %}
+          {%- if f.nota %}<br><em>{{ f.nota }}</em>{% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
 
 {% endblock %}
 

@@ -133,11 +133,17 @@ def registro():
     if plan_sel not in ('free', 'pro', 'codigo'):
         plan_sel = 'free'
 
+    from futbol import segmentos as seg
+
     return render_template('auth_register.html',
                            hide_tabbar=True,
                            rol_sel=rol_sel,
                            plan_sel=plan_sel,
                            role='especialista' if rol_sel == 'entrenador' else 'paciente',
+                           #  Solo lo ve el entrenador: el jugador no elige
+                           #  segmento, hereda el del equipo cuyo código mete.
+                           segmentos=seg.SEGMENTOS,
+                           segmento_sel=seg.POR_DEFECTO,
                            codigo=request.args.get('codigo', ''))
 
 
@@ -336,6 +342,15 @@ def signup():
         flash('No pudimos crear tu cuenta. Inténtalo de nuevo en un momento.', 'error')
         return redirect(volver)
 
+    # A quién entrena: crea ya su ficha de equipo con el segmento elegido, para
+    # que la primera pantalla que vea sea la de SU realidad y no la de un club
+    # profesional. No se obliga: si Supabase falla aquí, la cuenta ya está
+    # creada y el entrenador entra en el segmento por defecto — lo cambia en
+    # «Mi equipo» y no ha perdido nada. Ver futbol/segmentos.py › sembrar.
+    if es_coach:
+        from futbol import segmentos as seg
+        seg.sembrar(nuevo['id'], request.form.get('segmento'))
+
     # Vincular al equipo del entrenador
     if entrenador:
         db.insert('fut_plantilla', {
@@ -368,7 +383,12 @@ def signup():
         return redirect(url_for('futbol.canjear'))
 
     if entrenador:
-        flash(f'¡Listo! Ya eres parte del equipo de {entrenador["nombre"]}.', 'success')
+        #  El código del entrenador decide también la clasificación del jugador:
+        #  se dice en voz alta para que no parezca que se eligió sola.
+        from futbol import segmentos as seg
+        cual = seg.meta(seg.del_entrenador(db.equipo_id(entrenador['id'])))
+        flash(f'¡Listo! Ya eres parte del equipo de {entrenador["nombre"]} '
+              f'({cual["corta"].lower()}).', 'success')
     elif es_coach:
         flash('¡Cuenta creada! Comparte tu código de equipo con tus jugadores.', 'success')
     else:

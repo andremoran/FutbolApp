@@ -1,8 +1,13 @@
 {% extends '_shell.html' %}
-{% block title %}Microciclos · ProFoot{% endblock %}
+{% block title %}{{ palabras.microciclos }} · ProFoot{% endblock %}
 
-{# La semana de partido a partido. Un microciclo se arma una vez, se revisa
-   contra la guía de periodización y se vuelca al calendario. #}
+{# La semana de trabajo del equipo. Se arma una vez, se revisa contra la guía
+   del segmento y se vuelca al calendario.
+
+   Todo lo que se ve aquí —las palabras, las rotaciones, el ejemplo del
+   nombre— sale del modelo del segmento del equipo (futbol/segmentos.py y
+   futbol/microciclo_modelos.py). Un colegio y un club profesional usan esta
+   misma pantalla y no leen lo mismo. #}
 
 {% block hero_back %}
 <a class="pf-hero__btn" href="{{ url_for('futbol.c_calendario') }}" aria-label="Volver">
@@ -10,7 +15,7 @@
 </a>
 {% endblock %}
 {% block hero_label %}<div class="pf-hero__label">Planificación</div>{% endblock %}
-{% block hero_title %}Microciclos{% endblock %}
+{% block hero_title %}{{ palabras.microciclos }}{% endblock %}
 {% block hero_subtitle %}
 <div class="pf-hero__subtitle">
   {{ micros|length }} semana{{ '' if micros|length == 1 else 's' }} planificada{{ '' if micros|length == 1 else 's' }}
@@ -41,18 +46,45 @@
   .mn-mini    { display: flex; align-items: flex-end; gap: 2px; height: 30px;
                 width: 96px; flex: none; }
   .mn-mini__b { flex: 1; border-radius: 2px; min-height: 3px; }
+
+  /* Distintivo del segmento. Sale en la cabecera y, cuando hace falta, dentro
+     de una semana suelta: si el entrenador cambió de segmento, sus semanas
+     viejas se siguen leyendo con el modelo con el que se escribieron y hay que
+     poder verlo de un vistazo. */
+  .mn-seg     { display: inline-flex; align-items: center; gap: 5px;
+                padding: 3px 9px; border-radius: 999px; font-size: 11px;
+                font-weight: 800; letter-spacing: .2px; }
 </style>
 {% endblock %}
 
 {% block content %}
+
+{# ══════════ QUÉ MODELO ESTÁS USANDO ══════════
+   Sin esto, dos entrenadores de segmentos distintos ven pantallas parecidas y
+   no saben por qué la guía les dice cosas diferentes. #}
+<a class="pf-card pf-card--link" href="{{ url_for('futbol.c_equipo_editar') }}"
+   style="display:flex;align-items:center;gap:12px">
+  <span class="sg-ico" style="width:36px;height:36px;flex:none;border-radius:10px;
+        display:flex;align-items:center;justify-content:center;
+        background:{{ segmento.fondo }};color:{{ segmento.color }}">
+    <i data-ico="{{ segmento.icono }}" class="pf-ico--sm"></i>
+  </span>
+  <span class="pf-grow">
+    <span class="pf-item__title">{{ segmento.etiqueta }}</span>
+    <span class="pf-item__sub">{{ modelo.intro }}</span>
+  </span>
+  <span class="pf-item__chev"><i data-ico="chevron-right" class="pf-ico--sm"></i></span>
+</a>
 
 {# ══════════ GUÍA ══════════ #}
 <a class="pf-card pf-card--link" href="{{ url_for('futbol.c_microciclo_guia') }}"
    style="display:flex;align-items:center;gap:12px">
   <span class="pf-item__icon"><i data-ico="book-open" class="pf-ico--sm"></i></span>
   <span class="pf-grow">
-    <span class="pf-item__title">Guía de periodización</span>
-    <span class="pf-item__sub">Los 11 principios y la forma de cada semana</span>
+    <span class="pf-item__title">{{ palabras.guia }}</span>
+    <span class="pf-item__sub">
+      Los {{ modelo.principios|length }} principios y la forma de cada semana
+    </span>
   </span>
   <span class="pf-item__chev"><i data-ico="chevron-right" class="pf-ico--sm"></i></span>
 </a>
@@ -60,13 +92,10 @@
 {# ══════════ NUEVO ══════════ #}
 <div class="pf-card">
   <div class="pf-card__head"><h2 class="pf-card__title">Nueva semana</h2></div>
-  <p class="t-body-sm c-sec" style="margin:2px 0 12px">
-    Elige cuántos días separan un partido del siguiente. La semana nace con la
-    carga y la capacidad de cada día ya puestas.
-  </p>
+  <p class="t-body-sm c-sec" style="margin:2px 0 12px">{{ modelo.intro_nueva }}</p>
 
   <div class="pf-field">
-    <label class="pf-label">Días entre partidos</label>
+    <label class="pf-label">{{ modelo.nombre_rotacion }}</label>
     <div class="mn-rot" role="group" aria-label="Rotación" id="m-rot">
       {% for r in rotaciones %}
       <button type="button" class="mn-rot__b" data-r="{{ r }}"
@@ -83,16 +112,16 @@
   <div class="pf-field">
     <label class="pf-label" for="m-nombre">Nombre</label>
     <input class="pf-input" id="m-nombre" maxlength="120"
-           placeholder="Ej: Microciclo 7 — jornada 12">
+           placeholder="{{ modelo.ejemplo_nombre }}">
   </div>
 
   <div class="pf-field">
-    <label class="pf-label" for="m-desde">Primer día (el siguiente al partido)</label>
+    <label class="pf-label" for="m-desde">{{ modelo.primer_dia }}</label>
     <input class="pf-input" id="m-desde" type="date" value="{{ hoy }}">
   </div>
 
   <button class="pf-btn pf-btn--primary pf-btn--block" id="m-crear">
-    <i data-ico="plus" class="pf-ico--sm"></i> Crear microciclo
+    <i data-ico="plus" class="pf-ico--sm"></i> Crear {{ palabras.microciclo|lower }}
   </button>
 </div>
 
@@ -114,9 +143,20 @@
             {% if m._desde %}{{ m._desde.strftime('%d/%m') }}
               {%- if m._hasta %} – {{ m._hasta.strftime('%d/%m') }}{% endif %} ·
             {% endif %}
-            rotación de {{ m._rotacion }} días ·
+            {{ m._rotacion }} días ·
             {{ m._escritos }}/{{ m._dias|length }} día{{ '' if m._dias|length == 1 else 's' }} escrito{{ '' if m._escritos == 1 else 's' }}
           </div>
+          {# Una semana escrita con otro modelo: pasa cuando el entrenador
+             cambia de segmento. Se dice, en vez de dejar que se pregunte por
+             qué esa planilla tiene otras filas. #}
+          {% if m._segmento.clave != segmento.clave %}
+          <div style="margin-top:5px">
+            <span class="mn-seg" style="background:{{ m._segmento.fondo }};color:{{ m._segmento.color }}">
+              <i data-ico="{{ m._segmento.icono }}" class="pf-ico--xs"></i>
+              {{ m._segmento.corta }}
+            </span>
+          </div>
+          {% endif %}
           {% if m.lugar %}
           <div class="mn-item__s"><i data-ico="map-pin" class="pf-ico--xs"
                style="vertical-align:-2px"></i> {{ m.lugar }}</div>
@@ -140,10 +180,7 @@
   <div class="pf-empty">
     <div class="pf-empty__icon"><i data-ico="grid" class="pf-ico--xxl"></i></div>
     <h3 class="t-h3" style="margin:14px 0 4px">Todavía no hay ninguna semana</h3>
-    <p class="t-body-sm c-sec" style="max-width:34ch">
-      Crea tu primer microciclo arriba. Puedes empezar por la semana de 7 días,
-      que es la que cabe entera.
-    </p>
+    <p class="t-body-sm c-sec" style="max-width:34ch">{{ modelo.vacio }}</p>
   </div>
 </div>
 {% endif %}

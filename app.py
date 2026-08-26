@@ -107,6 +107,42 @@ def csrf_ok():
     return bool(enviado) and enviado == session.get('_csrf')
 
 
+class _DelSegmento:
+    """El segmento de quien mira, resuelto solo si alguna plantilla lo pide.
+
+    `fut_palabras.microciclos` y `fut_segmento.corta` están disponibles en
+    TODAS las plantillas, pero resolverlos cuesta una consulta a Supabase (dos
+    para un jugador, que primero tiene que encontrar a su entrenador). Pagarla
+    en cada pantalla —incluidas las que no dicen ni una palabra del segmento—
+    sería añadirle un cuarto de segundo a la app entera por un texto que casi
+    ninguna usa.
+
+    Así que esto no consulta nada hasta que alguien lee un atributo, y a partir
+    de ahí lo recuerda. Una pantalla que no lo menciona no paga nada.
+    """
+
+    def __init__(self, usuario, que):
+        self._usuario, self._que, self._datos = usuario, que, None
+
+    def _cargar(self):
+        if self._datos is None:
+            from futbol import segmentos as seg
+            clave = seg.del_usuario(self._usuario)
+            self._datos = seg.palabras(clave) if self._que == 'palabras' else seg.meta(clave)
+        return self._datos
+
+    def __getitem__(self, clave):
+        return self._cargar().get(clave, '')
+
+    def __getattr__(self, clave):
+        #  Jinja pregunta por atributos internos (`__html__`, `jinja_pass_arg`…)
+        #  antes de pintar: si esos también dispararan la consulta, el atajo no
+        #  serviría de nada.
+        if clave.startswith('_'):
+            raise AttributeError(clave)
+        return self._cargar().get(clave, '')
+
+
 @app.context_processor
 def _inyectar():
     """Lo que toda plantilla puede dar por hecho.
@@ -114,12 +150,18 @@ def _inyectar():
     `fut_es_pro` y `fut_es_admin` gobiernan los candados de la interfaz; la
     comprobación de verdad la hacen los decoradores de roles.py en el servidor,
     esto solo decide qué se dibuja.
+
+    `fut_segmento` y `fut_palabras` dicen a quién entrena este equipo
+    —profesional, semipro o colegio— y con qué palabras hablarle. Ver
+    futbol/segmentos.py.
     """
     import roles
 
     autenticado = bool(getattr(current_user, 'is_authenticated', False))
     return {
         'csrf_token': csrf_token,
+        'fut_segmento': _DelSegmento(current_user if autenticado else None, 'meta'),
+        'fut_palabras': _DelSegmento(current_user if autenticado else None, 'palabras'),
         'fut_es_entrenador': autenticado and getattr(current_user, 'role', '') == 'especialista',
         'fut_es_pro': roles.es_pro(current_user) if autenticado else False,
         'fut_es_admin': roles.es_admin(current_user) if autenticado else False,

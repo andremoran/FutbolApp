@@ -100,6 +100,36 @@ def c_inicio():
     hay_evento = bool(db.rows('fut_events', 'primeros pasos',
                               coach_id=uid, _limit=1))
 
+    #  Los primeros pasos son OTROS en cada segmento, porque el destino es otro:
+    #  el semipro no llega a ninguna parte sin decir antes contra qué se mide, y
+    #  el colegio necesita la talla para saber cuánta carga aguanta cada chico.
+    #  Ver futbol/segmentos.py › PASOS.
+    #
+    #  Cada señal se calcula SOLO si el segmento la pide: son consultas a
+    #  Supabase y ninguna vale para los tres.
+    from . import segmentos as seg
+    segmento = seg.del_entrenador(uid)
+    pasos = seg.pasos(segmento)
+    piden = {p['clave'] for p in pasos}
+
+    señales = {'plantilla': n_plantilla > 0,
+               'evaluacion': hay_evaluacion,
+               'evento': hay_evento}
+    if 'nivel' in piden:
+        eq_ctx = db.one('fut_teams', 'ctx pasos', coach_id=uid) or {}
+        señales['nivel'] = ((eq_ctx.get('categoria_edad') or 'general') != 'general'
+                            or (eq_ctx.get('nivel') or 'general') != 'general')
+    if 'talla' in piden:
+        señales['talla'] = bool(db.rows('fut_eval_results', 'talla pasos',
+                                        coach_id=uid, test_clave='antropometria',
+                                        _limit=1))
+    if 'microciclo' in piden:
+        señales['microciclo'] = bool(db.rows('fut_microcycles', 'micro pasos',
+                                             coach_id=uid, _limit=1))
+
+    pasos = [dict(p, hecho=bool(señales.get(p['clave'])), url=url_for(p['ruta']))
+             for p in pasos]
+
     # ── Estado físico promedio ──
     #  Sale del AUTOINFORME del jugador (fut_player_profile), igual que en la
     #  app original. NO tiene nada que ver con las respuestas del check-in de
@@ -153,6 +183,9 @@ def c_inicio():
                            eventos=proximos[:3],
                            hay_evaluacion=hay_evaluacion,
                            hay_evento=hay_evento,
+                           pasos=pasos,
+                           segmento=seg.meta(segmento),
+                           objetivos=seg.objetivos(segmento),
                            es_pro=roles.es_pro(current_user),
                            es_principal=roles.es_principal(current_user))
 
@@ -160,19 +193,41 @@ def c_inicio():
 @bp.route('/coach/equipo/editar')
 @solo_entrenador
 def c_equipo_editar():
-    """Datos del equipo + nivel competitivo (TeamLevelConfigModal.tsx).
+    """Segmento + datos del equipo + nivel competitivo (TeamLevelConfigModal.tsx).
 
-    El nivel y la categoría de edad no son decoración: son los que deciden
-    contra qué baremo se puntúan las pruebas físicas (ver tests_catalogo.py).
+    Las tres cosas que definen a un equipo, en una sola pantalla y en orden de
+    importancia:
+
+      · el SEGMENTO decide la periodización, el vocabulario y los objetivos
+        de toda la cuenta (ver futbol/segmentos.py);
+      · el nivel y la categoría de edad deciden contra qué baremo se puntúan
+        las pruebas físicas (ver tests_catalogo.py).
     """
+    from . import segmentos as seg
     from . import tests_catalogo as cat
     from .evaluaciones import contexto_equipo
 
     uid = db.equipo_id(current_user.id)
     edad, nivel = contexto_equipo(uid)
+    actual = seg.del_entrenador(uid)
+    #  La realidad y los objetivos van al navegador para poder pintarlos al
+    #  vuelo mientras el entrenador compara los tres, antes de guardar nada.
+    resumen = {s['clave']: {'realidad': s['realidad'],
+                            'objetivos': [list(o) for o in seg.objetivos(s['clave'])]}
+               for s in seg.SEGMENTOS}
     return render_template('c_equipo_editar.html',
                            hide_tabbar=True,
                            equipo=db.equipo_del_entrenador(uid),
+                           segmentos=seg.SEGMENTOS,
+                           segmento_actual=actual,
+                           segmento_meta=seg.meta(actual),
+                           segmentos_json=resumen,
+                           #  La etiqueta bonita del baremo que se aplica solo,
+                           #  para poder decirlo en pantalla sin que el
+                           #  entrenador tenga que configurar nada.
+                           nivel_sugerido_etiqueta=dict(
+                               (c, e) for c, e, _ in cat.NIVELES_COMPETITIVOS
+                           ).get(seg.nivel_sugerido(actual), 'General'),
                            categorias=cat.CATEGORIAS_EDAD,
                            niveles=cat.NIVELES_COMPETITIVOS,
                            ctx_edad=edad, ctx_nivel=nivel)

@@ -25,6 +25,20 @@
   .reg-code { letter-spacing: 3px; font-weight: 800; text-transform: uppercase; text-align:center; font-size:18px; }
   .reg-back { text-align:center; margin-top:22px; font-size:14px; }
   .reg-back a { color: var(--primary); font-weight: 700; }
+
+  /* Selector de segmento del alta del entrenador */
+  .reg-seg { display: flex; align-items: center; gap: 10px; width: 100%;
+             text-align: left; padding: 11px; margin-bottom: 7px;
+             border: 1.5px solid var(--border); border-radius: 11px;
+             background: #fff; font: inherit; }
+  .reg-seg[aria-pressed="true"] { border-width: 2px; padding: 10px; }
+  .reg-seg__ico { width: 30px; height: 30px; flex: none; border-radius: 8px;
+                  display: flex; align-items: center; justify-content: center; }
+  .reg-seg__l { display: block; font-size: 13.5px; font-weight: 800; color: var(--text); }
+  .reg-seg__d { display: block; font-size: 11.5px; color: var(--text-sec);
+                line-height: 15.5px; margin-top: 2px; }
+  .reg-seg__check { color: var(--primary); display: none; flex: none; }
+  .reg-seg[aria-pressed="true"] .reg-seg__check { display: block; }
 </style>
 {% endblock %}
 
@@ -88,6 +102,44 @@
         {% endif %}
       </p>
     </div>
+
+    {% if role == 'especialista' %}
+    {# ─── A quién entrenas ───────────────────────────────────────────────────
+       Se pregunta AQUÍ y no después porque de esto cuelga toda la cuenta: la
+       planificación semanal, el vocabulario y contra qué baremo se mide su
+       equipo. Preguntarlo el primer día cuesta un toque; descubrirlo dos
+       semanas después, cuando ya tiene microciclos escritos, cuesta mucho más.
+       Es cambiable en cualquier momento desde «Mi equipo». #}
+    <div class="reg-group">
+      ¿A quién entrenas?
+      <span style="font-weight:500;color:var(--text-muted);text-transform:none;
+                   letter-spacing:0"> · lo puedes cambiar luego</span>
+    </div>
+
+    <input type="hidden" name="segmento" id="reg-segmento" value="{{ segmento_sel }}">
+    <div id="reg-segs" style="margin-bottom:6px">
+      {% for s in segmentos %}
+      <button type="button" class="reg-seg" data-seg="{{ s.clave }}"
+              data-color="{{ s.color }}"
+              style="{{ 'border-color:' ~ s.color if s.clave == segmento_sel }}"
+              aria-pressed="{{ 'true' if s.clave == segmento_sel else 'false' }}">
+        <span class="reg-seg__ico" style="background:{{ s.fondo }};color:{{ s.color }}">
+          <i data-ico="{{ s.icono }}" class="pf-ico--sm"></i>
+        </span>
+        <span class="pf-grow">
+          <span class="reg-seg__l">{{ s.corta }}</span>
+          <span class="reg-seg__d">{{ s.descripcion }}</span>
+        </span>
+        <i data-ico="check" class="pf-ico--sm reg-seg__check"></i>
+      </button>
+      {% endfor %}
+    </div>
+    <p class="reg-hint" style="margin:0 0 4px">
+      Tu plan semanal, tus objetivos y los baremos de las pruebas se ajustan a
+      esto. Los jugadores que entren con tu código heredan la misma
+      clasificación.
+    </p>
+    {% endif %}
 
     <div class="reg-group">Tus datos</div>
 
@@ -165,4 +217,27 @@
     <a href="{{ url_for('auth.entrar') }}">Ya tengo cuenta</a>
   </p>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* El selector de segmento del entrenador. Escribe en un campo oculto porque el
+   alta es un formulario normal (sin JS obligatorio): si el navegador no
+   ejecuta esto, se envía el valor por defecto y la cuenta se crea igual. */
+(function () {
+  var cont = document.getElementById('reg-segs');
+  if (!cont) return;
+  var campo = document.getElementById('reg-segmento');
+  cont.addEventListener('click', function (e) {
+    var b = e.target.closest('.reg-seg');
+    if (!b) return;
+    campo.value = b.dataset.seg;
+    cont.querySelectorAll('.reg-seg').forEach(function (x) {
+      var activo = x === b;
+      x.setAttribute('aria-pressed', String(activo));
+      x.style.borderColor = activo ? x.dataset.color : '';
+    });
+  });
+})();
+</script>
 {% endblock %}
