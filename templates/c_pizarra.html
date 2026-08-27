@@ -86,6 +86,19 @@
   .pz-tool svg { display: block; }
 
   @media (min-width: 560px) { .pz-tools { border-radius: var(--r-lg) var(--r-lg) 0 0; } }
+
+  /*  El teléfono en apaisado tiene 390 px de alto y ahí no cabe un campo
+      vertical con toda la interfaz encima. La barra se queda sin etiquetas
+      —los iconos ya se entienden— y el nombre se aparta: son 90 px que
+      vuelven al campo, que es la diferencia entre poder dibujar y no.  */
+  @media (max-height: 500px) {
+    .pz-tool span { display: none; }
+    .pz-tool { min-width: 44px; padding: 9px 8px; }
+    .pz-form { grid-template-columns: 1fr 120px; margin-bottom: 6px; }
+    .pz-form .pf-input, .pz-form .pf-select { padding-top: 7px; padding-bottom: 7px;
+                                              font-size: 13px; }
+    .pz-anim { margin-top: 7px; }
+  }
 </style>
 {% endblock %}
 
@@ -122,13 +135,6 @@
   <div class="pf-card pf-mt-16">
     <div class="pz-sub">Espacio</div>
     <div class="pz-chips" id="pz-canchas"></div>
-
-    <div class="pz-sub">Empezar montado</div>
-    <div class="pz-chips" id="pz-ejercicios"></div>
-    <p id="pz-ejercicio-nota" style="margin:9px 0 0;font-size:12px;
-       color:var(--text-sec);line-height:1.5">
-      Elige un ejercicio y lo tienes puesto; luego mueve lo que quieras.
-    </p>
 
     <div class="pz-sub">Colocar mi equipo</div>
     <div class="pf-row" style="gap:8px">
@@ -183,7 +189,13 @@
     //  o sea justo detrás de ella.
     var altoAnim = anim ? anim.offsetHeight + 10 : 58;
     var altoBarra = barra ? barra.offsetHeight : 70;
-    return Math.max(240, alto - caja.top - altoBarra - altoAnim - 14);
+    //  En apaisado NO se intenta que quepa todo. Un teléfono tumbado tiene
+    //  390 px de alto y la cabecera verde se lleva 107: forzar el encaje
+    //  dejaba un campo de 106 px de ancho, inservible, y encima seguía sin
+    //  caber. Mejor un campo de 220 y bajar un dedo para capturar. En
+    //  vertical, que es como se usa esto a pie de campo, sí cabe todo.
+    var suelo = alto < 520 ? 220 : 240;
+    return Math.max(suelo, alto - caja.top - altoBarra - altoAnim - 14);
   }
 
   var pz = new Pizarra(document.getElementById('pz-canvas'), { altoMaximo: altoDisponible });
@@ -223,7 +235,14 @@
       return '<svg width="16" height="16" viewBox="0 0 17 17"><rect x="7.2" y="2" width="2.6" ' +
              'height="13" rx="1" fill="' + meta.color + '"/></svg>';
     }
-    if (clave === 'texto') return '<i data-ico="type" class="pf-ico--sm"></i>';
+    if (clave === 'texto') { return '<i data-ico="type" class="pf-ico--sm"></i>'; }
+    if (clave === 'balon') {
+      //  El balón es blanco y el botón también: sin borde y sin pentágono, el
+      //  de «Balón» salía como un botón vacío con una palabra debajo.
+      return '<svg width="16" height="16" viewBox="0 0 18 18">' +
+             '<circle cx="9" cy="9" r="7.2" fill="#fff" stroke="#111827" stroke-width="1.6"/>' +
+             '<polygon points="9,4.6 12.4,7.1 11.1,11.1 6.9,11.1 5.6,7.1" fill="#111827"/></svg>';
+    }
     return '<span class="pz-tool__p" style="background:' + meta.color +
            ';border:2px solid rgba(255,255,255,.9)"></span>';
   }
@@ -233,10 +252,13 @@
   function muestraTrazo(clave) {
     var m = pz.TRAZOS[clave];
     var color = m.color === '#ffffff' ? '#334155' : m.color;
-    var d = clave === 'conduccion' ? 'M2 9 L6 5 L10 13 L14 9' : 'M2 9 H15';
+    //  La muestra lleva el MISMO guion que el trazo real: el pase con rayas
+    //  largas y la conducción con puntos cortos. Si la muestra no distingue
+    //  los dos, hay que leer la etiqueta cada vez.
+    var guion = m.guion ? ' stroke-dasharray="' + m.guion.join(' ') + '"' : '';
     return '<svg width="18" height="16" viewBox="0 0 19 17">' +
-           '<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="' +
-           (m.ancho > 3 ? 3.4 : 2.2) + '"' + (m.guion ? ' stroke-dasharray="4 3"' : '') + '/>' +
+           '<path d="M2 9 H15" fill="none" stroke="' + color + '" stroke-width="' +
+           (m.ancho > 3 ? 3.4 : 2.2) + '"' + guion + '/>' +
            '<polygon points="15,5 19,9 15,13" fill="' + color + '"/></svg>';
   }
 
@@ -327,31 +349,6 @@
     PF.toast('Equipo colocado');
   });
 
-  function pintarEjercicios() {
-    var caja = document.getElementById('pz-ejercicios');
-    caja.innerHTML = '';
-    pz.EJERCICIOS.forEach(function (ej) {
-      var b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'pz-chip';
-      b.textContent = ej.nombre;
-      b.addEventListener('click', function () {
-        if (pz.estado.elementos.length &&
-            !confirm('Esto reemplaza lo que hay en el campo. ¿Seguir?')) { return; }
-        var puesto = pz.cargarEjercicio(ej.clave);
-        pintarCanchas(); pintarMomentos();
-        document.getElementById('pz-ejercicio-nota').textContent = puesto.nota;
-        var nombre = document.getElementById('pz-nombre');
-        if (!nombre.value.trim()) { nombre.value = puesto.nombre; }
-        document.getElementById('pz-carpeta').value =
-          puesto.clave.indexOf('rondo') === 0 ? 'Rondo'
-          : (puesto.clave.indexOf('rueda') === 0 ? 'Pases' : 'Jugada');
-        PF.toast(puesto.nombre + ' montado');
-      });
-      caja.appendChild(b);
-    });
-  }
-
   // ── Animación ───────────────────────────────────────────────────────────
   function pintarMomentos() {
     var caja = document.getElementById('pz-momentos');
@@ -429,7 +426,6 @@
 
   pintarHerramientas();
   pintarCanchas();
-  pintarEjercicios();
   pintarMomentos();
   //  Ahora que la barra y la fila de animación ya están pintadas y tienen su
   //  alto de verdad, se vuelve a medir el campo. La primera vez se calculó con

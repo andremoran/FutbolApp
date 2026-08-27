@@ -42,7 +42,7 @@
     rival:        { r: 15, color: '#dc2626', texto: '#fff', etiqueta: 'Rival' },
     neutro:       { r: 15, color: '#f59e0b', texto: '#1f2937', etiqueta: 'Comodín' },
     portero:      { r: 15, color: '#7e6acb', texto: '#fff', etiqueta: 'Portero' },
-    balon:        { r: 9,  color: '#ffffff', texto: '#111', etiqueta: 'Balón' },
+    balon:        { r: 10, color: '#ffffff', texto: '#111', etiqueta: 'Balón' },
     cono:         { r: 11, color: '#f97316', texto: '#fff', etiqueta: 'Cono' },
     pica:         { r: 10, color: '#eab308', texto: '#111', etiqueta: 'Pica' },
     miniporteria: { r: 16, color: '#e5e7eb', texto: '#111', etiqueta: 'Miniportería' },
@@ -54,7 +54,9 @@
   //  lee «pase» y «conducción» por la forma de la línea sin leer la leyenda.
   var TRAZOS = {
     pase:       { etiqueta: 'Pase',       color: '#ffffff', ancho: 2.5, guion: [9, 6] },
-    conduccion: { etiqueta: 'Conducción', color: '#ffffff', ancho: 2.5, onda: true },
+    //  Entrecortada, no en zigzag. Se distingue del pase por el ritmo del
+    //  guion: el pase son rayas largas y la conducción, puntos cortos.
+    conduccion: { etiqueta: 'Conducción', color: '#ffffff', ancho: 2.5, guion: [3, 4] },
     desmarque:  { etiqueta: 'Desmarque',  color: '#fde047', ancho: 2.5 },
     tiro:       { etiqueta: 'Tiro',       color: '#ef4444', ancho: 4 }
   };
@@ -92,133 +94,6 @@
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  EJERCICIOS DE PARTIDA
-  //  Un rondo son doce elementos bien puestos. Pedirle al entrenador que los
-  //  coloque uno a uno cada vez es la diferencia entre que use la pizarra y
-  //  que no la vuelva a abrir.
-  // ══════════════════════════════════════════════════════════════════════════
-  function enCirculo(tipo, cuantos, cx, cy, radio, desde) {
-    var salida = [];
-    for (var i = 0; i < cuantos; i++) {
-      var a = (desde || -Math.PI / 2) + (i * 2 * Math.PI / cuantos);
-      salida.push(elemento(tipo, cx + radio * Math.cos(a), cy + radio * Math.sin(a) * 1.0, i + 1));
-    }
-    return salida;
-  }
-
-  var EJERCICIOS = [
-    {
-      clave: 'rondo_4v2', nombre: 'Rondo 4v2', cancha: 'rondo',
-      nota: 'Cuatro por fuera, dos dentro. Dos toques; si el de dentro roba, cambia con quien perdió.',
-      arma: function () {
-        var e = enCirculo('jugador', 4, .5, .5, .30);
-        e = e.concat([elemento('rival', .44, .48, 1), elemento('rival', .58, .55, 2),
-                      elemento('balon', .30, .26)]);
-        for (var i = 0; i < 4; i++) {
-          e.push(elemento('cono', [.16, .84, .84, .16][i], [.16, .16, .84, .84][i]));
-        }
-        return { elementos: e, trazos: [
-          { id: nuevoId(), tipo: 'pase', x1: .28, y1: .22, x2: .72, y2: .22 },
-          { id: nuevoId(), tipo: 'pase', x1: .76, y1: .28, x2: .76, y2: .72 }
-        ] };
-      }
-    },
-    {
-      clave: 'rondo_5v2', nombre: 'Rondo 5v2', cancha: 'rondo',
-      nota: 'Cinco por fuera. Más ángulos de pase: exige al de dentro elegir a quién tapa.',
-      arma: function () {
-        var e = enCirculo('jugador', 5, .5, .5, .32);
-        e = e.concat([elemento('rival', .45, .47, 1), elemento('rival', .57, .56, 2),
-                      elemento('balon', .34, .24)]);
-        return { elementos: e, trazos: [
-          { id: nuevoId(), tipo: 'pase', x1: .32, y1: .22, x2: .70, y2: .32 }
-        ] };
-      }
-    },
-    {
-      clave: 'rondo_6v3', nombre: 'Rondo 6v3 con apoyos', cancha: 'rondo',
-      nota: 'Seis por fuera y dos comodines dentro que juegan con quien tiene el balón.',
-      arma: function () {
-        var e = enCirculo('jugador', 6, .5, .5, .34);
-        e = e.concat([elemento('neutro', .40, .44, 'A'), elemento('neutro', .60, .58, 'B'),
-                      elemento('rival', .50, .38, 1), elemento('rival', .40, .60, 2),
-                      elemento('rival', .62, .48, 3), elemento('balon', .28, .34)]);
-        return { elementos: e, trazos: [
-          { id: nuevoId(), tipo: 'pase', x1: .28, y1: .32, x2: .40, y2: .44 },
-          { id: nuevoId(), tipo: 'pase', x1: .42, y1: .46, x2: .72, y2: .34 }
-        ] };
-      }
-    },
-    {
-      clave: 'rueda_cuadrado', nombre: 'Rueda de pases en cuadrado', cancha: 'rondo',
-      nota: 'Pase, sigo mi pase. Se cambia el sentido a la señal.',
-      arma: function () {
-        var e = [];
-        var esq = [[.20, .20], [.80, .20], [.80, .80], [.20, .80]];
-        esq.forEach(function (p, i) {
-          e.push(elemento('cono', p[0], p[1]));
-          e.push(elemento('jugador', p[0] + (i === 1 || i === 2 ? -.09 : .09), p[1], i + 1));
-        });
-        e.push(elemento('balon', .30, .20));
-        var t = [];
-        for (var i = 0; i < 4; i++) {
-          var a = esq[i], b = esq[(i + 1) % 4];
-          t.push({ id: nuevoId(), tipo: 'pase', x1: a[0], y1: a[1], x2: b[0], y2: b[1] });
-        }
-        return { elementos: e, trazos: t };
-      }
-    },
-    {
-      clave: 'rueda_y', nombre: 'Rueda en Y', cancha: 'rondo',
-      nota: 'Apoyo, devuelve y cambio de orientación. El que recibe siempre se abre primero.',
-      arma: function () {
-        var e = [elemento('jugador', .50, .84, 1), elemento('jugador', .50, .54, 2),
-                 elemento('jugador', .22, .26, 3), elemento('jugador', .78, .26, 4),
-                 elemento('cono', .50, .66), elemento('cono', .34, .40), elemento('cono', .66, .40),
-                 elemento('balon', .44, .84)];
-        return { elementos: e, trazos: [
-          { id: nuevoId(), tipo: 'pase', x1: .50, y1: .80, x2: .50, y2: .58 },
-          { id: nuevoId(), tipo: 'pase', x1: .47, y1: .52, x2: .25, y2: .30 },
-          { id: nuevoId(), tipo: 'desmarque', x1: .53, y1: .52, x2: .70, y2: .34 }
-        ] };
-      }
-    },
-    {
-      clave: 'salida_balon', nombre: 'Salida de balón 4+2', cancha: 'media',
-      nota: 'Los centrales se abren, el pivote cae y los laterales dan amplitud.',
-      arma: function () {
-        var e = [elemento('portero', .50, .10, 1),
-                 elemento('jugador', .28, .26, 4), elemento('jugador', .72, .26, 2),
-                 elemento('jugador', .10, .46, 3), elemento('jugador', .90, .46, 5),
-                 elemento('jugador', .50, .40, 6), elemento('jugador', .50, .64, 8),
-                 elemento('rival', .38, .58, 1), elemento('rival', .62, .58, 2),
-                 elemento('balon', .50, .16)];
-        return { elementos: e, trazos: [
-          { id: nuevoId(), tipo: 'pase', x1: .48, y1: .14, x2: .30, y2: .24 },
-          { id: nuevoId(), tipo: 'pase', x1: .28, y1: .30, x2: .12, y2: .44 },
-          { id: nuevoId(), tipo: 'desmarque', x1: .50, y1: .44, x2: .50, y2: .60 }
-        ] };
-      }
-    },
-    {
-      clave: 'finalizacion', nombre: 'Centro y remate', cancha: 'tercio',
-      nota: 'Dos al primer palo, uno al segundo y uno al borde del área.',
-      arma: function () {
-        var e = [elemento('jugador', .88, .52, 7), elemento('jugador', .38, .34, 9),
-                 elemento('jugador', .58, .30, 11), elemento('jugador', .50, .68, 10),
-                 elemento('rival', .42, .42, 1), elemento('rival', .60, .40, 2),
-                 elemento('portero', .50, .12, 1), elemento('balon', .85, .58)];
-        return { elementos: e, trazos: [
-          { id: nuevoId(), tipo: 'conduccion', x1: .88, y1: .62, x2: .86, y2: .44 },
-          { id: nuevoId(), tipo: 'pase', x1: .84, y1: .42, x2: .56, y2: .28 },
-          { id: nuevoId(), tipo: 'desmarque', x1: .40, y1: .40, x2: .44, y2: .26 },
-          { id: nuevoId(), tipo: 'tiro', x1: .56, y1: .26, x2: .50, y2: .10 }
-        ] };
-      }
-    }
-  ];
-
-  // ══════════════════════════════════════════════════════════════════════════
   //  LA PIZARRA
   // ══════════════════════════════════════════════════════════════════════════
   function Pizarra(lienzo, opciones) {
@@ -239,7 +114,6 @@
   Pizarra.prototype.TRAZOS = TRAZOS;
   Pizarra.prototype.CANCHAS = CANCHAS;
   Pizarra.prototype.FORMACIONES = FORMACIONES;
-  Pizarra.prototype.EJERCICIOS = EJERCICIOS;
 
   // ── Carga y compatibilidad ────────────────────────────────────────────────
   /*  Las jugadas guardadas antes de esta pizarra tienen otra forma:
@@ -443,13 +317,24 @@
       ctx.ellipse(x, y, r, r * 0.55, 0, 0, 2 * Math.PI);
       ctx.stroke();
     } else if (e.tipo === 'balon') {
+      //  Blanco con borde y un pentágono dentro. Antes era un círculo blanco
+      //  con un punto: sobre el césped se leía como una mancha, y encima de
+      //  una ficha clara desaparecía del todo.
       ctx.beginPath();
       ctx.arc(x, y, r, 0, 2 * Math.PI);
       ctx.fillStyle = '#fff';
       ctx.fill();
       ctx.shadowColor = 'transparent';
+      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = '#111827';
+      ctx.stroke();
       ctx.beginPath();
-      ctx.arc(x, y, r * 0.42, 0, 2 * Math.PI);
+      for (var p = 0; p < 5; p++) {
+        var ang = -Math.PI / 2 + p * 2 * Math.PI / 5;
+        var px = x + r * 0.52 * Math.cos(ang), py = y + r * 0.52 * Math.sin(ang);
+        if (p === 0) { ctx.moveTo(px, py); } else { ctx.lineTo(px, py); }
+      }
+      ctx.closePath();
       ctx.fillStyle = '#111827';
       ctx.fill();
     } else if (e.tipo === 'texto') {
@@ -517,25 +402,7 @@
     //  hasta el final, la cabeza queda montada encima y se ve un borrón.
     var fin = largo - 11;
 
-    if (meta.onda) {
-      //  La conducción se dibuja en zigzag, que es como se apunta en cualquier
-      //  pizarra de vestuario del mundo.
-      ctx.beginPath();
-      ctx.translate(x1, y1);
-      ctx.rotate(ang);
-      ctx.moveTo(0, 0);
-      var paso = 9, amp = 4.5;
-      for (var d = 0; d < fin; d += paso) {
-        ctx.lineTo(d + paso / 2, ((d / paso) % 2 === 0 ? -amp : amp));
-      }
-      ctx.lineTo(fin, 0);
-      ctx.stroke();
-      ctx.setTransform(this.ctx.getTransform());
-      ctx.restore();
-      ctx.save();
-      ctx.strokeStyle = meta.color;
-      ctx.fillStyle = meta.color;
-    } else {
+    {
       ctx.setLineDash(meta.guion || []);
       ctx.beginPath();
       ctx.moveTo(x1, y1);
@@ -762,19 +629,6 @@
     this.estado.formacion = nombre;
     this.estado.cancha = 'completa';
     this.redimensionar();
-  };
-
-  Pizarra.prototype.cargarEjercicio = function (clave) {
-    var ej = EJERCICIOS.filter(function (e) { return e.clave === clave; })[0];
-    if (!ej) return null;
-    this.guardarHistorial();
-    var armado = ej.arma();
-    this.estado.elementos = armado.elementos;
-    this.estado.trazos = armado.trazos || [];
-    this.estado.momentos = [];
-    this.estado.cancha = ej.cancha;
-    this.redimensionar();
-    return ej;
   };
 
   Pizarra.prototype.limpiar = function () {
