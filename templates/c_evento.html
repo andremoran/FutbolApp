@@ -153,6 +153,55 @@
 </a>
 {% endif %}
 
+{# ══════════ TÁCTICA DE LA SESIÓN ══════════ #}
+{# La pizarra guardaba jugadas y la agenda guardaba entrenos, y eran dos
+   cajones sin conexión: se montaba el rondo del martes y el martes había que
+   acordarse de cuál era. Aquí se cuelga, y el jugador la ve en su ficha. #}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Táctica de la sesión</h2>
+    {% if jugadas %}<span class="pf-card__badge">{{ jugadas|length }}</span>{% endif %}
+  </div>
+
+  {% for j in jugadas %}
+  <div class="pf-item" style="padding-left:0;padding-right:0">
+    <a class="pf-item__body" href="{{ url_for('futbol.c_pizarra', jid=j.id) }}"
+       style="text-decoration:none;min-width:0">
+      <span class="pf-item__title">{{ j.nombre }}</span>
+      <span class="pf-item__sub">{{ j.carpeta or 'Jugada' }}{% if j.formacion %} · {{ j.formacion }}{% endif %}</span>
+    </a>
+    {# `pf-icon-btn` no existe en el CSS: se usa el botón fantasma de siempre
+       recortado, para no inventar una clase nueva por un aspa. #}
+    <button class="pf-btn pf-btn--ghost" type="button" aria-label="Quitar de la sesión"
+            style="flex:none;padding:8px 11px;min-width:0"
+            onclick="quitarJugada('{{ j._enlace }}', this)">
+      <i data-ico="x" class="pf-ico--sm"></i>
+    </button>
+  </div>
+  {% else %}
+  <p style="margin:10px 0 0;font-size:12.5px;color:var(--text-sec);line-height:1.55">
+    Cuelga aquí el rondo o la jugada que vas a trabajar. El jugador la verá al
+    abrir esta sesión en su agenda.
+  </p>
+  {% endfor %}
+
+  {% if biblioteca %}
+  <div class="pf-row pf-mt-12" style="gap:8px">
+    <select class="pf-select pf-grow" id="ev-jugada" aria-label="Jugada">
+      {% for j in biblioteca %}
+      <option value="{{ j.id }}">{{ j.carpeta or 'Jugada' }} · {{ j.nombre }}</option>
+      {% endfor %}
+    </select>
+    <button class="pf-btn pf-btn--ghost" type="button" onclick="ponerJugada(this)">Añadir</button>
+  </div>
+  {% elif not jugadas %}
+  <a class="pf-btn pf-btn--ghost pf-btn--block pf-mt-12"
+     href="{{ url_for('futbol.c_pizarra') }}">
+    <i data-ico="plus" class="pf-ico--sm"></i> Crear una en la pizarra
+  </a>
+  {% endif %}
+</div>
+
 {# ══════════ ESTADO ══════════ #}
 <div class="ev-pie">
   <button class="ev-pie__b ev-pie__b--ok" type="button" onclick="marcar('hecho')">
@@ -173,6 +222,25 @@
 {% block scripts %}
 <script>
 const EID = {{ evento.id|tojson }};
+
+/*  Colgar y descolgar táctica. Se recarga la página al terminar en vez de
+    repintar la lista a mano: es una acción de una vez, y así el desplegable
+    vuelve a salir sin la que se acaba de añadir.  */
+function ponerJugada(boton) {
+  const sel = document.getElementById('ev-jugada');
+  if (!sel || !sel.value) { return; }
+  boton.disabled = true;
+  PF.api('/api/evento/' + EID + '/jugada', { jugada_id: sel.value })
+    .then(function () { PF.toast('Añadida a la sesión'); location.reload(); })
+    .catch(function (e) { PF.toast(e.message, 'error'); boton.disabled = false; });
+}
+
+function quitarJugada(enlace, boton) {
+  boton.disabled = true;
+  PF.api('/api/evento/' + EID + '/jugada/' + enlace, null, 'DELETE')
+    .then(function () { PF.toast('Quitada de la sesión'); location.reload(); })
+    .catch(function (e) { PF.toast(e.message, 'error'); boton.disabled = false; });
+}
 
 /* Editar y borrar viven en el calendario, que es donde está el formulario. */
 function editar() {

@@ -703,6 +703,51 @@ def api_jugada_guardar():
     return jsonify({'ok': True, 'id': fila['id']})
 
 
+@bp.route('/api/evento/<eid>/jugada', methods=['POST'])
+@api
+def api_evento_jugada(eid):
+    """Cuelga una jugada de un entrenamiento o de un partido.
+
+    Se comprueba que TANTO el evento COMO la jugada son del equipo: con el id
+    del evento a secas se le podría colgar a un entreno propio una jugada de
+    otro club, y quedaría a la vista de toda la plantilla.
+    """
+    if not es_coach():
+        return jsonify({'error': 'Solo el entrenador planifica la sesión.'}), 403
+
+    uid = db.equipo_id(current_user.id)
+    d = body()
+    if not db.one('fut_events', 'evento mio', id=eid, coach_id=uid):
+        return jsonify({'error': 'Ese evento no es de tu equipo.'}), 404
+
+    jid = (d.get('jugada_id') or '').strip()
+    if not db.one('fut_tactical_plays', 'jugada mia', id=jid, coach_id=uid):
+        return jsonify({'error': 'Esa jugada no es de tu equipo.'}), 404
+
+    ya = db.rows('fut_event_plays', 'ya colgadas', event_id=eid) or []
+    if any(str(x.get('play_id')) == jid for x in ya):
+        return jsonify({'error': 'Esa jugada ya está en esta sesión.'}), 400
+
+    fila = db.insert('fut_event_plays', {
+        'coach_id': uid, 'event_id': eid, 'play_id': jid,
+        'orden': len(ya),
+        'nota': (d.get('nota') or '').strip()[:200],
+        'creado': ahora(),
+    }, 'colgar jugada', obligatorio=True)
+    return jsonify({'ok': True, 'id': fila['id'], 'mensaje': 'Añadida a la sesión.'})
+
+
+@bp.route('/api/evento/<eid>/jugada/<enlace>', methods=['DELETE'])
+@api
+def api_evento_jugada_quitar(eid, enlace):
+    """Descuelga una jugada. NO la borra: la jugada sigue en la biblioteca."""
+    if not es_coach():
+        return jsonify({'error': 'Solo el entrenador planifica la sesión.'}), 403
+    db.delete('fut_event_plays', 'descolgar', id=enlace, event_id=eid,
+              coach_id=db.equipo_id(current_user.id), obligatorio=True)
+    return jsonify({'ok': True, 'mensaje': 'Quitada de la sesión.'})
+
+
 @bp.route('/api/jugada/<jid>', methods=['DELETE'])
 @api
 def api_jugada_borrar(jid):

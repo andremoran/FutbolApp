@@ -256,10 +256,14 @@
     //  largas y la conducción con puntos cortos. Si la muestra no distingue
     //  los dos, hay que leer la etiqueta cada vez.
     var guion = m.guion ? ' stroke-dasharray="' + m.guion.join(' ') + '"' : '';
+    //  La muestra también se queda sin punta si el trazo no la lleva: es lo
+    //  que hace que se distinga de un vistazo del pase, que sí la tiene.
+    var hasta = m.sinPunta ? 18 : 15;
     return '<svg width="18" height="16" viewBox="0 0 19 17">' +
-           '<path d="M2 9 H15" fill="none" stroke="' + color + '" stroke-width="' +
+           '<path d="M2 9 H' + hasta + '" fill="none" stroke="' + color + '" stroke-width="' +
            (m.ancho > 3 ? 3.4 : 2.2) + '"' + guion + '/>' +
-           '<polygon points="15,5 19,9 15,13" fill="' + color + '"/></svg>';
+           (m.sinPunta ? '' : '<polygon points="15,5 19,9 15,13" fill="' + color + '"/>') +
+           '</svg>';
   }
 
   function boton(contenido, etiqueta, activo, alPulsar) {

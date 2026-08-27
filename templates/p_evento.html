@@ -237,6 +237,33 @@
 {% endif %}
 
 <div style="height:28px"></div>
+
+{# ══════════ LA TÁCTICA DE ESTA SESIÓN ══════════ #}
+{# Que la jugada esté en la biblioteca no sirve de nada si hay que buscarla
+   entre veinte el día del partido: aquí sale la de ESTE día. #}
+{% if evento._jugadas %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">Lo que vamos a trabajar</h2>
+    <span class="pf-card__badge">{{ evento._jugadas|length }}</span>
+  </div>
+  {% for j in evento._jugadas %}
+  <a class="pf-item" href="{{ url_for('futbol.p_jugada', jid=j.id) }}">
+    <span class="pf-item__icon" style="background:var(--primary-soft);color:var(--primary)">
+      <i data-ico="target" class="pf-ico--sm"></i>
+    </span>
+    <span class="pf-item__body">
+      <span class="pf-item__title">{{ j.nombre }}</span>
+      <span class="pf-item__sub">
+        {{ j.carpeta or 'Jugada' }}{% if j._nota %} · {{ j._nota }}{% endif %}
+      </span>
+    </span>
+    <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
 {% endblock %}
 
 {% block scripts %}

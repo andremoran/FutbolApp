@@ -188,6 +188,10 @@ def p_evento(eid):
         abort(404)
 
     evento['_fecha'] = db.parse_fecha(evento.get('fecha'))
+    #  La táctica que el entrenador colgó de esta sesión. Es lo que el jugador
+    #  venía a mirar: que la jugada esté en la biblioteca no sirve de nada si
+    #  hay que buscarla entre veinte el día del partido.
+    evento['_jugadas'] = db.jugadas_de_eventos([eid]).get(eid, [])
     meta = cal.ENTRENO_META.get(evento.get('tipo_entreno') or '', {})
     evento['_tipo_entreno'] = meta.get('etiqueta')
     evento['_intensidad'] = dict(

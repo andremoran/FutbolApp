@@ -54,9 +54,11 @@
   //  lee «pase» y «conducción» por la forma de la línea sin leer la leyenda.
   var TRAZOS = {
     pase:       { etiqueta: 'Pase',       color: '#ffffff', ancho: 2.5, guion: [9, 6] },
-    //  Entrecortada, no en zigzag. Se distingue del pase por el ritmo del
-    //  guion: el pase son rayas largas y la conducción, puntos cortos.
-    conduccion: { etiqueta: 'Conducción', color: '#ffffff', ancho: 2.5, guion: [3, 4] },
+    //  Entrecortada y SIN punta. Se distingue del pase por dos cosas: el
+    //  ritmo del guion —el pase son rayas largas, esto puntos cortos— y que
+    //  no lleva flecha. Un pase va a alguien; una conducción es un recorrido.
+    conduccion: { etiqueta: 'Conducción', color: '#ffffff', ancho: 2.5,
+                  guion: [3, 4], sinPunta: true },
     desmarque:  { etiqueta: 'Desmarque',  color: '#fde047', ancho: 2.5 },
     tiro:       { etiqueta: 'Tiro',       color: '#ef4444', ancho: 4 }
   };
@@ -398,9 +400,10 @@
     ctx.shadowColor = 'rgba(0,0,0,.4)';
     ctx.shadowBlur = 3;
 
-    //  La punta se deja libre para la cabeza de la flecha: si la línea llega
-    //  hasta el final, la cabeza queda montada encima y se ve un borrón.
-    var fin = largo - 11;
+    //  Se deja hueco para la cabeza de la flecha: si la línea llegara hasta
+    //  el final, la cabeza quedaría montada encima y se vería un borrón. Sin
+    //  flecha no hay que dejar nada y la línea llega hasta el punto.
+    var fin = meta.sinPunta ? largo : largo - 11;
 
     {
       ctx.setLineDash(meta.guion || []);
@@ -411,13 +414,15 @@
       ctx.setLineDash([]);
     }
 
-    ctx.fillStyle = meta.color;
-    ctx.beginPath();
-    ctx.moveTo(x2, y2);
-    ctx.lineTo(x2 - 12 * Math.cos(ang - 0.42), y2 - 12 * Math.sin(ang - 0.42));
-    ctx.lineTo(x2 - 12 * Math.cos(ang + 0.42), y2 - 12 * Math.sin(ang + 0.42));
-    ctx.closePath();
-    ctx.fill();
+    if (!meta.sinPunta) {
+      ctx.fillStyle = meta.color;
+      ctx.beginPath();
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(x2 - 12 * Math.cos(ang - 0.42), y2 - 12 * Math.sin(ang - 0.42));
+      ctx.lineTo(x2 - 12 * Math.cos(ang + 0.42), y2 - 12 * Math.sin(ang + 0.42));
+      ctx.closePath();
+      ctx.fill();
+    }
     ctx.restore();
   };
 

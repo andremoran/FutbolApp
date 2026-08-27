@@ -444,6 +444,41 @@ def racha_actual(player_id):
 
 
 # ─── Agenda ──────────────────────────────────────────────────────────────────
+def jugadas_de_eventos(event_ids):
+    """Las jugadas colgadas de unos eventos, ya con su ficha.
+
+    Dos consultas para TODOS los eventos y no dos por evento: la agenda pinta
+    una semana entera y así son dos viajes en vez de catorce.
+
+    Devuelve {event_id: [ficha de la jugada, …]} en el orden de la sesión.
+    """
+    if not event_ids:
+        return {}
+    enlaces = q(lambda: _sb.table('fut_event_plays').select('*')
+                .in_('event_id', list(event_ids)).order('orden').execute().data or [],
+                [], 'jugadas de eventos')
+    if not enlaces:
+        return {}
+
+    ids = list({e['play_id'] for e in enlaces})
+    fichas = q(lambda: _sb.table('fut_tactical_plays').select('*')
+               .in_('id', ids).execute().data or [], [], 'fichas de jugadas')
+    por_id = {f['id']: f for f in fichas}
+
+    salida = {}
+    for e in enlaces:
+        ficha = por_id.get(e['play_id'])
+        if not ficha:
+            continue
+        #  Se copia: la misma jugada puede colgar de dos eventos con notas
+        #  distintas, y compartir el diccionario mezclaría las dos.
+        fila = dict(ficha)
+        fila['_enlace'] = e['id']
+        fila['_nota'] = e.get('nota') or ''
+        salida.setdefault(e['event_id'], []).append(fila)
+    return salida
+
+
 def eventos_equipo(coach_id, desde=None, hasta=None):
     def _go():
         sel = _sb.table('fut_events').select('*').eq('coach_id', coach_id)

@@ -552,9 +552,18 @@ def c_evento(eid):
             hoja['_n'] = len([f for f in filas
                               if any((f.get(c) or 0) for c in db.CAMPOS_PARTIDO)])
 
+    #  La táctica de la sesión, y el resto de la biblioteca para poder
+    #  añadir más sin salir de aquí.
+    colgadas = db.jugadas_de_eventos([eid]).get(eid, [])
+    puestas = {j['id'] for j in colgadas}
+    biblioteca = [j for j in (db.rows('fut_tactical_plays', 'biblioteca',
+                                      coach_id=uid, _order='creado', _desc=True) or [])
+                  if j['id'] not in puestas]
+
     return render_template('c_evento.html',
                            tab_activa='agenda', hide_tabbar=True,
                            evento=evento,
+                           jugadas=colgadas, biblioteca=biblioteca,
                            marcados=len(marcas), fueron=fueron,
                            plantilla=plantilla,
                            observacion=observacion,
