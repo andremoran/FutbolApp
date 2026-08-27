@@ -297,8 +297,19 @@
 
   // ── Medidas ───────────────────────────────────────────────────────────────
   Pizarra.prototype.redimensionar = function () {
+    var ratio = (CANCHAS[this.estado.cancha] || CANCHAS.completa).alto;
     var ancho = Math.min(this.c.parentNode.clientWidth || 520, 560);
-    var alto = Math.round(ancho * (CANCHAS[this.estado.cancha] || CANCHAS.completa).alto);
+    var alto = Math.round(ancho * ratio);
+
+    //  El campo se encoge para que quepa en la pantalla. Sin esto, en un
+    //  teléfono de 667 px el campo entero llegaba hasta abajo y los botones de
+    //  la animación quedaban fuera: para capturar un momento había que bajar,
+    //  capturar y volver a subir, en cada paso de la jugada.
+    var tope = this.op.altoMaximo ? this.op.altoMaximo() : 0;
+    if (tope && alto > tope) {
+      alto = Math.round(tope);
+      ancho = Math.round(alto / ratio);
+    }
     //  Se dibuja al doble en pantallas densas: si no, las líneas del campo y
     //  los números salen borrosos justo en el móvil, que es donde se usa.
     var dpr = Math.min(global.devicePixelRatio || 1, 2);

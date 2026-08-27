@@ -3,9 +3,16 @@
 
 {# La pizarra: jugadas, rondos y ruedas de pases.
 
-   Todo el dibujo vive en static/pizarra.js — aquí solo está la pantalla que lo
-   maneja. Las herramientas van en una barra fija abajo, como en la app nativa:
-   a pie de campo se dibuja con el pulgar y con una mano. #}
+   El dibujo vive en static/pizarra.js — aquí solo está la pantalla.
+
+   ORDEN DE LA PANTALLA. Todo lo que se usa MIENTRAS se dibuja va pegado al
+   campo y sin scroll: las herramientas abajo, fijas, y la fila de animación
+   justo debajo del lienzo. Capturar un momento es lo que más se repite —
+   colocar, capturar, mover, capturar— y estaba dos tarjetas más abajo: había
+   que bajar y subir en cada paso.
+
+   Lo que se toca UNA vez por jugada —el espacio, la formación, el ejercicio
+   de partida— se agrupó en una sola tarjeta debajo. #}
 
 {% block hero_back %}
 <a class="pf-hero__btn" href="{{ url_for('futbol.c_tactica') }}" aria-label="Volver">
@@ -17,19 +24,36 @@
 
 {% block head %}
 <style>
-  .pz-wrap { padding-bottom: 178px; }
-
+  .pz-wrap { padding-bottom: 118px; }
+  .pz-lienzo { max-width: 560px; margin: 0 auto; }
   .pz-cancha { display: block; margin: 0 auto; border-radius: var(--r-lg);
                box-shadow: 0 6px 18px rgba(0,0,0,.22); touch-action: none;
                background: #15803d; }
-  .pz-lienzo { max-width: 560px; margin: 0 auto; }
 
-  /* ── Cabecera: nombre y dónde se guarda ─────────────────────────────── */
   .pz-form { display: grid; grid-template-columns: 1fr auto; gap: 8px;
              max-width: 560px; margin: 0 auto 10px; }
   .pz-form .pf-input, .pz-form .pf-select { min-width: 0; }
 
-  /* ── Fichas de selección (cancha, ejercicios) ───────────────────────── */
+  /* ── La fila de animación, pegada al campo ──────────────────────────── */
+  .pz-anim { max-width: 560px; margin: 10px auto 0; display: flex; gap: 7px;
+             align-items: center; }
+  .pz-anim__b { flex: none; display: inline-flex; align-items: center; gap: 6px;
+                padding: 9px 13px; border-radius: var(--r-md); border: 1px solid var(--border);
+                background: #fff; font-size: 12.5px; font-weight: 700;
+                color: var(--text); cursor: pointer; }
+  .pz-anim__b--play { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .pz-anim__b:disabled { opacity: .45; }
+  .pz-momentos { flex: 1; min-width: 0; display: flex; gap: 5px; overflow-x: auto;
+                 scrollbar-width: none; }
+  .pz-momentos::-webkit-scrollbar { display: none; }
+  .pz-momento { flex: none; width: 30px; height: 30px; border-radius: 8px;
+                border: 1px solid var(--border); background: #fff; font-weight: 800;
+                font-size: 12px; color: var(--text-sec); display: grid;
+                place-items: center; cursor: pointer; }
+  .pz-momento.is-on { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .pz-momentos__vacio { font-size: 11.5px; color: var(--text-muted); align-self: center; }
+
+  /* ── Fichas de selección ────────────────────────────────────────────── */
   .pz-chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px;
               -webkit-overflow-scrolling: touch; scrollbar-width: none; }
   .pz-chips::-webkit-scrollbar { display: none; }
@@ -38,38 +62,27 @@
              border: none; cursor: pointer; white-space: nowrap; }
   .pz-chip.on { background: var(--primary); color: #fff; }
 
-  /* ── La animación ───────────────────────────────────────────────────── */
-  .pz-anim__fila { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .pz-momentos { display: flex; gap: 6px; overflow-x: auto; margin-top: 10px;
-                 scrollbar-width: none; }
-  .pz-momentos::-webkit-scrollbar { display: none; }
-  .pz-momento { flex: none; width: 32px; height: 32px; border-radius: 9px;
-                border: 1px solid var(--border); background: #fff; font-weight: 800;
-                font-size: 12.5px; color: var(--text-sec); display: grid;
-                place-items: center; cursor: pointer; }
-  .pz-momento.is-on { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .pz-sub { font-size: 10.5px; font-weight: 800; letter-spacing: .4px;
+            text-transform: uppercase; color: var(--text-muted); margin: 14px 0 7px; }
+  .pz-sub:first-child { margin-top: 0; }
 
-  /* ── La caja de herramientas, fija abajo ────────────────────────────── */
-  .pz-tools { position: fixed; left: 0; right: 0; z-index: 60;
-              bottom: 0; padding: 9px 12px calc(10px + env(safe-area-inset-bottom, 0px));
-              background: rgba(255,255,255,.97);
-              backdrop-filter: blur(10px); border-top: 1px solid var(--border); }
+  /* ── Herramientas: una sola fila, y el resto detrás de «Más» ────────── */
+  .pz-tools { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+              padding: 8px 12px calc(9px + env(safe-area-inset-bottom, 0px));
+              background: rgba(255,255,255,.97); backdrop-filter: blur(10px);
+              border-top: 1px solid var(--border); }
   .pz-tools__caja { max-width: 560px; margin: 0 auto; }
-  .pz-tools__fila { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px;
-                    scrollbar-width: none; }
+  .pz-tools__fila { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
   .pz-tools__fila::-webkit-scrollbar { display: none; }
-  .pz-tools__fila + .pz-tools__fila { margin-top: 6px; }
+  .pz-tools__fila--extra { margin-bottom: 6px; }
+  .pz-tools__fila--extra[hidden] { display: none; }
 
-  .pz-tool { flex: none; min-width: 58px; padding: 7px 6px; border: 1px solid var(--border);
+  .pz-tool { flex: none; min-width: 54px; padding: 6px 6px; border: 1px solid var(--border);
              background: #fff; border-radius: var(--r-md); display: flex;
              flex-direction: column; align-items: center; gap: 3px; cursor: pointer;
              font-size: 9.5px; font-weight: 700; color: var(--text-sec); line-height: 1.2; }
   .pz-tool.on { background: var(--primary); border-color: var(--primary); color: #fff; }
-  .pz-tool__p { width: 17px; height: 17px; border-radius: 50%; display: block; }
-  .pz-tool__sep { flex: none; width: 1px; background: var(--border); margin: 4px 2px; }
-
-  /*  La muestra del trazo: una raya con la forma real de cada uno. Un icono
-      genérico obligaría a leer la etiqueta cada vez.  */
+  .pz-tool__p { width: 16px; height: 16px; border-radius: 50%; display: block; }
   .pz-tool svg { display: block; }
 
   @media (min-width: 560px) { .pz-tools { border-radius: var(--r-lg) var(--r-lg) 0 0; } }
@@ -79,7 +92,6 @@
 {% block content %}
 <div class="pz-wrap">
 
-  {# ══════════ NOMBRE Y CARPETA ══════════ #}
   <div class="pz-form">
     <input class="pf-input" id="pz-nombre" maxlength="80" placeholder="Nombre de la jugada"
            value="{{ jugada.nombre if jugada else '' }}">
@@ -95,70 +107,51 @@
     <canvas class="pz-cancha" id="pz-canvas"></canvas>
   </div>
 
-  {# ══════════ QUÉ CAMPO ══════════ #}
-  <div class="pf-card pf-mt-12">
-    <div class="pf-card__head">
-      <h2 class="pf-card__title">Espacio</h2>
-      <span class="pf-card__badge" id="pz-espacio-etq">Campo entero</span>
-    </div>
-    <div class="pz-chips pf-mt-12" id="pz-canchas"></div>
-    <div class="pf-row pf-mt-12" style="gap:8px">
+  {# ══════════ ANIMACIÓN — pegada al campo, sin bajar ══════════ #}
+  <div class="pz-anim">
+    <button class="pz-anim__b" type="button" id="pz-capturar">
+      <i data-ico="camera" class="pf-ico--xs"></i> Capturar
+    </button>
+    <button class="pz-anim__b pz-anim__b--play" type="button" id="pz-reproducir" disabled>
+      <i data-ico="play" class="pf-ico--xs"></i>
+    </button>
+    <div class="pz-momentos" id="pz-momentos"></div>
+  </div>
+
+  {# ══════════ MONTAJE — lo que se toca una vez por jugada ══════════ #}
+  <div class="pf-card pf-mt-16">
+    <div class="pz-sub">Espacio</div>
+    <div class="pz-chips" id="pz-canchas"></div>
+
+    <div class="pz-sub">Empezar montado</div>
+    <div class="pz-chips" id="pz-ejercicios"></div>
+    <p id="pz-ejercicio-nota" style="margin:9px 0 0;font-size:12px;
+       color:var(--text-sec);line-height:1.5">
+      Elige un ejercicio y lo tienes puesto; luego mueve lo que quieras.
+    </p>
+
+    <div class="pz-sub">Colocar mi equipo</div>
+    <div class="pf-row" style="gap:8px">
       <select class="pf-select pf-grow" id="pz-formacion" aria-label="Formación">
         {% for f in ['4-4-2', '4-3-3', '4-2-3-1', '3-5-2', '5-3-2', '4-1-4-1'] %}
         <option value="{{ f }}">{{ f }}</option>
         {% endfor %}
       </select>
-      <button class="pf-btn pf-btn--ghost" type="button" id="pz-poner-formacion">
-        Colocar equipo
-      </button>
+      <button class="pf-btn pf-btn--ghost" type="button" id="pz-poner-formacion">Colocar</button>
     </div>
   </div>
 
-  {# ══════════ EJERCICIOS DE PARTIDA ══════════ #}
-  {# Un rondo son doce elementos bien puestos. Pedirle al entrenador que los
-     coloque uno a uno cada vez es la diferencia entre que use la pizarra y que
-     no la vuelva a abrir. #}
-  <div class="pf-card">
-    <div class="pf-card__head">
-      <h2 class="pf-card__title">Empezar desde un ejercicio</h2>
-    </div>
-    <div class="pz-chips pf-mt-12" id="pz-ejercicios"></div>
-    <p class="pf-hint" id="pz-ejercicio-nota" style="margin:10px 0 0;font-size:12px;
-       color:var(--text-sec);line-height:1.5">
-      Elige uno y lo tienes montado; luego mueve lo que quieras.
-    </p>
-    {# La pulsación larga no se ve por ninguna parte: si no se dice, nadie la
-       encuentra y los dorsales se quedan con el número que salga. #}
-    <p style="margin:8px 0 0;font-size:12px;color:var(--text-muted);line-height:1.5">
-      Con <b>Mover</b>, deja el dedo sobre una ficha para cambiarle el dorsal
-      o corregir un rótulo.
-    </p>
-  </div>
+  {# Las dos cosas que no se ven solas. Van juntas y en pequeño: son ayuda,
+     no interfaz. #}
+  <p style="max-width:560px;margin:12px auto 0;font-size:12px;
+     color:var(--text-muted);line-height:1.6">
+    Coloca a todos y pulsa <b>Capturar</b>; mueve a los que se desplazan y captura
+    otra vez — al reproducir se ve el movimiento. Con <b>Mover</b>, deja el dedo
+    sobre una ficha para cambiarle el dorsal, y sobre un número de momento para
+    borrarlo.
+  </p>
 
-  {# ══════════ ANIMACIÓN ══════════ #}
-  <div class="pf-card">
-    <div class="pf-card__head">
-      <h2 class="pf-card__title">Animación</h2>
-      <span class="pf-card__badge"><span id="pz-n-momentos">0</span> momentos</span>
-    </div>
-    <div class="pz-anim__fila pf-mt-12">
-      <button class="pf-btn pf-btn--ghost pf-grow" type="button" id="pz-capturar">
-        <i data-ico="camera" class="pf-ico--xs"></i> Capturar momento
-      </button>
-      <button class="pf-btn pf-btn--primary pf-grow" type="button" id="pz-reproducir" disabled>
-        <i data-ico="play" class="pf-ico--xs"></i> Reproducir
-      </button>
-    </div>
-    <div class="pz-momentos" id="pz-momentos"></div>
-    <p style="margin:10px 0 0;font-size:12px;color:var(--text-sec);line-height:1.5">
-      Coloca a todos, captura. Mueve a los que se desplazan, captura otra vez.
-      Al reproducir se ve el movimiento completo. Pulsación larga en un número
-      para borrar ese momento.
-    </p>
-  </div>
-
-  {# ══════════ GUARDAR ══════════ #}
-  <button class="pf-btn pf-btn--primary pf-btn--block pf-mt-12" type="button" id="pz-guardar">
+  <button class="pf-btn pf-btn--primary pf-btn--block pf-mt-16" type="button" id="pz-guardar">
     <i data-ico="save" class="pf-ico--sm"></i> Guardar
   </button>
   <div style="height:12px"></div>
@@ -167,8 +160,8 @@
 {# ══════════ HERRAMIENTAS ══════════ #}
 <div class="pz-tools">
   <div class="pz-tools__caja">
-    <div class="pz-tools__fila" id="pz-fila-elementos"></div>
-    <div class="pz-tools__fila" id="pz-fila-trazos"></div>
+    <div class="pz-tools__fila pz-tools__fila--extra" id="pz-fila-extra" hidden></div>
+    <div class="pz-tools__fila" id="pz-fila-base"></div>
   </div>
 </div>
 {% endblock %}
@@ -177,121 +170,144 @@
 <script src="{{ url_for('static', filename='pizarra.js') }}"></script>
 <script>
 (function () {
-  var pz = new Pizarra(document.getElementById('pz-canvas'));
+  /*  Cuánto alto le queda al campo para que la fila de animación y la caja de
+      herramientas sigan a la vista. Es lo que hace que colocar-capturar-mover
+      -capturar se haga sin mover la pantalla ni una vez.  */
+  function altoDisponible() {
+    var caja = document.querySelector('.pz-lienzo').getBoundingClientRect();
+    var barra = document.querySelector('.pz-tools');
+    var anim = document.querySelector('.pz-anim');
+    var alto = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+    //  Se MIDEN la fila de animación y la barra, no se estiman: con números a
+    //  ojo la fila acababa 22 px por debajo de la barra en un teléfono de 667,
+    //  o sea justo detrás de ella.
+    var altoAnim = anim ? anim.offsetHeight + 10 : 58;
+    var altoBarra = barra ? barra.offsetHeight : 70;
+    return Math.max(240, alto - caja.top - altoBarra - altoAnim - 14);
+  }
+
+  var pz = new Pizarra(document.getElementById('pz-canvas'), { altoMaximo: altoDisponible });
 
   var GUARDADO = {{ ((jugada.datos if jugada else None) or {})|tojson }};
   pz.cargar(GUARDADO);
   if (!pz.estado.elementos.length) { pz.aplicarFormacion('4-4-2'); }
   if (pz.estado.formacion) { document.getElementById('pz-formacion').value = pz.estado.formacion; }
 
-  // ── Herramientas ────────────────────────────────────────────────────────
-  var ELEMENTOS = [
-    ['mover', 'Mover'], ['jugador', 'Jugador'], ['rival', 'Rival'],
-    ['neutro', 'Comodín'], ['portero', 'Portero'], ['balon', 'Balón'],
-    ['cono', 'Cono'], ['pica', 'Pica'], ['miniporteria', 'Portería'],
-    ['aro', 'Aro'], ['texto', 'Texto'], ['borrar', 'Borrar']
-  ];
+  /*  Las herramientas se parten en dos: las que se usan a cada rato y el
+      resto. Diecinueve botones a la vez son una caja de herramientas de
+      taller, no una pizarra que se abre a pie de campo con una mano.  */
+  var BASE = [['mover', 'Mover'], ['jugador', 'Jugador'], ['rival', 'Rival'],
+              ['balon', 'Balón'], ['cono', 'Cono']];
+  var EXTRA = [['portero', 'Portero'], ['neutro', 'Comodín'], ['pica', 'Pica'],
+               ['miniporteria', 'Portería'], ['aro', 'Aro'], ['texto', 'Texto']];
+  var TRAZOS_BASE = ['pase', 'conduccion', 'desmarque'];
+  var TRAZOS_EXTRA = ['tiro'];
 
   function muestraElemento(clave) {
     if (clave === 'mover') return '<i data-ico="move" class="pf-ico--sm"></i>';
     if (clave === 'borrar') return '<i data-ico="trash-2" class="pf-ico--sm"></i>';
     var meta = pz.TIPOS[clave] || {};
     if (clave === 'cono') {
-      return '<svg width="17" height="17" viewBox="0 0 17 17">' +
+      return '<svg width="16" height="16" viewBox="0 0 17 17">' +
              '<polygon points="8.5,2 15,15 2,15" fill="' + meta.color + '"/></svg>';
     }
     if (clave === 'miniporteria') {
-      return '<svg width="17" height="17" viewBox="0 0 17 17"><path d="M3 12V5h11v7" ' +
+      return '<svg width="16" height="16" viewBox="0 0 17 17"><path d="M3 12V5h11v7" ' +
              'fill="none" stroke="#94a3b8" stroke-width="2.4"/></svg>';
     }
     if (clave === 'aro') {
-      return '<svg width="17" height="17" viewBox="0 0 17 17"><ellipse cx="8.5" cy="8.5" rx="6.5" ' +
+      return '<svg width="16" height="16" viewBox="0 0 17 17"><ellipse cx="8.5" cy="8.5" rx="6.5" ' +
              'ry="4" fill="none" stroke="' + meta.color + '" stroke-width="2.2"/></svg>';
     }
     if (clave === 'pica') {
-      return '<svg width="17" height="17" viewBox="0 0 17 17"><rect x="7.2" y="2" width="2.6" ' +
+      return '<svg width="16" height="16" viewBox="0 0 17 17"><rect x="7.2" y="2" width="2.6" ' +
              'height="13" rx="1" fill="' + meta.color + '"/></svg>';
     }
-    if (clave === 'texto') {
-      return '<i data-ico="type" class="pf-ico--sm"></i>';
-    }
+    if (clave === 'texto') return '<i data-ico="type" class="pf-ico--sm"></i>';
     return '<span class="pz-tool__p" style="background:' + meta.color +
            ';border:2px solid rgba(255,255,255,.9)"></span>';
   }
 
-  //  La muestra del trazo lleva su forma real: punteado para el pase, zigzag
-  //  para la conducción. Con un icono genérico habría que leer la etiqueta.
+  //  La muestra del trazo lleva su forma real: punteado el pase, zigzag la
+  //  conducción. Con un icono genérico habría que leer la etiqueta cada vez.
   function muestraTrazo(clave) {
     var m = pz.TRAZOS[clave];
-    var d = clave === 'conduccion'
-      ? 'M2 9 L6 5 L10 13 L14 9'
-      : 'M2 9 H15';
-    return '<svg width="19" height="17" viewBox="0 0 19 17">' +
-           '<path d="' + d + '" fill="none" stroke="' + (m.color === '#ffffff' ? '#334155' : m.color) +
-           '" stroke-width="' + (m.ancho > 3 ? 3.4 : 2.2) + '"' +
-           (m.guion ? ' stroke-dasharray="4 3"' : '') + '/>' +
-           '<polygon points="15,5 19,9 15,13" fill="' +
-           (m.color === '#ffffff' ? '#334155' : m.color) + '"/></svg>';
+    var color = m.color === '#ffffff' ? '#334155' : m.color;
+    var d = clave === 'conduccion' ? 'M2 9 L6 5 L10 13 L14 9' : 'M2 9 H15';
+    return '<svg width="18" height="16" viewBox="0 0 19 17">' +
+           '<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="' +
+           (m.ancho > 3 ? 3.4 : 2.2) + '"' + (m.guion ? ' stroke-dasharray="4 3"' : '') + '/>' +
+           '<polygon points="15,5 19,9 15,13" fill="' + color + '"/></svg>';
+  }
+
+  function boton(contenido, etiqueta, activo, alPulsar) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'pz-tool' + (activo ? ' on' : '');
+    b.innerHTML = contenido + '<span>' + etiqueta + '</span>';
+    b.addEventListener('click', alPulsar);
+    return b;
   }
 
   function pintarHerramientas() {
-    var f1 = document.getElementById('pz-fila-elementos');
-    var f2 = document.getElementById('pz-fila-trazos');
-    f1.innerHTML = ''; f2.innerHTML = '';
+    var base = document.getElementById('pz-fila-base');
+    var extra = document.getElementById('pz-fila-extra');
+    base.innerHTML = ''; extra.innerHTML = '';
 
-    ELEMENTOS.forEach(function (par) {
-      var b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'pz-tool' + (pz.herramienta === par[0] ? ' on' : '');
-      b.dataset.tool = par[0];
-      b.innerHTML = muestraElemento(par[0]) + '<span>' + par[1] + '</span>';
-      b.addEventListener('click', function () { elegirHerramienta(par[0]); });
-      f1.appendChild(b);
+    BASE.forEach(function (p) {
+      base.appendChild(boton(muestraElemento(p[0]), p[1], pz.herramienta === p[0],
+                             function () { elegir(p[0]); }));
     });
-
-    Object.keys(pz.TRAZOS).forEach(function (clave) {
-      var b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'pz-tool' +
-        (pz.herramienta === 'trazo' && pz.trazoActual === clave ? ' on' : '');
-      b.innerHTML = muestraTrazo(clave) + '<span>' + pz.TRAZOS[clave].etiqueta + '</span>';
-      b.addEventListener('click', function () {
-        pz.trazoActual = clave;
-        elegirHerramienta('trazo');
-      });
-      f2.appendChild(b);
+    TRAZOS_BASE.forEach(function (k) {
+      base.appendChild(boton(muestraTrazo(k), pz.TRAZOS[k].etiqueta,
+                             pz.herramienta === 'trazo' && pz.trazoActual === k,
+                             function () { pz.trazoActual = k; elegir('trazo'); }));
     });
+    base.appendChild(boton(muestraElemento('borrar'), 'Borrar', pz.herramienta === 'borrar',
+                           function () { elegir('borrar'); }));
+    base.appendChild(boton('<i data-ico="refresh-cw" class="pf-ico--sm"></i>', 'Deshacer', false,
+                           function () {
+                             if (!pz.deshacer()) { PF.toast('No hay nada que deshacer'); }
+                             pintarMomentos(); pintarCanchas();
+                           }));
+    base.appendChild(boton('<i data-ico="more-horizontal" class="pf-ico--sm"></i>', 'Más',
+                           !extra.hidden, function () {
+                             extra.hidden = !extra.hidden;
+                             pintarHerramientas();
+                             //  La fila extra cambia el alto de la barra, así
+                             //  que el campo tiene que volver a medirse.
+                             pz.redimensionar();
+                           }));
 
-    var sep = document.createElement('span');
-    sep.className = 'pz-tool__sep';
-    f2.appendChild(sep);
-
-    [['Deshacer', 'refresh-cw', function () {
-        if (!pz.deshacer()) PF.toast('No hay nada que deshacer');
-        pintarMomentos();
-      }],
-     ['Sin flechas', 'x', function () { pz.borrarTrazos(); }],
-     ['Vaciar', 'trash-2', function () {
-        if (confirm('¿Vaciar el campo entero?')) { pz.limpiar(); pintarMomentos(); }
-      }]
-    ].forEach(function (a) {
-      var b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'pz-tool';
-      b.innerHTML = '<i data-ico="' + a[1] + '" class="pf-ico--sm"></i><span>' + a[0] + '</span>';
-      b.addEventListener('click', a[2]);
-      f2.appendChild(b);
+    EXTRA.forEach(function (p) {
+      extra.appendChild(boton(muestraElemento(p[0]), p[1], pz.herramienta === p[0],
+                              function () { elegir(p[0]); }));
     });
+    TRAZOS_EXTRA.forEach(function (k) {
+      extra.appendChild(boton(muestraTrazo(k), pz.TRAZOS[k].etiqueta,
+                              pz.herramienta === 'trazo' && pz.trazoActual === k,
+                              function () { pz.trazoActual = k; elegir('trazo'); }));
+    });
+    extra.appendChild(boton('<i data-ico="x" class="pf-ico--sm"></i>', 'Sin flechas', false,
+                            function () { pz.borrarTrazos(); }));
+    extra.appendChild(boton('<i data-ico="trash-2" class="pf-ico--sm"></i>', 'Vaciar', false,
+                            function () {
+                              if (confirm('¿Vaciar el campo entero?')) {
+                                pz.limpiar(); pintarMomentos();
+                              }
+                            }));
 
-    if (window.PF && PF.icons) PF.icons(document.querySelector('.pz-tools'));
+    if (window.PF && PF.icons) { PF.icons(document.querySelector('.pz-tools')); }
   }
 
-  function elegirHerramienta(h) {
+  function elegir(h) {
     pz.herramienta = h;
+    //  Si la herramienta elegida está en la fila de «Más», esa fila se queda
+    //  abierta: cerrarla dejaría al entrenador sin ver con qué está pintando.
     pintarHerramientas();
   }
 
-  // ── Espacio ─────────────────────────────────────────────────────────────
+  // ── Espacio y ejercicios ────────────────────────────────────────────────
   function pintarCanchas() {
     var caja = document.getElementById('pz-canchas');
     caja.innerHTML = '';
@@ -300,15 +316,9 @@
       b.type = 'button';
       b.className = 'pz-chip' + (pz.estado.cancha === clave ? ' on' : '');
       b.textContent = pz.CANCHAS[clave].etiqueta;
-      b.addEventListener('click', function () {
-        pz.cambiarCancha(clave);
-        pintarCanchas();
-        document.getElementById('pz-espacio-etq').textContent = pz.CANCHAS[clave].etiqueta;
-      });
+      b.addEventListener('click', function () { pz.cambiarCancha(clave); pintarCanchas(); });
       caja.appendChild(b);
     });
-    document.getElementById('pz-espacio-etq').textContent =
-      (pz.CANCHAS[pz.estado.cancha] || {}).etiqueta || '';
   }
 
   document.getElementById('pz-poner-formacion').addEventListener('click', function () {
@@ -317,7 +327,6 @@
     PF.toast('Equipo colocado');
   });
 
-  // ── Ejercicios ──────────────────────────────────────────────────────────
   function pintarEjercicios() {
     var caja = document.getElementById('pz-ejercicios');
     caja.innerHTML = '';
@@ -328,16 +337,15 @@
       b.textContent = ej.nombre;
       b.addEventListener('click', function () {
         if (pz.estado.elementos.length &&
-            !confirm('Esto reemplaza lo que hay en el campo. ¿Seguir?')) return;
+            !confirm('Esto reemplaza lo que hay en el campo. ¿Seguir?')) { return; }
         var puesto = pz.cargarEjercicio(ej.clave);
-        pintarCanchas();
-        pintarMomentos();
+        pintarCanchas(); pintarMomentos();
         document.getElementById('pz-ejercicio-nota').textContent = puesto.nota;
         var nombre = document.getElementById('pz-nombre');
         if (!nombre.value.trim()) { nombre.value = puesto.nombre; }
-        var carpeta = document.getElementById('pz-carpeta');
-        carpeta.value = puesto.clave.indexOf('rondo') === 0 ? 'Rondo'
-                      : (puesto.clave.indexOf('rueda') === 0 ? 'Pases' : 'Jugada');
+        document.getElementById('pz-carpeta').value =
+          puesto.clave.indexOf('rondo') === 0 ? 'Rondo'
+          : (puesto.clave.indexOf('rueda') === 0 ? 'Pases' : 'Jugada');
         PF.toast(puesto.nombre + ' montado');
       });
       caja.appendChild(b);
@@ -348,7 +356,14 @@
   function pintarMomentos() {
     var caja = document.getElementById('pz-momentos');
     caja.innerHTML = '';
-    (pz.estado.momentos || []).forEach(function (_, i) {
+    var ms = pz.estado.momentos || [];
+    if (!ms.length) {
+      var v = document.createElement('span');
+      v.className = 'pz-momentos__vacio';
+      v.textContent = 'Sin momentos todavía';
+      caja.appendChild(v);
+    }
+    ms.forEach(function (_, i) {
       var b = document.createElement('button');
       b.type = 'button';
       b.className = 'pz-momento';
@@ -372,8 +387,7 @@
       });
       caja.appendChild(b);
     });
-    document.getElementById('pz-n-momentos').textContent = (pz.estado.momentos || []).length;
-    document.getElementById('pz-reproducir').disabled = (pz.estado.momentos || []).length < 2;
+    document.getElementById('pz-reproducir').disabled = ms.length < 2;
   }
 
   document.getElementById('pz-capturar').addEventListener('click', function () {
@@ -387,9 +401,9 @@
     var antes = boton.innerHTML;
     if (pz.reproducir(function () {
       boton.innerHTML = antes;
-      if (window.PF && PF.icons) PF.icons();
+      if (window.PF && PF.icons) { PF.icons(boton); }
     })) {
-      boton.innerHTML = 'Reproduciendo…';
+      boton.innerHTML = '…';
     }
   });
 
@@ -417,6 +431,10 @@
   pintarCanchas();
   pintarEjercicios();
   pintarMomentos();
+  //  Ahora que la barra y la fila de animación ya están pintadas y tienen su
+  //  alto de verdad, se vuelve a medir el campo. La primera vez se calculó con
+  //  la barra todavía vacía, y salía un campo más alto de lo que cabe.
+  pz.redimensionar();
 })();
 </script>
 {% endblock %}
