@@ -448,7 +448,14 @@
       var an = ctx.measureText(txt).width + 14;
       ctx.fillStyle = 'rgba(17,24,39,.82)';
       ctx.beginPath();
-      ctx.roundRect(x - an / 2, y - 11, an, 22, 6);
+      //  `roundRect` es de Safari 16 en adelante. En uno anterior lanza, y
+      //  como esto corre dentro del bucle de pintado, un throw aquí deja el
+      //  campo entero en blanco. La esquina cuadrada se nota mucho menos.
+      if (ctx.roundRect) {
+        ctx.roundRect(x - an / 2, y - 11, an, 22, 6);
+      } else {
+        ctx.rect(x - an / 2, y - 11, an, 22);
+      }
       ctx.fill();
       ctx.fillStyle = '#fff';
       ctx.textAlign = 'center';
@@ -588,7 +595,17 @@
 
       if (h === 'mover') {
         var e = self._elementoEn(p);
-        if (e) { self.guardarHistorial(); self.arrastrando = e; }
+        if (e) {
+          self.guardarHistorial();
+          self.arrastrando = e;
+          //  Pulsación larga sobre una ficha: cambiarle el dorsal o el texto.
+          //  Sin esto los números eran los que salieran y un rótulo no se
+          //  podía corregir nunca. En el móvil no hay doble clic ni menú.
+          self._pulsacion = setTimeout(function () {
+            self.arrastrando = null;
+            self.renombrar(e);
+          }, 620);
+        }
         return;
       }
       if (h === 'borrar') {
@@ -614,7 +631,16 @@
       }
       //  Cualquier otra herramienta es un elemento que se pone donde se toca.
       self.guardarHistorial();
-      self.estado.elementos.push(elemento(h, p.x, p.y, self._siguienteNumero(h)));
+      var puesto = elemento(h, p.x, p.y, self._siguienteNumero(h));
+      //  Un rótulo sin texto es un rectángulo que pone «Texto» y no hay forma
+      //  de cambiarlo: se pregunta al ponerlo. Si no escribe nada, no se pone
+      //  —mejor eso que dejarle basura en el campo.
+      if (h === 'texto') {
+        var escrito = (global.prompt('¿Qué pone el rótulo?', '') || '').trim();
+        if (!escrito) { self.historial.pop(); return; }
+        puesto.n = escrito.slice(0, 24);
+      }
+      self.estado.elementos.push(puesto);
       self.pintar();
       if (self.op.alPoner) self.op.alPoner(h);
     }
@@ -624,6 +650,13 @@
       if (self.arrastrando) {
         ev.preventDefault();
         var p = self._pos(ev);
+        //  Si el dedo se movió, ya no es una pulsación larga: es un arrastre.
+        if (self._pulsacion &&
+            Math.hypot((p.x - self.arrastrando.x) * self.W,
+                       (p.y - self.arrastrando.y) * self.H) > 7) {
+          clearTimeout(self._pulsacion);
+          self._pulsacion = null;
+        }
         self.arrastrando.x = Math.max(0.02, Math.min(0.98, p.x));
         self.arrastrando.y = Math.max(0.02, Math.min(0.98, p.y));
         self.pintar();
@@ -637,6 +670,7 @@
     }
 
     function arriba() {
+      if (self._pulsacion) { clearTimeout(self._pulsacion); self._pulsacion = null; }
       if (self.dibujando) {
         var t = self.dibujando;
         self.dibujando = null;
@@ -658,6 +692,22 @@
     global.addEventListener('resize', function () { self.redimensionar(); });
   };
 
+  /*  Cambiarle el dorsal a una ficha o el texto a un rótulo. Es un `prompt`
+      y no una ventana propia a posta: en el campo, con una mano y el sol de
+      frente, el teclado del sistema es lo más rápido que hay.  */
+  Pizarra.prototype.renombrar = function (e) {
+    var esRotulo = e.tipo === 'texto';
+    var actual = (e.n === undefined || e.n === null) ? '' : String(e.n);
+    var puesto = global.prompt(
+      esRotulo ? '¿Qué pone el rótulo?' : 'Dorsal o inicial de la ficha:', actual);
+    if (puesto === null) return;
+    this.guardarHistorial();
+    e.n = puesto.trim().slice(0, esRotulo ? 24 : 3);
+    this.pintar();
+    if (this.op.alRenombrar) this.op.alRenombrar(e);
+  };
+
+
   Pizarra.prototype._trazoCercaDe = function (p) {
     var mejor = null, mejorD = 0.05;
     this.estado.trazos.forEach(function (t) {
@@ -673,8 +723,16 @@
 
   Pizarra.prototype._siguienteNumero = function (tipo) {
     if (['jugador', 'rival', 'neutro', 'portero'].indexOf(tipo) < 0) return '';
-    var usados = this.estado.elementos.filter(function (e) { return e.tipo === tipo; }).length;
-    return usados + 1;
+    //  El siguiente al MAYOR, no «cuántos hay». Contando, al borrar al 2 y
+    //  añadir otro salía un segundo 3: dos fichas con el mismo dorsal en el
+    //  campo, que es justo lo que una pizarra no puede permitirse.
+    var alto = 0;
+    this.estado.elementos.forEach(function (e) {
+      if (e.tipo !== tipo) return;
+      var n = parseInt(e.n, 10);
+      if (!isNaN(n) && n > alto) alto = n;
+    });
+    return alto + 1;
   };
 
   // ── Acciones ──────────────────────────────────────────────────────────────
