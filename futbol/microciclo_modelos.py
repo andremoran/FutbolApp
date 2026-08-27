@@ -744,11 +744,19 @@ def semi_revisar(dias):
                                  'siete días de la semana no los controlas tú.')})
 
     #  El exceso de sesiones: el error de entusiasmo del entrenador nuevo.
-    if len(escritos) >= 6:
+    #
+    #  Se cuentan SESIONES, no días escritos. Este modelo pide expresamente
+    #  escribir el día de descanso —«dale tarea, no entrenamiento»— y el del
+    #  partido, así que contando días con texto, un entrenador que hace justo
+    #  lo que el modelo le dice sale con «has escrito 7 sesiones». Se le
+    #  regañaba por haberlo hecho bien. El modelo de colegio ya contaba así.
+    sesiones = [d for d in escritos
+                if d.get('carga') not in ('descanso', 'partido')]
+    if len(sesiones) >= 6:
         avisos.append({'nivel': 'aviso', 'principio': 1,
                        'texto': ('Has escrito %d sesiones. En semipro eso no es un plan '
                                  'ambicioso: es una lista de a quién vas a perder primero.'
-                                 % len(escritos))})
+                                 % len(sesiones))})
 
     return avisos
 
