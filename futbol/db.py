@@ -454,8 +454,12 @@ def jugadas_de_eventos(event_ids):
     """
     if not event_ids:
         return {}
+    #  Se desempata por `creado`: si dos filas comparten `orden` —las que
+    #  quedaron de antes de arreglarlo— el orden lo decidiría la base y la
+    #  lista se recolocaría sola entre una visita y la siguiente.
     enlaces = q(lambda: _sb.table('fut_event_plays').select('*')
-                .in_('event_id', list(event_ids)).order('orden').execute().data or [],
+                .in_('event_id', list(event_ids))
+                .order('orden').order('creado').execute().data or [],
                 [], 'jugadas de eventos')
     if not enlaces:
         return {}

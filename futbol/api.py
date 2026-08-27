@@ -728,9 +728,15 @@ def api_evento_jugada(eid):
     if any(str(x.get('play_id')) == jid for x in ya):
         return jsonify({'error': 'Esa jugada ya está en esta sesión.'}), 400
 
+    #  El siguiente al MAYOR, no «cuántas hay». Contando, al quitar la de en
+    #  medio de tres y añadir otra salían dos con el orden 2, y entonces cuál
+    #  va antes lo decidía la base: la sesión se recolocaba sola entre una
+    #  visita y la siguiente. En un entrenamiento el orden es media
+    #  planificación —el calentamiento no va después del partidillo—.
+    alto = max([x.get('orden') or 0 for x in ya] or [-1])
     fila = db.insert('fut_event_plays', {
         'coach_id': uid, 'event_id': eid, 'play_id': jid,
-        'orden': len(ya),
+        'orden': alto + 1,
         'nota': (d.get('nota') or '').strip()[:200],
         'creado': ahora(),
     }, 'colgar jugada', obligatorio=True)

@@ -109,7 +109,11 @@
     this.reproduciendo = false;
     this.arrastrando = null;
     this.dibujando = null;
-    this._atar();
+    //  En solo lectura NO se atan los eventos. Es la pantalla del jugador: no
+    //  puede mover a nadie ni por accidente ni a propósito, y sin listeners no
+    //  hay forma de que ocurra — mejor que confiar en esconder los botones.
+    if (!this.op.soloLectura) { this._atar(); }
+    else { global.addEventListener('resize', this.redimensionar.bind(this)); }
   }
 
   Pizarra.prototype.TIPOS = TIPOS;
