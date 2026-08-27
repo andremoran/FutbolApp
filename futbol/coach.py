@@ -932,6 +932,53 @@ def c_agenda():
 
 
 # ═══════════════════════ 4. TÁCTICA ═══════════════════════
+#  Colores de la miniatura. Son los mismos que pinta static/pizarra.js: una
+#  jugada tiene que reconocerse en la lista por los mismos colores con los que
+#  se dibujó.
+_MINI_COLOR = {'jugador': '#ecfdf5', 'portero': '#ede9fe', 'rival': '#ef4444',
+               'neutro': '#f59e0b', 'balon': '#ffffff', 'cono': '#f97316'}
+_MINI_ALTO = {'completa': 140, 'media': 95, 'tercio': 72, 'rondo': 100, 'vacia': 100}
+
+
+def _mini_jugada(datos):
+    """Los puntos de la miniatura de una jugada, venga del modelo que venga.
+
+    Las jugadas guardadas antes de la pizarra nueva tienen `jugadores` y
+    `rivales` sueltos; las de ahora, `elementos` con su tipo. Se traducen las
+    dos a lo mismo — si no, la mitad de la biblioteca saldría en blanco.
+    """
+    alto = _MINI_ALTO.get(datos.get('cancha') or 'completa', 140)
+    puntos, trazos = [], []
+
+    if datos.get('elementos'):
+        for e in datos['elementos']:
+            color = _MINI_COLOR.get(e.get('tipo'))
+            if not color or e.get('x') is None:
+                continue
+            puntos.append({'x': round(e['x'] * 100, 1), 'y': round(e['y'] * alto, 1),
+                           'color': color,
+                           'r': 2.2 if e.get('tipo') in ('balon', 'cono') else 3.4})
+        for t in (datos.get('trazos') or [])[:8]:
+            trazos.append({'x1': round(t['x1'] * 100, 1), 'y1': round(t['y1'] * alto, 1),
+                           'x2': round(t['x2'] * 100, 1), 'y2': round(t['y2'] * alto, 1)})
+    else:
+        for p in (datos.get('jugadores') or []):
+            puntos.append({'x': round((p.get('x') or 0) * 100, 1),
+                           'y': round((p.get('y') or 0) * alto, 1),
+                           'color': '#ecfdf5', 'r': 3.4})
+        for p in (datos.get('rivales') or []):
+            puntos.append({'x': round((p.get('x') or 0) * 100, 1),
+                           'y': round((p.get('y') or 0) * alto, 1),
+                           'color': '#ef4444', 'r': 3})
+        for t in (datos.get('flechas') or [])[:8]:
+            trazos.append({'x1': round(t['x1'] * 100, 1), 'y1': round(t['y1'] * alto, 1),
+                           'x2': round(t['x2'] * 100, 1), 'y2': round(t['y2'] * alto, 1)})
+
+    return {'_mini': puntos, '_mini_trazos': trazos, '_mini_alto': alto,
+            '_cancha': datos.get('cancha') or 'completa',
+            '_momentos': len(datos.get('momentos') or [])}
+
+
 @bp.route('/coach/tactica')
 @solo_entrenador
 @roles.solo_pro('tactica')
@@ -940,8 +987,17 @@ def c_tactica():
                       _order='creado', _desc=True)
     for j in jugadas:
         j['_fecha'] = db.parse_fecha(j.get('creado'))
+        j.update(_mini_jugada(j.get('datos') or {}))
+
+    #  Las carpetas que se usan de verdad, en el orden de siempre y sin las
+    #  vacías: un filtro con cuatro pestañas que no llevan a nada es peor que
+    #  no tener filtro.
+    usadas = {(j.get('carpeta') or 'Jugada') for j in jugadas}
+    carpetas = [c for c in ('Jugada', 'Rondo', 'Pases', 'ABP', 'Calentamiento')
+                if c in usadas]
+
     return render_template('c_tactica.html',
-                           tab_activa='tactica', jugadas=jugadas)
+                           tab_activa='tactica', jugadas=jugadas, carpetas=carpetas)
 
 
 @bp.route('/coach/tactica/pizarra')

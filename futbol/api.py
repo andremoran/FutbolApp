@@ -676,9 +676,15 @@ def api_jugada_guardar():
     d = body()
     nombre = (d.get('nombre') or '').strip() or 'Jugada sin nombre'
     uid = db.equipo_id(current_user.id)
+    #  La carpeta es lo que separa un rondo de una jugada de ABP en la lista.
+    #  Estaba en la tabla desde el principio y no se guardaba: todas las
+    #  jugadas salian juntas y sin manera de filtrarlas.
+    CARPETAS = ('Jugada', 'Rondo', 'Pases', 'ABP', 'Calentamiento')
+    carpeta = (d.get('carpeta') or '').strip()
     datos = {
         'nombre': nombre[:80],
         'formacion': (d.get('formacion') or '')[:20],
+        'carpeta': carpeta if carpeta in CARPETAS else 'Jugada',
         'datos': d.get('datos') or {},
     }
     jid = d.get('id')

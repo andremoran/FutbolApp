@@ -1,14 +1,17 @@
 {% extends '_shell.html' %}
 {% block title %}Táctica · ProFoot{% endblock %}
 
-{# screens/TacticalPlaysLibraryScreen.tsx: biblioteca de jugadas guardadas.
-   Cada tarjeta muestra una miniatura de la cancha con las posiciones reales. #}
+{# screens/TacticalPlaysLibraryScreen.tsx: la biblioteca de lo guardado.
+
+   Cada tarjeta lleva una miniatura con las posiciones reales. Los puntos los
+   arma la vista (`coach._mini_jugada`), no la plantilla: hay que mirar el tipo
+   de cada elemento para darle color, y eso en Jinja no se lee ni compila. #}
 
 {% block hero_label %}<div class="pf-hero__label">Biblioteca</div>{% endblock %}
 {% block hero_title %}Táctica{% endblock %}
 {% block hero_subtitle %}
 <div class="pf-hero__subtitle">
-  {{ jugadas|length }} jugada{{ '' if jugadas|length == 1 else 's' }} guardada{{ '' if jugadas|length == 1 else 's' }}
+  {{ jugadas|length }} guardada{{ '' if jugadas|length == 1 else 's' }}
 </div>
 {% endblock %}
 {% block hero_actions %}
@@ -19,7 +22,15 @@
 
 {% block head %}
 <style>
-  .tc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 16px; }
+  .tc-filtros { display: flex; gap: 6px; overflow-x: auto; padding: 14px 16px 0;
+                scrollbar-width: none; }
+  .tc-filtros::-webkit-scrollbar { display: none; }
+  .tc-filtro { flex: none; padding: 7px 13px; border-radius: 100px; font-size: 12.5px;
+               font-weight: 700; background: var(--border-soft); color: var(--text-sec);
+               border: none; cursor: pointer; }
+  .tc-filtro.on { background: var(--primary); color: #fff; }
+
+  .tc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 14px 16px 0; }
   .tc-card {
     background: #fff; border: 1px solid var(--border-soft); border-radius: var(--r-xl);
     overflow: hidden; box-shadow: var(--sh-sm); transition: transform .12s;
@@ -29,6 +40,9 @@
   .tc-body { padding: 11px 12px; }
   .tc-t { font-size: 14px; font-weight: 700; }
   .tc-s { font-size: 11px; color: var(--text-sec); margin-top: 2px; }
+  .tc-tag { display: inline-block; font-size: 9.5px; font-weight: 800; letter-spacing: .3px;
+            text-transform: uppercase; padding: 2px 7px; border-radius: 100px;
+            background: var(--primary-soft); color: var(--primary); margin-bottom: 5px; }
 </style>
 {% endblock %}
 
@@ -36,55 +50,99 @@
 
 <div style="padding:16px 16px 0">
   <a class="pf-btn pf-btn--primary pf-btn--block" href="{{ url_for('futbol.c_pizarra') }}">
-    <i data-ico="plus" class="pf-ico--sm"></i> Nueva jugada
+    <i data-ico="plus" class="pf-ico--sm"></i> Nueva jugada, rondo o rueda
   </a>
 </div>
 
 {% if jugadas %}
-<div class="tc-grid">
+{% if carpetas|length > 1 %}
+<div class="tc-filtros" id="tc-filtros">
+  <button class="tc-filtro on" type="button" data-f="">Todo</button>
+  {% for c in carpetas %}
+  <button class="tc-filtro" type="button" data-f="{{ c }}">{{ c }}</button>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="tc-grid" id="tc-grid">
   {% for j in jugadas %}
-  <a class="tc-card" href="{{ url_for('futbol.c_pizarra', jid=j.id) }}">
-    {# Miniatura: la cancha con los puntos donde están los jugadores #}
-    <svg class="tc-mini" viewBox="0 0 100 140" preserveAspectRatio="xMidYMid meet">
-      <rect x="0" y="0" width="100" height="140" fill="#15803d"/>
-      <rect x="3" y="3" width="94" height="134" fill="none" stroke="rgba(255,255,255,.6)" stroke-width="1"/>
-      <line x1="3" y1="70" x2="97" y2="70" stroke="rgba(255,255,255,.6)" stroke-width="1"/>
-      <circle cx="50" cy="70" r="12" fill="none" stroke="rgba(255,255,255,.6)" stroke-width="1"/>
-      <rect x="22" y="3" width="56" height="18" fill="none" stroke="rgba(255,255,255,.45)" stroke-width=".8"/>
-      <rect x="22" y="119" width="56" height="18" fill="none" stroke="rgba(255,255,255,.45)" stroke-width=".8"/>
-      {% if j.datos and j.datos.jugadores %}
-        {% for p in j.datos.jugadores %}
-        <circle cx="{{ (p.x * 100)|round(1) }}" cy="{{ (p.y * 140)|round(1) }}" r="3.6"
-                fill="#ecfdf5" stroke="#047857" stroke-width="1"/>
-        {% endfor %}
+  <a class="tc-card" data-carpeta="{{ j.carpeta or 'Jugada' }}"
+     href="{{ url_for('futbol.c_pizarra', jid=j.id) }}">
+    <svg class="tc-mini" viewBox="0 0 100 {{ j._mini_alto }}" preserveAspectRatio="xMidYMid meet">
+      <rect x="0" y="0" width="100" height="{{ j._mini_alto }}" fill="#15803d"/>
+      {% if j._cancha == 'rondo' %}
+        <rect x="4" y="4" width="92" height="{{ j._mini_alto - 8 }}" fill="none"
+              stroke="rgba(255,255,255,.6)" stroke-width="1"/>
+      {% elif j._cancha != 'vacia' %}
+        <rect x="3" y="3" width="94" height="{{ j._mini_alto - 6 }}" fill="none"
+              stroke="rgba(255,255,255,.6)" stroke-width="1"/>
+        <rect x="22" y="3" width="56" height="16" fill="none"
+              stroke="rgba(255,255,255,.45)" stroke-width=".8"/>
+        {% if j._cancha == 'completa' %}
+        <line x1="3" y1="{{ j._mini_alto / 2 }}" x2="97" y2="{{ j._mini_alto / 2 }}"
+              stroke="rgba(255,255,255,.6)" stroke-width="1"/>
+        <circle cx="50" cy="{{ j._mini_alto / 2 }}" r="12" fill="none"
+                stroke="rgba(255,255,255,.6)" stroke-width="1"/>
+        <rect x="22" y="{{ j._mini_alto - 19 }}" width="56" height="16" fill="none"
+              stroke="rgba(255,255,255,.45)" stroke-width=".8"/>
+        {% endif %}
       {% endif %}
-      {% if j.datos and j.datos.rivales %}
-        {% for p in j.datos.rivales %}
-        <circle cx="{{ (p.x * 100)|round(1) }}" cy="{{ (p.y * 140)|round(1) }}" r="3"
-                fill="#ef4444" opacity=".85"/>
-        {% endfor %}
-      {% endif %}
+
+      {% for t in j._mini_trazos %}
+      <line x1="{{ t.x1 }}" y1="{{ t.y1 }}" x2="{{ t.x2 }}" y2="{{ t.y2 }}"
+            stroke="rgba(255,255,255,.75)" stroke-width="1" stroke-dasharray="3 2"/>
+      {% endfor %}
+      {% for p in j._mini %}
+      <circle cx="{{ p.x }}" cy="{{ p.y }}" r="{{ p.r }}" fill="{{ p.color }}"
+              stroke="rgba(0,0,0,.25)" stroke-width=".6"/>
+      {% endfor %}
     </svg>
     <div class="tc-body">
+      <span class="tc-tag">{{ j.carpeta or 'Jugada' }}</span>
       <div class="tc-t pf-truncate">{{ j.nombre }}</div>
       <div class="tc-s">
-        {{ j.formacion or '—' }}
-        {%- if j.datos and j.datos.flechas %} · {{ j.datos.flechas|length }} mov.{% endif %}
+        {{ j.formacion or (j._mini|length ~ ' elementos') }}
+        {%- if j._momentos %} · {{ j._momentos }} momentos{% endif %}
       </div>
     </div>
   </a>
   {% endfor %}
 </div>
+<div style="height:20px"></div>
 
 {% else %}
 <div class="pf-empty">
   <div class="pf-empty__icon"><i data-ico="target" class="pf-ico--xxl"></i></div>
-  <h2 class="pf-empty__title">Sin jugadas todavía</h2>
+  <h2 class="pf-empty__title">Sin nada guardado todavía</h2>
   <p class="pf-empty__text">
-    Abre la pizarra, coloca a tus jugadores y dibuja los movimientos.
-    Cada jugada que guardes queda aquí para repasarla antes del partido.
+    Abre la pizarra y monta un rondo en dos toques, o coloca a tu equipo y
+    dibuja los movimientos. Lo que guardes queda aquí para repasarlo antes del
+    entrenamiento.
   </p>
 </div>
 {% endif %}
 
+{% endblock %}
+
+{% block scripts %}
+<script>
+  /*  El filtro es del navegador y no del servidor: son unas pocas tarjetas ya
+      pintadas y recargar la página entera para esconder la mitad sería pedirle
+      datos al móvil por nada.  */
+  (function () {
+    var filtros = document.getElementById('tc-filtros');
+    if (!filtros) { return; }
+    filtros.addEventListener('click', function (ev) {
+      var b = ev.target.closest('.tc-filtro');
+      if (!b) { return; }
+      filtros.querySelectorAll('.tc-filtro').forEach(function (o) {
+        o.classList.toggle('on', o === b);
+      });
+      var quiero = b.dataset.f;
+      document.querySelectorAll('#tc-grid .tc-card').forEach(function (c) {
+        c.hidden = !!quiero && c.dataset.carpeta !== quiero;
+      });
+    });
+  })();
+</script>
 {% endblock %}
