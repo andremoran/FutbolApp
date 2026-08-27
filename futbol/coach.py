@@ -603,6 +603,60 @@ def datos_de_progreso(uid, jugador, clave='30'):
     }
 
 
+@bp.route('/coach/jugador/<pid>/informe')
+@solo_entrenador
+def c_informe_jugador(pid):
+    """El informe del jugador en una hoja, lista para imprimir o guardar en PDF.
+
+    Come de `datos_de_progreso`, la misma función que pinta la pantalla: el
+    papel que el entrenador le enseña a un padre o manda a un club NO puede
+    decir otra cosa que la pantalla desde la que se generó.
+
+    El PDF lo hace el navegador. Montar uno en el servidor pedía WeasyPrint —
+    Cairo y Pango enteros— para reproducir lo que Chrome y Safari ya saben
+    hacer, y `requirements.txt` es corto a propósito.
+    """
+    uid = db.equipo_id(current_user.id)
+    jugador = next((x for x in db.plantilla_completa(uid) if str(x['id']) == str(pid)), None)
+    if not jugador:
+        abort(404)
+
+    clave = request.args.get('periodo', '30')
+    datos = datos_de_progreso(uid, jugador, clave)
+
+    analisis = db.one('fut_ia_analisis', 'analisis informe',
+                      periodo=clave, **datos['dueno']) or ultimo_analisis(datos['dueno'])
+    if analisis and not analisis.get('_creado'):
+        analisis['_creado'] = db.fecha_local(analisis.get('creado'))
+
+    #  Los datos de la ficha que no salen en la pantalla de progreso pero que un
+    #  informe con membrete sí necesita: de quién es este chico y de qué equipo.
+    perfil = {} if jugador['es_manual'] else (db.perfil_jugador(pid) or {})
+    manual = db.one('fut_manual_players', 'manual informe', id=pid) if jugador['es_manual'] else {}
+
+    return render_template(
+        'c_informe_jugador.html',
+        #  `jugador` NO se pasa aquí: ya viene dentro de `datos`, y repetirlo
+        #  hace que render_template reciba el mismo nombre dos veces.
+        equipo=db.equipo_del_entrenador(uid) or {},
+        entrenador=getattr(current_user, 'name', ''),
+        posicion=(manual or {}).get('posicion') or perfil.get('posicion') or '',
+        dorsal=(manual or {}).get('dorsal') or perfil.get('dorsal') or '',
+        #  `edad_de` recibe los campos, no la ficha entera. El manual guarda su
+        #  fecha en su propia fila; el registrado, en `usuarios`.
+        edad=db.edad_de(
+            fecha_nacimiento=(manual or {}).get('fecha_nacimiento')
+                             or perfil.get('fecha_nacimiento')
+                             or jugador.get('fecha_nacimiento'),
+            anio_nacimiento=(manual or {}).get('anio_nacimiento')
+                            or perfil.get('anio_nacimiento')
+                            or jugador.get('anio_nacimiento')),
+        analisis=analisis,
+        generado=date.today().strftime('%d/%m/%Y'),
+        periodos=PERIODOS,
+        **datos)
+
+
 def ultimo_analisis(dueno):
     """La ultima lectura que pidio la IA de este jugador, del periodo que sea.
 

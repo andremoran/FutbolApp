@@ -303,6 +303,13 @@
   {% endif %}
 </div>
 
+{# El informe en papel. Va aquí abajo y no arriba: primero se mira cómo va
+   el jugador, y solo después se decide si eso hay que enseñárselo a alguien. #}
+<a class="pf-btn pf-btn--ghost pf-btn--block pf-mt-12"
+   href="{{ url_for('futbol.c_informe_jugador', pid=jugador.id, periodo=periodo) }}">
+  <i data-ico="file-text" class="pf-ico--sm"></i> Informe en PDF
+</a>
+
 {# ══════════ LA LECTURA DE LA IA ══════════ #}
 {% with pid = jugador.id, periodo = periodo, analisis = analisis,
         pie = 'Analiza el periodo que tengas elegido: ' + etiqueta_periodo|lower + '.' %}

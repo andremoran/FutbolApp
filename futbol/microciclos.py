@@ -451,7 +451,11 @@ def api_microciclo_agendar(mid):
             'hora': (d.get('hora') or '')[:5] or None,
             'lugar': (d.get('lugar') or micro.get('lugar') or '')[:120],
             'descripcion': ('\n'.join(cuerpo))[:1200],
-            'duracion_min': int(d.get('duracion') or 0) or 90,
+            #  Por `_minutos` y no por `int()` a pelo: al guardar ya se sanea,
+            #  pero una fila escrita antes de que eso existiera —o a mano— tiene
+            #  la duración como texto, y aquí tumbaba el volcado entero con un
+            #  500. La misma función está dos pantallas más arriba.
+            'duracion_min': _minutos(d.get('duracion')) or 90,
             'intensidad': {'partido': 'muy_alta', 'alta': 'alta', 'media': 'media',
                            'baja': 'baja', 'descanso': 'baja'}.get(d.get('carga'), 'media'),
             'estado': 'programado',

@@ -221,6 +221,12 @@
 </div>
 {% endif %}
 
+{# ══════════ EL INFORME ══════════ #}
+<a class="pf-btn pf-btn--ghost pf-btn--block" style="margin-bottom:12px"
+   href="{{ url_for('futbol.c_informe_jugador', pid=jugador.id) }}">
+  <i data-ico="file-text" class="pf-ico--sm"></i> Informe en PDF con todas sus estadísticas
+</a>
+
 {# ══════════ REPORTE DE LA IA ══════════ #}
 {# Esta tarjeta llevaba desde el principio diciendo «pendiente de que se
    despliegue el servicio de IA»: la ruta pasaba `reporte=None` a pelo y no

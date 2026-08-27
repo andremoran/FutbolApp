@@ -1,0 +1,328 @@
+{# ============================================================================
+   c_informe_jugador.html — El informe del jugador, hecho para imprimir.
+
+   NO hereda de `_shell.html` a propósito. El armazón trae la cabecera hero, la
+   barra de pestañas y el botón flotante, y todo eso hay que esconderlo para
+   imprimir: sale más limpio partir de una hoja en blanco que tapar media app
+   con `display:none`.
+
+   El PDF lo hace el navegador («Imprimir → Guardar como PDF», y en el móvil
+   desde el botón de compartir). Sin librería: `requirements.txt` dice, y con
+   razón, que cada dependencia que no está ahí es una vulnerabilidad menos y un
+   minuto de build menos — y WeasyPrint arrastra Cairo y Pango enteros para
+   hacer lo que el navegador ya hace.
+   ============================================================================ #}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ jugador.nombre }} · Informe · ProFoot</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='profoot.css') }}">
+  <style>
+    /* ── La hoja ───────────────────────────────────────────────────────── */
+    @page { size: A4 portrait; margin: 14mm 12mm; }
+
+    body { background: #f1f5f9; margin: 0;
+           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+           color: var(--text); }
+    .hoja { max-width: 190mm; margin: 0 auto; background: #fff; padding: 16px 18px 26px; }
+
+    /* ── Barra de acciones: existe en pantalla, no en el papel ─────────── */
+    .barra { max-width: 190mm; margin: 0 auto; display: flex; gap: 8px;
+             align-items: center; padding: 12px 18px; }
+    .barra__t { flex: 1; font-size: 13px; color: var(--text-sec); }
+
+    /* ── Cabecera ──────────────────────────────────────────────────────── */
+    .cab { display: flex; align-items: flex-start; gap: 14px;
+           border-bottom: 3px solid var(--primary); padding-bottom: 12px; }
+    .cab__l { flex: 1; min-width: 0; }
+    .cab__club { font-size: 11px; font-weight: 800; letter-spacing: .6px;
+                 text-transform: uppercase; color: var(--primary); }
+    .cab__n { font-size: 26px; font-weight: 800; letter-spacing: -.6px;
+              line-height: 1.15; margin: 2px 0 0; }
+    .cab__d { font-size: 12.5px; color: var(--text-sec); margin: 3px 0 0; }
+    .cab__r { text-align: right; font-size: 11px; color: var(--text-muted);
+              line-height: 1.6; flex: none; }
+    .cab__ovr { font-size: 34px; font-weight: 800; color: var(--primary);
+                line-height: 1; letter-spacing: -1px; }
+
+    /* ── Secciones ─────────────────────────────────────────────────────── */
+    .sec { margin-top: 18px; break-inside: avoid; }
+    .sec__t { font-size: 12px; font-weight: 800; letter-spacing: .5px;
+              text-transform: uppercase; color: var(--text-sec);
+              border-bottom: 1px solid var(--border); padding-bottom: 5px;
+              margin: 0 0 10px; }
+
+    /*  Los 18 van a UNA columna por defecto y a dos cuando hay sitio. En A4
+        sobra ancho para una sola; en un teléfono de 375 px, dos columnas dejan
+        170 px por fila y «Trabajo en equipo» no cabe con su barra y su número.  */
+    .attr { column-gap: 22px; }
+    @media screen and (min-width: 620px) { .attr { columns: 2; } }
+    @media print { .attr { columns: 2; } }
+    .attr__fam { font-size: 10.5px; font-weight: 800; text-transform: uppercase;
+                 letter-spacing: .4px; color: var(--text-muted);
+                 margin: 0 0 4px; break-after: avoid; }
+    .attr__g { break-inside: avoid; margin-bottom: 10px; }
+    .fila { display: flex; align-items: center; gap: 7px; padding: 2.5px 0;
+            font-size: 11.5px; break-inside: avoid; }
+    .fila__n { flex: 1; min-width: 0; }
+    .fila__b { flex: none; width: 46px; height: 5px; border-radius: 99px;
+               background: var(--border-soft); overflow: hidden; }
+    .fila__b i { display: block; height: 100%; background: var(--primary); }
+    .fila__v { flex: none; width: 22px; text-align: right; font-weight: 800; }
+    .fila__d { flex: none; width: 30px; text-align: right; font-size: 10.5px;
+               font-weight: 800; }
+    .sube { color: #047857; } .baja { color: #b91c1c; } .igual { color: var(--text-muted); }
+
+    /* ── Tablas ────────────────────────────────────────────────────────── */
+    table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+    th { text-align: left; font-size: 10px; text-transform: uppercase;
+         letter-spacing: .4px; color: var(--text-muted); font-weight: 800;
+         padding: 0 6px 5px 0; border-bottom: 1px solid var(--border); }
+    td { padding: 5px 6px 5px 0; border-bottom: 1px solid var(--border-soft); }
+    td.num, th.num { text-align: right; }
+
+    /* ── Cifras ────────────────────────────────────────────────────────── */
+    .cifras { display: flex; gap: 8px; }
+    .cifra { flex: 1; border: 1px solid var(--border); border-radius: 8px;
+             padding: 8px 6px; text-align: center; }
+    .cifra__v { font-size: 19px; font-weight: 800; letter-spacing: -.4px; }
+    .cifra__e { font-size: 9.5px; text-transform: uppercase; letter-spacing: .3px;
+                color: var(--text-muted); margin-top: 1px; }
+
+    .ia__t { font-size: 12.5px; line-height: 1.6; margin: 0 0 8px; }
+    .ia__s { font-size: 11px; font-weight: 800; margin: 10px 0 3px; }
+    .ia__l { font-size: 11.5px; line-height: 1.55; margin: 0 0 2px; padding-left: 12px;
+             position: relative; }
+    .ia__l::before { content: '\2022'; position: absolute; left: 2px; color: var(--text-muted); }
+
+    .pie { margin-top: 22px; padding-top: 8px; border-top: 1px solid var(--border);
+           display: flex; justify-content: space-between; gap: 12px;
+           font-size: 10px; color: var(--text-muted); }
+    .vacio { font-size: 11.5px; color: var(--text-muted); font-style: italic; margin: 0; }
+    /*  La nota al pie de una sección. Antes reutilizaba `.pie`, que es flex y
+        lleva borde: funcionaba de casualidad y a base de estilos en línea.  */
+    .nota { font-size: 10px; color: var(--text-muted); margin: 6px 0 0; }
+
+    @media print {
+      body { background: #fff; }
+      .barra { display: none; }
+      .hoja { max-width: none; padding: 0; }
+      /*  Que el navegador imprima los fondos de color: si no, las barras de los
+          atributos y los avisos salen en blanco y el informe pierde la mitad
+          de lo que se entiende de un vistazo.  */
+      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="barra">
+  <a class="pf-btn pf-btn--ghost" href="{{ url_for('futbol.c_progreso_jugador', pid=jugador.id, periodo=periodo) }}">
+    <i data-ico="arrow-left" class="pf-ico--sm"></i> Volver
+  </a>
+  <span class="barra__t">Imprime esta hoja y elige «Guardar como PDF».</span>
+  <button class="pf-btn pf-btn--primary" type="button" onclick="window.print()">
+    <i data-ico="save" class="pf-ico--sm"></i> Descargar PDF
+  </button>
+</div>
+
+<div class="hoja">
+
+  {# ══════════ CABECERA ══════════ #}
+  <div class="cab">
+    <div class="cab__l">
+      <div class="cab__club">{{ equipo.nombre or 'ProFoot' }}</div>
+      <h1 class="cab__n">{{ jugador.nombre }}</h1>
+      <p class="cab__d">
+        {%- if posicion %}{{ posicion }}{% endif -%}
+        {%- if dorsal %} · Dorsal {{ dorsal }}{% endif -%}
+        {%- if edad %} · {{ edad }} años{% endif -%}
+        {%- if not posicion and not dorsal and not edad %}Jugador de la plantilla{% endif -%}
+      </p>
+    </div>
+    <div class="cab__r">
+      {% if resumen.overall is not none %}
+      <div class="cab__ovr">{{ resumen.overall }}</div>
+      <div>valoración global</div>
+      {% endif %}
+      <div style="margin-top:4px">{{ etiqueta_periodo }}</div>
+      <div>{{ generado }}</div>
+    </div>
+  </div>
+
+  {% if resumen.overall is none %}
+  <div class="sec">
+    <p class="vacio">
+      A este jugador todavía no se le ha hecho ninguna evaluación, así que el
+      informe no tiene datos que enseñar.
+    </p>
+  </div>
+  {% else %}
+
+  {# ══════════ LA EVOLUCIÓN ══════════ #}
+  <div class="sec">
+    <h2 class="sec__t">Cómo ha evolucionado · {{ etiqueta_periodo|lower }}</h2>
+    {% if grafica %}
+      {% with g = grafica %}{% include '_grafica_multi.html' %}{% endwith %}
+    {% else %}
+      <p class="vacio">
+        Con una sola evaluación no hay evolución que dibujar. La línea aparece a
+        partir de la segunda.
+      </p>
+    {% endif %}
+
+    <div class="cifras" style="margin-top:12px">
+      {% for f in familias %}
+      <div class="cifra">
+        <div class="cifra__v" style="color:{{ f.tono }}">
+          {{ f.media|round|int if f.media is not none else '–' }}
+        </div>
+        <div class="cifra__e">{{ f.titulo }}</div>
+        {% if f.delta is not none and f.delta != 0 %}
+        <div class="cifra__e {{ 'sube' if f.delta > 0 else 'baja' }}">
+          {{ '+' if f.delta > 0 }}{{ f.delta }}
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  {# ══════════ LOS 18 ATRIBUTOS ══════════ #}
+  <div class="sec">
+    <h2 class="sec__t">Perfil dinámico · los 18 atributos</h2>
+    <div class="attr">
+      {% for f in familias %}
+      {% set delfam = atributos | selectattr('familia', 'equalto', f.clave) | list %}
+      {% if delfam %}
+      <div class="attr__g">
+        <div class="attr__fam">{{ f.titulo }}</div>
+        {% for a in delfam %}
+        <div class="fila">
+          <span class="fila__n">{{ a.etiqueta }}</span>
+          <span class="fila__b"><i style="width:{{ a.hoy or 0 }}%;background:{{ f.tono }}"></i></span>
+          <span class="fila__v">{{ a.hoy if a.hoy is not none else '–' }}</span>
+          <span class="fila__d {{ 'sube' if a.delta and a.delta > 0 else ('baja' if a.delta and a.delta < 0 else 'igual') }}">
+            {%- if a.delta %}{{ '+' if a.delta > 0 }}{{ a.delta }}{% else %}—{% endif -%}
+          </span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+  {# ══════════ PRUEBAS FÍSICAS ══════════ #}
+  <div class="sec">
+    <h2 class="sec__t">Pruebas físicas</h2>
+    {% if tests %}
+    <table>
+      <thead>
+        <tr>
+          <th>Prueba</th><th class="num">Primera</th><th class="num">Última</th>
+          <th class="num">Cambio</th><th>Nivel</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in tests %}
+        <tr>
+          <td>{{ t.nombre }}{% if t.veces > 1 %} <span style="color:var(--text-muted)">({{ t.veces }} tomas)</span>{% endif %}</td>
+          <td class="num">{% if t.veces > 1 %}{{ t.primera }} {{ t.unidad }}{% else %}—{% endif %}</td>
+          <td class="num">{{ t.ultima }} {{ t.unidad }}</td>
+          <td class="num {{ 'sube' if t.mejora and t.mejora > 0 else ('baja' if t.mejora and t.mejora < 0 else 'igual') }}">
+            {%- if t.mejora %}{{ '+' if t.mejora > 0 }}{{ t.mejora }}{% else %}—{% endif -%}
+          </td>
+          <td>{{ t.nivel or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="nota">
+      En las pruebas de tiempo, bajar es mejorar: la columna «cambio» ya lo tiene en cuenta.
+    </p>
+    {% else %}
+    <p class="vacio">Ninguna prueba tomada en este periodo.</p>
+    {% endif %}
+  </div>
+
+  {# ══════════ PARTIDOS Y ASISTENCIA ══════════ #}
+  <div class="sec">
+    <h2 class="sec__t">Competición y compromiso</h2>
+    {% if competicion and competicion.partidos %}
+    <div class="cifras">
+      {% for etq, valor in [('Partidos', competicion.partidos), ('Titular', competicion.titularidades),
+                            ('Minutos', competicion.minutos), ('Goles', competicion.goles),
+                            ('Asist.', competicion.asistencias), ('J. clave', competicion.jugadas_clave)] %}
+      <div class="cifra"><div class="cifra__v">{{ valor or 0 }}</div><div class="cifra__e">{{ etq }}</div></div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="vacio">No jugó ningún partido en este periodo.</p>
+    {% endif %}
+
+    {% if asistencia %}
+    <p style="font-size:11.5px;margin:10px 0 0">
+      <b>Asistencia:</b> vino a {{ asistencia.vino }} de {{ asistencia.total }} sesiones
+      ({{ asistencia.pct }}%)
+      {%- if asistencia.tarde %} · {{ asistencia.tarde }} tarde{% endif -%}
+      {%- if asistencia.faltas %} · {{ asistencia.faltas }} sin justificar{% endif -%}
+      {%- if asistencia.justificadas %} · {{ asistencia.justificadas }} justificada{{ 's' if asistencia.justificadas != 1 }}{% endif -%}
+      .
+    </p>
+    {% else %}
+    <p class="vacio" style="margin-top:10px">
+      El entrenador no pasó lista en este periodo.
+    </p>
+    {% endif %}
+  </div>
+
+  {# ══════════ LESIONES ══════════ #}
+  {% if lesiones %}
+  <div class="sec">
+    <h2 class="sec__t">Lesiones en este periodo</h2>
+    <table>
+      <thead><tr><th>Fecha</th><th>Zona</th><th>Tipo</th><th>Gravedad</th><th>Estado</th></tr></thead>
+      <tbody>
+        {% for l in lesiones %}
+        <tr>
+          <td>{{ l._fecha.strftime('%d/%m/%Y') if l._fecha else '—' }}</td>
+          <td>{{ l.zona or '—' }}</td><td>{{ l.tipo or '—' }}</td>
+          <td>{{ l.gravedad or '—' }}</td><td>{{ l.estado or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {# ══════════ LA LECTURA DE LA IA ══════════ #}
+  {% if analisis and analisis.resumen %}
+  <div class="sec">
+    <h2 class="sec__t">
+      Análisis de la IA{% if analisis._creado %} · {{ analisis._creado.strftime('%d/%m/%Y') }}{% endif %}
+    </h2>
+    <p class="ia__t">{{ analisis.resumen }}</p>
+    {% for titulo, clave in [('Lo que va bien', 'fuerte'), ('A mejorar', 'mejorar'),
+                             ('Qué hacer estas semanas', 'plan')] %}
+    {% set puntos = (analisis.puntos or {}).get(clave) %}
+    {% if puntos %}
+    <div class="ia__s">{{ titulo }}</div>
+    {% for p in puntos %}<p class="ia__l">{{ p }}</p>{% endfor %}
+    {% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endif %}
+
+  <div class="pie">
+    <span>{{ equipo.nombre or 'ProFoot' }}{% if entrenador %} · {{ entrenador }}{% endif %}</span>
+    <span>Generado con ProFoot Assistant · profut.org</span>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='profoot.js') }}"></script>
+</body>
+</html>
