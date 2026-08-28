@@ -184,16 +184,32 @@
         .then(function (r) {
           PF.toast(r.mensaje || 'Jugada borrada.');
           var tarjeta = b.closest('.tc-card');
+          var carpeta = tarjeta.dataset.carpeta;      // antes de sacarla
           tarjeta.remove();
           //  Si era la última, la pantalla tiene que enseñar el vacío de
           //  siempre —y el contador de la cabecera es del servidor—, así que
           //  se vuelve a pedir en vez de dejar una rejilla en blanco.
           if (!grid.querySelector('.tc-card')) { location.reload(); return; }
+
           //  El contador de la cabecera lo pinta el servidor: si no se toca,
           //  se queda diciendo que hay ocho cuando quedan siete.
           var cuenta = grid.querySelectorAll('.tc-card').length;
           var sub = document.querySelector('.pf-hero__subtitle');
           if (sub) { sub.textContent = cuenta + (cuenta === 1 ? ' guardada' : ' guardadas'); }
+
+          //  Y si era la última de su carpeta, fuera el filtro: un botón que
+          //  deja la rejilla en blanco es peor que no tener filtro.
+          if (!grid.querySelector('[data-carpeta="' + carpeta + '"]')) {
+            var chip = document.querySelector('.tc-filtro[data-f="' + carpeta + '"]');
+            if (chip) {
+              var estaba = chip.classList.contains('on');
+              chip.remove();
+              if (estaba) {
+                var todo = document.querySelector('.tc-filtro[data-f=""]');
+                if (todo) { todo.click(); }
+              }
+            }
+          }
         })
         .catch(function (e) { PF.toast(e.message, 'error'); b.disabled = false; });
     });

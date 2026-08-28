@@ -15,20 +15,34 @@
 
    Opcional: `compacto = true` deja fuera el material y acorta la descripción
    —es lo que ve el jugador, que no monta el material—.
+
+   OJO CON LOS MINUTOS. Aquí se SUMAN, y antes solo se imprimían: un bloque
+   sin ese campo salía sin número y ya está, pero sumar lo que no existe
+   tumbaba la pantalla entera —500 en la ficha del plan, en la del evento y
+   en la del jugador—. Los planes que guarda esta app traen siempre su
+   entero, pero en la base hay planes de antes y escribe también la app
+   nativa. Por eso cada bloque pasa por `default(0, true) | int`: sin el
+   campo, con un nulo o con el número escrito como texto, sale un número.
    ============================================================================ #}
 
 {% set _bl = bloques | default([], true) | list %}
 {% if _bl %}
-{% set _total = _bl | sum(attribute='minutos') %}
+
+{% set _ns = namespace(total=0) %}
+{% for b in _bl %}
+{%- set _ns.total = _ns.total + (b.minutos | default(0, true) | int) -%}
+{% endfor %}
+{% set _total = _ns.total %}
 
 {% if _total %}
 {# La sesión entera en una barra. Cada tramo es un bloque, a escala. #}
 <div class="pb-barra" role="img"
      aria-label="Reparto de los {{ _total }} minutos de la sesión">
   {% for b in _bl %}
-  {% if b.minutos %}
+  {% set _m = b.minutos | default(0, true) | int %}
+  {% if _m %}
   <span class="pb-barra__t pb-t{{ loop.index0 % 6 }}"
-        style="flex:{{ b.minutos }}" title="{{ b.nombre }} · {{ b.minutos }}′"></span>
+        style="flex:{{ _m }}" title="{{ b.nombre }} · {{ _m }}′"></span>
   {% endif %}
   {% endfor %}
 </div>
@@ -37,20 +51,21 @@
 </div>
 {% endif %}
 
-{% set _ns = namespace(desde=0) %}
+{% set _reloj = namespace(desde=0) %}
 {% for b in _bl %}
+{% set _m = b.minutos | default(0, true) | int %}
 <div class="pb-bloque">
   <span class="pb-bloque__n pb-t{{ loop.index0 % 6 }}">{{ loop.index }}</span>
 
   <span class="pb-bloque__cuerpo">
     <span class="pb-bloque__cab">
       <span class="pb-bloque__t">{{ b.nombre or b.titulo or 'Bloque ' ~ loop.index }}</span>
-      {% if b.minutos %}
+      {% if _m %}
       {# El minuto en el que empieza. A pie de campo se mira el reloj, no la
          suma de los bloques anteriores. #}
       <span class="pb-bloque__min">
-        {{ b.minutos }}′
-        <span class="pb-bloque__reloj">{{ _ns.desde }}–{{ _ns.desde + b.minutos }}</span>
+        {{ _m }}′
+        <span class="pb-bloque__reloj">{{ _reloj.desde }}–{{ _reloj.desde + _m }}</span>
       </span>
       {% endif %}
     </span>
@@ -66,6 +81,6 @@
     {% endif %}
   </span>
 </div>
-{% if b.minutos %}{% set _ns.desde = _ns.desde + b.minutos %}{% endif %}
+{% set _reloj.desde = _reloj.desde + _m %}
 {% endfor %}
 {% endif %}
