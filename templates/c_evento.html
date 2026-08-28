@@ -164,20 +164,7 @@
   </div>
 
   {% for j in jugadas %}
-  <div class="pf-item" style="padding-left:0;padding-right:0">
-    <a class="pf-item__body" href="{{ url_for('futbol.c_pizarra', jid=j.id) }}"
-       style="text-decoration:none;min-width:0">
-      <span class="pf-item__title">{{ j.nombre }}</span>
-      <span class="pf-item__sub">{{ j.carpeta or 'Jugada' }}{% if j.formacion %} · {{ j.formacion }}{% endif %}</span>
-    </a>
-    {# `pf-icon-btn` no existe en el CSS: se usa el botón fantasma de siempre
-       recortado, para no inventar una clase nueva por un aspa. #}
-    <button class="pf-btn pf-btn--ghost" type="button" aria-label="Quitar de la sesión"
-            style="flex:none;padding:8px 11px;min-width:0"
-            onclick="quitarJugada('{{ j._enlace }}', this)">
-      <i data-ico="x" class="pf-ico--sm"></i>
-    </button>
-  </div>
+  {% with j = j, editable = true %}{% include '_jugada_previa.html' %}{% endwith %}
   {% else %}
   <p style="margin:10px 0 0;font-size:12.5px;color:var(--text-sec);line-height:1.55">
     Cuelga aquí el rondo o la jugada que vas a trabajar. El jugador la verá al
@@ -235,12 +222,8 @@ function ponerJugada(boton) {
     .catch(function (e) { PF.toast(e.message, 'error'); boton.disabled = false; });
 }
 
-function quitarJugada(enlace, boton) {
-  boton.disabled = true;
-  PF.api('/api/evento/' + EID + '/jugada/' + enlace, null, 'DELETE')
-    .then(function () { PF.toast('Quitada de la sesión'); location.reload(); })
-    .catch(function (e) { PF.toast(e.message, 'error'); boton.disabled = false; });
-}
+/*  Quitar una jugada lo lleva ahora `_jugada_previa_js.html`, que es donde
+    está el botón. */
 
 /* Editar y borrar viven en el calendario, que es donde está el formulario. */
 function editar() {
@@ -266,4 +249,5 @@ function borrar() {
     .catch(e => PF.toast(e.message, 'error'));
 }
 </script>
+{% include '_jugada_previa_js.html' %}
 {% endblock %}

@@ -151,22 +151,11 @@
   {% endif %}
 
   {% if plan.bloques %}
-  <div class="pf-mt-12">
-    {% for b in plan.bloques %}
-    <div class="pe-bloque">
-      <span class="pe-bloque__n">{{ loop.index }}</span>
-      <span class="pf-grow">
-        <span class="pe-bloque__t" style="display:block">
-          {{ b.nombre or b.titulo or 'Bloque ' ~ loop.index }}
-          {%- if b.minutos %} · {{ b.minutos }} min{% endif -%}
-        </span>
-        {% if b.descripcion %}
-        <span class="pe-bloque__d" style="display:block">{{ b.descripcion }}</span>
-        {% endif %}
-      </span>
-    </div>
-    {% endfor %}
-  </div>
+  {# `compacto`: el jugador no monta el material, así que no le sale. Lo que
+     sí le sirve —y no tenía— es cuánto dura cada parte y en qué minuto entra. #}
+  {% with bloques = plan.bloques, compacto = true %}
+    {% include '_plan_bloques.html' %}
+  {% endwith %}
   {% endif %}
 </div>
 {% endif %}
@@ -248,18 +237,7 @@
     <span class="pf-card__badge">{{ evento._jugadas|length }}</span>
   </div>
   {% for j in evento._jugadas %}
-  <a class="pf-item" href="{{ url_for('futbol.p_jugada', jid=j.id) }}">
-    <span class="pf-item__icon" style="background:var(--primary-soft);color:var(--primary)">
-      <i data-ico="target" class="pf-ico--sm"></i>
-    </span>
-    <span class="pf-item__body">
-      <span class="pf-item__title">{{ j.nombre }}</span>
-      <span class="pf-item__sub">
-        {{ j.carpeta or 'Jugada' }}{% if j._nota %} · {{ j._nota }}{% endif %}
-      </span>
-    </span>
-    <i data-ico="chevron-right" class="pf-ico--sm pf-item__chev"></i>
-  </a>
+  {% with j = j %}{% include '_jugada_previa.html' %}{% endwith %}
   {% endfor %}
 </div>
 {% endif %}
@@ -319,4 +297,5 @@
   }
 })();
 </script>
+{% include '_jugada_previa_js.html' %}
 {% endblock %}

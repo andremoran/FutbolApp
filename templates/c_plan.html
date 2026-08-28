@@ -34,30 +34,13 @@
     <h2 class="pf-card__title">La sesión</h2>
   </div>
 
-  {% for b in plan._bloques %}
-  <div style="padding:13px 0;border-bottom:1px solid var(--border-soft)">
-    <div class="pf-row pf-row--between">
-      <span style="font-weight:700;font-size:14px">
-        {{ loop.index }}. {{ b.nombre }}
-      </span>
-      <span class="pf-pill pf-pill--muted">{{ b.minutos }}′</span>
-    </div>
-    {% if b.descripcion %}
-    <p style="margin:6px 0 0;font-size:13px;line-height:1.65;color:var(--text-sec)">
-      {{ b.descripcion }}
-    </p>
-    {% endif %}
-    {% if b.material %}
-    <p style="margin:4px 0 0;font-size:11.5px;color:var(--text-muted)">
-      🎒 {{ b.material }}
-    </p>
-    {% endif %}
-  </div>
+  {% if plan._bloques %}
+  {% with bloques = plan._bloques %}{% include '_plan_bloques.html' %}{% endwith %}
   {% else %}
   <p style="margin:0;font-size:13px;color:var(--text-muted)">
     Este plan no tiene bloques detallados.
   </p>
-  {% endfor %}
+  {% endif %}
 
   {% if plan.material %}
   <div class="pf-mt-12">

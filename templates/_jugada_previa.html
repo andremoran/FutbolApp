@@ -1,0 +1,63 @@
+{# ============================================================================
+   _jugada_previa.html — Una jugada colgada de una sesión, con su dibujo.
+
+   La lista decía el nombre y poco más: para ver el rondo había que salir de
+   la sesión, abrir la biblioteca y buscarlo. Ahora se despliega aquí mismo.
+
+   El campo NO se dibuja al cargar la página: una sesión puede llevar cuatro
+   jugadas y serían cuatro lienzos pintados que nadie ha pedido. Se pinta la
+   primera vez que se abre el desplegable — ver `_jugada_previa_js.html`.
+
+   Se usa así, dentro de un bucle:
+     {% with j = jugada, editable = true %}
+       {% include '_jugada_previa.html' %}
+     {% endwith %}
+
+   `editable` añade el aspa de quitar y el enlace a la pizarra (entrenador).
+   Sin él es solo lectura (jugador).
+   ============================================================================ #}
+
+<details class="jp" data-jugada="{{ j.id }}">
+  <summary class="jp__cab">
+    <span class="jp__ico">
+      <i data-ico="target" class="pf-ico--sm"></i>
+    </span>
+    <span class="jp__txt">
+      <span class="jp__t">{{ j.nombre }}</span>
+      <span class="jp__s">
+        {{ j.carpeta or 'Jugada' }}
+        {%- if j._nota %} · {{ j._nota }}{% endif -%}
+        {%- if j._momentos %} · {{ j._momentos }} momentos{% endif -%}
+      </span>
+    </span>
+    <i data-ico="chevron-down" class="pf-ico--sm jp__chev"></i>
+  </summary>
+
+  <div class="jp__cuerpo">
+    <div class="jp__lienzo"><canvas class="jp__cancha"></canvas></div>
+
+    <div class="jp__pie">
+      <button class="pf-btn pf-btn--ghost jp__play" type="button" hidden>
+        <i data-ico="play" class="pf-ico--xs"></i> Reproducir
+      </button>
+      {% if editable %}
+      <a class="pf-btn pf-btn--ghost" href="{{ url_for('futbol.c_pizarra', jid=j.id) }}">
+        <i data-ico="grid" class="pf-ico--xs"></i> Editar
+      </a>
+      <button class="pf-btn pf-btn--ghost jp__quitar" type="button"
+              data-enlace="{{ j._enlace }}" aria-label="Quitar de la sesión">
+        <i data-ico="x" class="pf-ico--xs"></i> Quitar
+      </button>
+      {% else %}
+      <a class="pf-btn pf-btn--ghost" href="{{ url_for('futbol.p_jugada', jid=j.id) }}">
+        Verla en grande
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
+  {# Los datos viajan en el HTML y no se piden aparte: ya están en el
+     servidor cuando se pinta la ficha, y una petición por jugada para algo
+     que quizá no se abra nunca es gastar por gastar. #}
+  <script type="application/json" class="jp__datos">{{ (j.datos or {})|tojson }}</script>
+</details>

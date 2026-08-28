@@ -1,0 +1,71 @@
+{# ============================================================================
+   _plan_bloques.html — Los bloques de una sesión, en forma de sesión.
+
+   Antes era una lista de párrafos: nombre, minutos y un texto debajo. Todo
+   junto se lee como apuntes, y lo que un entrenador necesita ver de un
+   vistazo es OTRA cosa — cuánto dura cada parte y cuándo empieza. Eso ya
+   estaba en sus datos; solo no se estaba dibujando.
+
+   La barra de arriba reparte los minutos QUE ÉL PUSO: si dedicó 25 de 90 al
+   bloque táctico, ese trozo ocupa un cuarto de la barra. La forma de la
+   sesión es suya, no una plantilla nuestra.
+
+   Se usa así:
+     {% with bloques = plan.bloques %}{% include '_plan_bloques.html' %}{% endwith %}
+
+   Opcional: `compacto = true` deja fuera el material y acorta la descripción
+   —es lo que ve el jugador, que no monta el material—.
+   ============================================================================ #}
+
+{% set _bl = bloques | default([], true) | list %}
+{% if _bl %}
+{% set _total = _bl | sum(attribute='minutos') %}
+
+{% if _total %}
+{# La sesión entera en una barra. Cada tramo es un bloque, a escala. #}
+<div class="pb-barra" role="img"
+     aria-label="Reparto de los {{ _total }} minutos de la sesión">
+  {% for b in _bl %}
+  {% if b.minutos %}
+  <span class="pb-barra__t pb-t{{ loop.index0 % 6 }}"
+        style="flex:{{ b.minutos }}" title="{{ b.nombre }} · {{ b.minutos }}′"></span>
+  {% endif %}
+  {% endfor %}
+</div>
+<div class="pb-total">
+  <span>{{ _total }} minutos en {{ _bl|length }} bloque{{ '' if _bl|length == 1 else 's' }}</span>
+</div>
+{% endif %}
+
+{% set _ns = namespace(desde=0) %}
+{% for b in _bl %}
+<div class="pb-bloque">
+  <span class="pb-bloque__n pb-t{{ loop.index0 % 6 }}">{{ loop.index }}</span>
+
+  <span class="pb-bloque__cuerpo">
+    <span class="pb-bloque__cab">
+      <span class="pb-bloque__t">{{ b.nombre or b.titulo or 'Bloque ' ~ loop.index }}</span>
+      {% if b.minutos %}
+      {# El minuto en el que empieza. A pie de campo se mira el reloj, no la
+         suma de los bloques anteriores. #}
+      <span class="pb-bloque__min">
+        {{ b.minutos }}′
+        <span class="pb-bloque__reloj">{{ _ns.desde }}–{{ _ns.desde + b.minutos }}</span>
+      </span>
+      {% endif %}
+    </span>
+
+    {% if b.descripcion %}
+    <span class="pb-bloque__d">{{ b.descripcion }}</span>
+    {% endif %}
+
+    {% if b.material and not compacto %}
+    <span class="pb-bloque__mat">
+      <i data-ico="grid" class="pf-ico--xs"></i> {{ b.material }}
+    </span>
+    {% endif %}
+  </span>
+</div>
+{% if b.minutos %}{% set _ns.desde = _ns.desde + b.minutos %}{% endif %}
+{% endfor %}
+{% endif %}

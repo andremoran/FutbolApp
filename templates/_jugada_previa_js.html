@@ -1,0 +1,54 @@
+{# ============================================================================
+   _jugada_previa_js.html — El JS de _jugada_previa.html. Va en {% block scripts %}.
+
+   Se pinta al ABRIR, no al cargar: una sesión con cuatro jugadas serían
+   cuatro lienzos dibujados que nadie ha mirado, y en un móvil eso se nota.
+   ============================================================================ #}
+<script src="{{ url_for('static', filename='pizarra.js') }}"></script>
+<script>
+(function () {
+  document.querySelectorAll('.jp').forEach(function (caja) {
+    var pz = null;
+
+    caja.addEventListener('toggle', function () {
+      if (!caja.open || pz) { return; }
+
+      var lienzo = caja.querySelector('.jp__cancha');
+      var datos = {};
+      try {
+        datos = JSON.parse(caja.querySelector('.jp__datos').textContent || '{}');
+      } catch (e) { datos = {}; }
+
+      //  Solo lectura: ni siquiera engancha los eventos del ratón. Esto es
+      //  una vista previa, no la pizarra.
+      pz = new Pizarra(lienzo, { soloLectura: true });
+      pz.cargar(datos);
+
+      var play = caja.querySelector('.jp__play');
+      if (play && (pz.estado.momentos || []).length > 1) {
+        play.hidden = false;
+        play.addEventListener('click', function () {
+          var antes = play.innerHTML;
+          play.disabled = true;
+          if (!pz.reproducir(function () {
+            play.innerHTML = antes;
+            play.disabled = false;
+            if (window.PF && PF.icons) { PF.icons(play); }
+          })) { play.disabled = false; return; }
+          play.innerHTML = 'Reproduciendo…';
+        });
+      }
+    });
+
+    var quitar = caja.querySelector('.jp__quitar');
+    if (quitar) {
+      quitar.addEventListener('click', function () {
+        quitar.disabled = true;
+        PF.api('/api/evento/' + EID + '/jugada/' + quitar.dataset.enlace, null, 'DELETE')
+          .then(function () { PF.toast('Quitada de la sesión'); location.reload(); })
+          .catch(function (e) { PF.toast(e.message, 'error'); quitar.disabled = false; });
+      });
+    }
+  });
+})();
+</script>
