@@ -1237,9 +1237,58 @@ a.pf-avatar--xl::after   { inset: 0; }
 .mc-fuente b    { color: var(--text-sec); }
 
 /* ── Barra de guardar, pegada abajo ────────────────────────────────────── */
-.mc-guardar     { position: sticky; bottom: 0; z-index: 20;
+.mc-guardar     { position: sticky; bottom: 0; z-index: 20; display: flex;
+                  align-items: center; gap: 10px;
                   background: linear-gradient(180deg, rgba(249,250,251,0) 0%, var(--bg) 38%);
                   padding: 18px 16px calc(16px + env(safe-area-inset-bottom, 0px)); }
+.mc-guardar .pf-btn { flex: none; }
+
+/*  Copiar la semana pasada: el boton va debajo de la tarjeta, no dentro
+    del enlace, para que tocar la semana siga abriendola.  */
+.mn-item__ir    { display: block; color: inherit; text-decoration: none; }
+.mn-copiar      { display: inline-flex; align-items: center; gap: 6px;
+                  margin: 0 0 10px; padding: 7px 12px; border: 1px solid var(--border);
+                  background: #fff; border-radius: var(--r-full);
+                  font: inherit; font-size: 12px; font-weight: 700;
+                  color: var(--text-sec); cursor: pointer; }
+.mn-copiar:disabled { opacity: .5; }
+
+/*  Se guarda solo, como una hoja de calculo. El rotulo dice en que estado
+    esta: sin el, guardar solo se parece demasiado a no guardar.  */
+.mc-estado      { flex: 1; min-width: 0; font-size: 12px; font-weight: 700;
+                  color: var(--text-muted); }
+.mc-estado.is-ok   { color: var(--primary); }
+.mc-estado.is-mal  { color: var(--danger); }
+
+/*  «Usar»: escribe la propuesta del modelo en el cuadro, para no tener que
+    copiarla a mano.  */
+.mc-usar        { margin-left: auto; padding: 2px 9px; border: 1px solid var(--primary);
+                  background: var(--primary-faint); border-radius: var(--r-full);
+                  font: inherit; font-size: 10.5px; font-weight: 800;
+                  letter-spacing: .3px; color: var(--primary); cursor: pointer; }
+.mc-usar[hidden] { display: none; }
+
+/*  Hora y minutos: lo unico que se escribe TODOS los dias.  */
+.mc-rapido      { display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+                  margin: 12px 0; }
+.mc-rapido label { display: block; font-size: 11px; font-weight: 800;
+                   text-transform: uppercase; letter-spacing: .5px;
+                   color: var(--text-sec); }
+.mc-rapido input { width: 100%; margin-top: 4px; padding: 9px 11px;
+                   border: 1px solid var(--border); border-radius: var(--r-md);
+                   background: var(--bg); font-size: 14px; }
+.mc-rapido input:focus { outline: none; border-color: var(--primary); background: #fff; }
+
+/*  Los otros cinco bloques del dia. Siguen ahi, pero no de entrada: siete
+    cuadros por dia son 49 para una semana.  */
+.mc-mas         { display: inline-flex; align-items: center; gap: 5px;
+                  margin: 2px 0 10px; padding: 6px 10px; border: none;
+                  background: var(--border-soft); border-radius: var(--r-full);
+                  font: inherit; font-size: 12px; font-weight: 700;
+                  color: var(--text-sec); cursor: pointer; }
+.mc-mas i       { transition: transform .2s; }
+.mc-mas.is-on i { transform: rotate(180deg); }
+.mc-dia__mas    { border-top: 1px dashed var(--border); padding-top: 10px; }
 
 /* ── Bloques de una sesión (_plan_bloques.html) ────────────────────────── */
 /*  La barra reparte los minutos que puso el entrenador: si dedicó 25 de 90 al

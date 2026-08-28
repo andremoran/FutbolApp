@@ -100,6 +100,11 @@ def plantilla(modelo, rotacion, desde=None):
             'capacidad': guia['capacidad'],
             'lugar': '', 'hora': '', 'duracion': 0,
         }
+        #  Los días nacen VACÍOS a propósito. La propuesta del modelo se
+        #  enseña en la pantalla —dentro del cuadro, en gris— y se escribe
+        #  con el botón «Usar»: si se guardara sola, la guía creería que el
+        #  entrenador ya escribió la semana y empezaría a avisarle de lo que
+        #  le falta antes de que hubiera tenido tiempo de ponerlo.
         for clave in modelos.CLAVES_CAMPOS:
             dia[clave] = ''
         salida.append(dia)
@@ -124,6 +129,8 @@ def decorar(micro, modelo=None):
         d['_foco'] = guia.get('foco', '')
         d['_detalle'] = guia.get('detalle', '')
         d['_principios'] = guia.get('principios', ())
+        #  Qué dos bloques se enseñan abiertos en este día.
+        d['_claves'] = modelos.campos_clave(modelo, d.get('md') or '')
         #  Un día se considera escrito si tiene algo en cualquiera de sus
         #  bloques. Sirve para la barra de «cuánto llevas planificado».
         d['_escrito'] = any((d.get(k) or '').strip() for k in modelos.CLAVES_CAMPOS)
@@ -397,6 +404,58 @@ def api_microciclo_nuevo():
     if not fila:
         return jsonify({'error': 'No se pudo crear el microciclo.'}), 500
     return jsonify({'ok': True, 'id': fila['id'],
+                    'redirect': url_for('futbol.c_microciclo', mid=fila['id'])})
+
+
+@bp.route('/api/microciclo/<mid>/duplicar', methods=['POST'])
+@login_required
+def api_microciclo_duplicar(mid):
+    """Copia una semana entera a la siguiente.
+
+    Es lo que se hace en la hoja de cálculo: duplicar la pestaña de la semana
+    pasada y cambiar cuatro cosas. Casi ninguna semana se escribe desde cero,
+    y escribirla desde cero era lo único que se podía hacer aquí.
+    """
+    error = _guardia_coach()
+    if error:
+        return error
+
+    uid = db.equipo_id(current_user.id)
+    micro = db.one('fut_microcycles', 'micro a copiar', id=mid, coach_id=uid)
+    if not micro:
+        return jsonify({'error': 'Esa semana no es de tu equipo.'}), 404
+
+    dias = micro.get('dias') or []
+    #  Las fechas se corren tantos días como dure la rotación: la copia es la
+    #  semana SIGUIENTE, no otra vez la misma.
+    salto = int(micro.get('rotacion') or len(dias) or 7)
+    nuevos = []
+    for d in dias:
+        copia = dict(d)
+        f = db.parse_fecha(d.get('fecha'))
+        if f:
+            f = f + timedelta(days=salto)
+            copia['fecha'] = f.isoformat()
+            copia['etiqueta'] = etiqueta_fecha(f)
+        nuevos.append(copia)
+
+    fila = db.insert('fut_microcycles', {
+        'coach_id': uid,
+        'segmento': micro.get('segmento'),
+        'nombre': ('Copia de %s' % (micro.get('nombre') or 'la semana'))[:120],
+        'lugar': micro.get('lugar') or '',
+        'rotacion': micro.get('rotacion'),
+        'dias': nuevos,
+        'desde': nuevos[0]['fecha'] if nuevos else micro.get('desde'),
+        'hasta': nuevos[-1]['fecha'] if nuevos else micro.get('hasta'),
+        'recomendaciones': micro.get('recomendaciones') or '',
+        'observaciones': micro.get('observaciones') or '',
+        'cuerpo_tecnico': micro.get('cuerpo_tecnico') or '',
+        'creado': _ahora(),
+    }, 'duplicar micro')
+    if not fila:
+        return jsonify({'error': 'No se pudo copiar la semana.'}), 500
+    return jsonify({'ok': True, 'id': fila['id'], 'mensaje': 'Semana copiada.',
                     'redirect': url_for('futbol.c_microciclo', mid=fila['id'])})
 
 

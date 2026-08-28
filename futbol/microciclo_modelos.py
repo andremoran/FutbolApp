@@ -52,6 +52,39 @@ FASES_BASE = (
 )
 
 
+#  Los DOS campos que de verdad se escriben cada día, según en qué fase de
+#  la semana esté. Los siete siguen guardándose igual —no se toca ni una clave—
+#  pero enseñarlos todos de golpe son 49 cuadros para planificar una semana,
+#  y eso es más lento que la hoja de cálculo que se quiere sustituir.
+#
+#  El criterio es el del propio modelo: en adquisición se carga y se juega, en
+#  afinamiento se afina el modelo de juego y se prepara al rival, el día del
+#  partido lo que queda es la charla, y al recuperar manda cómo llega el
+#  jugador —de piernas y de cabeza—.
+CAMPOS_CLAVE_POR_FASE = {
+    'adquisicion':  ('fisico', 'tactico'),
+    'afinamiento':  ('tactico', 'estrategico'),
+    'partido':      ('estrategico', 'psicologico'),
+    'recuperacion': ('fisico', 'psicologico'),
+}
+
+
+def campos_clave(modelo, md):
+    """Qué dos bloques se enseñan abiertos en ese día."""
+    guia = (modelo['dias'].get(md or '') or {})
+    claves = CAMPOS_CLAVE_POR_FASE.get(guia.get('fase'), ('fisico', 'tactico'))
+    #  La vispera es de afinamiento pero no se parece a MD-2: la sesion es
+    #  corta y lo que se escribe es el plan del partido y el balon parado, no
+    #  el trabajo fisico. Se distingue por la carga, que es dato del modelo.
+    if guia.get('fase') == 'afinamiento' and guia.get('carga') in ('media', 'alta'):
+        claves = ('fisico', 'tactico')
+    #  Si un modelo no tuviera alguno de los siete, se queda con los que tenga:
+    #  más vale enseñar dos cualesquiera que dejar el día sin nada donde
+    #  escribir.
+    suyos = modelo.get('claves_campos') or CLAVES_CAMPOS
+    return tuple(c for c in claves if c in suyos) or tuple(suyos[:2])
+
+
 def texto_de(dia, campos=CLAVES_CAMPOS):
     """Todo lo escrito en un día, junto. Para buscar palabras dentro.
 

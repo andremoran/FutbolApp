@@ -135,7 +135,10 @@
 
   <div style="margin-top:12px">
     {% for m in micros %}
-    <a class="mn-item" href="{{ url_for('futbol.c_microciclo', mid=m.id) }}">
+    {# El enlace envuelve solo lo que lleva a la semana: un botón dentro de un
+       enlace no es HTML válido y el toque acabaría abriéndola. #}
+    <div class="mn-item">
+    <a class="mn-item__ir" href="{{ url_for('futbol.c_microciclo', mid=m.id) }}">
       <div class="pf-row pf-row--between" style="align-items:flex-start">
         <div class="pf-grow">
           <div class="mn-item__t">{{ m.nombre }}</div>
@@ -172,6 +175,15 @@
         </div>
       </div>
     </a>
+
+    {# Copiar la semana pasada y corregir encima: es como se planifica de
+       verdad, y era justo lo que no se podía hacer. Las fechas se corren
+       solas a la semana siguiente. #}
+    <button class="mn-copiar" type="button" data-copiar="{{ m.id }}"
+            data-nombre="{{ m.nombre }}">
+      <i data-ico="copy" class="pf-ico--xs"></i> Duplicar para la semana siguiente
+    </button>
+    </div>
     {% endfor %}
   </div>
 </div>
@@ -191,6 +203,17 @@
 <script>
 (function () {
   var AVISOS = {{ avisos_rotacion|tojson }};
+
+  /*  Duplicar. No pregunta nada: la copia se abre y ahí se cambia lo que sea,
+      que es más rápido que un formulario para decidir de antemano.  */
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest('.mn-copiar');
+    if (!b) { return; }
+    b.disabled = true;
+    PF.api('/api/microciclo/' + b.dataset.copiar + '/duplicar', {})
+      .then(function (r) { location.href = r.redirect; })
+      .catch(function (e) { b.disabled = false; PF.toast(e.message, 'error'); });
+  });
   var rot = 7;
 
   var cont = document.getElementById('m-rot');

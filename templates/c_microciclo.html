@@ -121,17 +121,47 @@
   </div>
 </div>
 
+{# El mismo cuadro de texto para los dos sitios donde se pinta: los dos
+   bloques del día y los cinco de «Detalle». Uno solo, para que no se
+   separen con el tiempo. #}
+{% set etiquetas = dict(campos) %}
+{% macro bloque(d, clave, etiqueta, filas, propuesta='') %}
+<div class="mc-campo">
+  <div class="mc-campo__lab">
+    {%- for bclave, betiqueta, bico, bcolor in bloques -%}
+      {%- if bclave == clave %}<span class="mc-campo__pt" style="background:{{ bcolor }}"></span>{% endif -%}
+    {%- endfor -%}
+    {{ etiqueta }}
+    {# La propuesta del modelo, a un toque. Se enseña dentro del cuadro en
+       gris; el botón la escribe de verdad. No se guarda sola: la guía avisa
+       de lo que falta en cuanto hay algo escrito, y regañar a alguien por
+       una semana que no ha escrito él es la forma de que deje de leer los
+       avisos. #}
+    {% if propuesta %}
+    <button type="button" class="mc-usar" data-usar="{{ propuesta }}">Usar</button>
+    {% endif %}
+  </div>
+  <textarea data-campo="{{ clave }}" maxlength="600" rows="{{ filas }}"
+            placeholder="{{ propuesta or ('Ej: activación, movilidad articular, rondos' if clave == 'inicial'
+                            else ('Ej: estiramiento y flexibilidad, feedback' if clave == 'final' else '')) }}"
+            >{{ d[clave] or '' }}</textarea>
+</div>
+{% endmacro %}
+
 {# ══════════ 4. LOS DÍAS ══════════ #}
 <div class="pf-card">
   <div class="pf-card__head"><h2 class="pf-card__title">Días</h2></div>
   <p class="t-body-sm c-sec" style="margin:2px 0 12px">
-    Toca un día para escribirlo. Cada uno lleva el consejo de la evidencia para
-    esa posición de la semana.
+    Cada día llega con la propuesta del modelo escrita. Cámbiala a tu gusto:
+    se guarda solo.
   </p>
 
   <div id="m-dias">
     {% for d in micro._dias %}
-    <div class="mc-dia" data-dia="{{ loop.index0 }}"
+    {# Los días salen ABIERTOS. Antes había que abrir y cerrar siete
+       acordeones para leer la semana, que es justo lo que una hoja de
+       cálculo enseña de una vez. #}
+    <div class="mc-dia is-abierto" data-dia="{{ loop.index0 }}"
          data-md="{{ d.md }}" data-fecha="{{ d.fecha }}" data-etiqueta="{{ d.etiqueta }}">
 
       <button type="button" class="mc-dia__cab" data-abrir>
@@ -148,18 +178,7 @@
         <span class="mc-dia__chev"><i data-ico="chevron-right" class="pf-ico--sm"></i></span>
       </button>
 
-      <div class="mc-dia__cuerpo pf-hide" data-cuerpo>
-
-        {# El consejo de la evidencia para este día #}
-        {% if d._foco %}
-        <div class="mc-tip">
-          <i data-ico="info" class="pf-ico--sm mc-tip__ico"></i>
-          <span>
-            <span class="mc-tip__t">{{ d._foco }}</span>
-            <span class="mc-tip__d">{{ d._detalle }}</span>
-          </span>
-        </div>
-        {% endif %}
+      <div class="mc-dia__cuerpo" data-cuerpo>
 
         {# Carga del día #}
         <div class="mc-campo">
@@ -176,6 +195,45 @@
           </div>
         </div>
 
+        {# ── Lo que se escribe TODOS los días: hora y cuánto dura ───── #}
+        <div class="mc-rapido">
+          <label>Hora
+            <input data-campo="hora" type="time" value="{{ d.hora or '' }}">
+          </label>
+          <label>Minutos
+            <input data-campo="duracion" type="number" min="0" max="300" step="5"
+                   placeholder="{{ 45 if d.md == 'MD-1' else 75 }}"
+                   value="{{ d.duracion or '' }}">
+          </label>
+        </div>
+
+        {# ── Los DOS bloques de este día ─────────────────────────────────
+           Cuáles son lo dice el modelo según la fase (ver
+           `microciclo_modelos.campos_clave`). Los otros cinco siguen
+           guardándose igual, ahí abajo en «Detalle». #}
+        {% for clave in d._claves %}
+        {{ bloque(d, clave, etiquetas.get(clave, clave), 3,
+                  d._foco if loop.first else '') }}
+        {% endfor %}
+
+        {# ── Y el resto, para quien lo quiera ────────────────────────────── #}
+        <button type="button" class="mc-mas" data-mas>
+          <i data-ico="chevron-down" class="pf-ico--xs"></i>
+          Detalle del día
+        </button>
+
+        <div class="mc-dia__mas pf-hide" data-mas-cuerpo>
+
+        {% if d._detalle %}
+        <div class="mc-tip">
+          <i data-ico="info" class="pf-ico--sm mc-tip__ico"></i>
+          <span>
+            <span class="mc-tip__t">{{ d._foco }}</span>
+            <span class="mc-tip__d">{{ d._detalle }}</span>
+          </span>
+        </div>
+        {% endif %}
+
         {# Capacidad física #}
         <div class="mc-campo">
           <div class="mc-campo__lab">Capacidad física</div>
@@ -191,32 +249,22 @@
           </select>
         </div>
 
-        {# Lugar / hora / duración #}
-        <div class="mc-meta">
-          <input data-campo="lugar" maxlength="80" placeholder="Lugar"
-                 value="{{ d.lugar or '' }}">
-          <input data-campo="hora" type="time" value="{{ d.hora or '' }}">
-          <input data-campo="duracion" type="number" min="0" max="300" step="5"
-                 placeholder="min" value="{{ d.duracion or '' }}">
+        {# Lugar: la semana entera ya tiene el suyo; aquí solo si ese día
+           se entrena en otro sitio. #}
+        <div class="mc-campo">
+          <div class="mc-campo__lab">Si ese día se entrena en otro sitio</div>
+          <input class="pf-input" data-campo="lugar" maxlength="80"
+                 placeholder="{{ micro.lugar or 'Lugar' }}" value="{{ d.lugar or '' }}">
         </div>
 
-        {# Los siete bloques de contenido #}
+        {# Los otros cinco bloques #}
         {% for clave, etiqueta in campos %}
-        <div class="mc-campo">
-          <div class="mc-campo__lab">
-            {%- for bclave, betiqueta, bico, bcolor in bloques -%}
-              {%- if bclave == clave %}<span class="mc-campo__pt" style="background:{{ bcolor }}"></span>{% endif -%}
-            {%- endfor -%}
-            {{ etiqueta }}
-          </div>
-          <textarea data-campo="{{ clave }}" maxlength="600"
-                    rows="{{ 3 if clave in ('fisico', 'tecnico', 'tactico') else 2 }}"
-                    placeholder="{{ 'Ej: activación, movilidad articular, rondos' if clave == 'inicial'
-                                    else ('Ej: estiramiento y flexibilidad, feedback' if clave == 'final' else '') }}"
-                    >{{ d[clave] or '' }}</textarea>
-        </div>
+        {% if clave not in d._claves %}
+        {{ bloque(d, clave, etiqueta, 2) }}
+        {% endif %}
         {% endfor %}
 
+        </div>{# /mas #}
       </div>
     </div>
     {% endfor %}
@@ -313,8 +361,11 @@
 
 {# ══════════ GUARDAR ══════════ #}
 <div class="mc-guardar">
-  <button class="pf-btn pf-btn--primary pf-btn--block" id="m-guardar">
-    <i data-ico="save" class="pf-ico--sm"></i> Guardar {{ palabras.microciclo|lower }}
+  {# Se guarda solo; el botón se queda para quien quiera asegurarse, y el
+     rótulo dice en qué estado está — que es lo que de verdad tranquiliza. #}
+  <span class="mc-estado" id="m-estado">Se guarda solo</span>
+  <button class="pf-btn pf-btn--primary" id="m-guardar">
+    <i data-ico="save" class="pf-ico--sm"></i> Guardar
   </button>
 </div>
 
@@ -393,9 +444,38 @@
     });
 
     el.querySelectorAll('[data-campo]').forEach(function (c) {
-      c.addEventListener('input', function () { refrescar(el); });
-      c.addEventListener('change', function () { refrescar(el); });
+      c.addEventListener('input', function () { refrescar(el); autoguardar(); });
+      //  `change` es soltar el campo: ahí ya no hay que esperar más.
+      c.addEventListener('change', function () { refrescar(el); autoguardar(250); });
     });
+
+    /* «Usar»: la propuesta del modelo, escrita de un toque. Desaparece en
+       cuanto el cuadro tiene algo, que ya no hace falta. */
+    el.querySelectorAll('.mc-usar').forEach(function (b) {
+      var caja = b.closest('.mc-campo').querySelector('textarea');
+      b.hidden = !!(caja.value || '').trim();
+      b.addEventListener('click', function () {
+        caja.value = b.dataset.usar;
+        b.hidden = true;
+        caja.focus();
+        refrescar(el);
+        autoguardar(250);
+      });
+      caja.addEventListener('input', function () {
+        b.hidden = !!(caja.value || '').trim();
+      });
+    });
+
+    /* «Detalle del día»: los otros cinco bloques, la capacidad y el porqué. */
+    var mas = el.querySelector('[data-mas]');
+    if (mas) {
+      mas.addEventListener('click', function () {
+        var cuerpo = el.querySelector('[data-mas-cuerpo]');
+        var abierto = !cuerpo.classList.contains('pf-hide');
+        cuerpo.classList.toggle('pf-hide', abierto);
+        mas.classList.toggle('is-on', !abierto);
+      });
+    }
   });
 
   /* Resumen de la cabecera + punto de "escrito" + celda de la planilla */
@@ -448,17 +528,69 @@
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
 
-  /* ─── Guardar ─────────────────────────────────────────────────────────── */
+  /* ─── Se guarda solo ───────────────────────────────────────────────────
+     Una hoja de cálculo no te pide que guardes, y aquí había 49 cuadros de
+     texto y un botón al final: perder la semana por cerrar la pestaña era
+     cuestión de tiempo. Se guarda al dejar de escribir; el botón se queda
+     para quien quiera pulsarlo. */
   var bg = document.getElementById('m-guardar');
-  bg.addEventListener('click', function () {
+  var rotulo = document.getElementById('m-estado');
+  var espera = null, guardando = false, otraVez = false;
+
+  function decir(texto, clase) {
+    rotulo.textContent = texto;
+    rotulo.className = 'mc-estado' + (clase ? ' ' + clase : '');
+  }
+
+  function guardar(solo) {
+    //  Si ya hay una petición en marcha se apunta que hay que repetir al
+    //  acabar: dos guardados a la vez pueden llegar en orden cambiado y
+    //  dejar escrito lo viejo encima de lo nuevo.
+    if (guardando) { otraVez = true; return; }
+    guardando = true;
+    clearTimeout(espera);
+    decir('Guardando…');
     bg.disabled = true;
     PF.api('{{ url_for("futbol.api_microciclo") }}', leerTodo())
       .then(function (r) {
-        PF.toast(r.mensaje);
+        guardando = false;
         bg.disabled = false;
+        decir('Guardado', 'is-ok');
         if (r.avisos) pintarRevision(r.avisos);
+        if (!solo) { PF.toast(r.mensaje); }
+        if (otraVez) { otraVez = false; autoguardar(200); }
       })
-      .catch(function (err) { bg.disabled = false; PF.toast(err.message, 'error'); });
+      .catch(function (err) {
+        guardando = false;
+        bg.disabled = false;
+        decir('No se pudo guardar', 'is-mal');
+        if (!solo) { PF.toast(err.message, 'error'); }
+      });
+  }
+
+  function autoguardar(ms) {
+    clearTimeout(espera);
+    decir('Sin guardar…');
+    espera = setTimeout(function () { guardar(true); }, ms || 1400);
+  }
+
+  bg.addEventListener('click', function () { guardar(false); });
+
+  //  Lo de arriba (nombre, sede, rotación) y lo de abajo (recomendaciones,
+  //  observaciones, cuerpo técnico) también se guardan solos.
+  ['m-nombre', 'm-lugar', 'm-rotacion', 'm-recom', 'm-obs', 'm-cuerpo']
+    .forEach(function (id) {
+      var c = document.getElementById(id);
+      if (!c) { return; }
+      c.addEventListener('input', function () { autoguardar(); });
+      c.addEventListener('change', function () { autoguardar(250); });
+    });
+
+  //  Al irse a otra pestaña o dejar el móvil, si quedaba algo a medias se
+  //  manda ya. (`sendBeacon` no vale aquí: no lleva la cabecera del CSRF y el
+  //  servidor lo rechazaria en silencio, que es peor que no intentarlo.)
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden' && espera) { guardar(true); }
   });
 
   /* La revisión se rehace con lo que responde el servidor, que es quien tiene
