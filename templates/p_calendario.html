@@ -176,7 +176,7 @@ function verDia(iso) {
       '<div class="pf-ev__s">' + escapar(e._etiqueta) +
       (e.hora ? ' · ' + String(e.hora).slice(0, 5) : '') +
       (e.lugar ? ' · ' + escapar(e.lugar) : '') +
-      (e.descripcion ? '<br>' + escapar(e.descripcion) : '') + '</div></div>';
+      (e.notas ? '<br>' + escapar(e.notas) : '') + '</div></div>';
     caja.appendChild(div);
   });
   PF.openSheet('pf-sheet-dia');

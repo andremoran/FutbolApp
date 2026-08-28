@@ -68,8 +68,15 @@
           {%- if e.hora %}{% if e._hoy %} · {% endif %}{{ e.hora[:5] }}{% endif -%}
           {%- if e.lugar %} · {{ e.lugar }}{% endif -%}
         </span>
-        {% if e.descripcion %}
-        <span class="pf-item__sub" style="white-space:normal">{{ e.descripcion }}</span>
+        {% if e._notas %}
+        <span class="pf-item__sub" style="white-space:normal">{{ e._notas }}</span>
+        {% endif %}
+        {# En una lista no caben los bloques, pero decir cuántos hay ya cambia
+           las cosas: se sabe si la sesión está preparada sin entrar. #}
+        {% if e._bloques %}
+        <span class="pf-item__sub">
+          {{ e._bloques|length }} bloques · {{ e._bloques|sum(attribute='minutos') }}′
+        </span>
         {% endif %}
 
         {# Avisar de si va o no. Es un AVISO, no la asistencia: esa la marca el

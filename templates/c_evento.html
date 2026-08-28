@@ -89,7 +89,7 @@
       ('target', 'Tipo', evento._etiqueta),
       ('zap', 'Intensidad', evento._intensidad.etiqueta if evento._intensidad else '—'),
       ('map-pin', 'Lugar', evento.lugar),
-      ('file-text', 'Notas', evento.descripcion),
+      ('file-text', 'Notas', notas),
   ] if valor %}
   <div class="ev-fila">
     <i data-ico="{{ ico }}" class="pf-ico--sm"></i>
@@ -151,6 +151,24 @@
   </span>
   <i data-ico="chevron-right" class="pf-ico--sm"></i>
 </a>
+{% endif %}
+
+{# ══════════ LA SESIÓN, BLOQUE A BLOQUE ══════════
+   Esto ya estaba escrito: al agendar el plan, sus bloques se copian en las
+   notas del evento. Pero se enseñaba como un párrafo corrido —minutos,
+   material y ejercicios pegados— justo lo que hay que leer de un vistazo
+   antes de entrar al campo. #}
+{% if bloques %}
+<div class="pf-card">
+  <div class="pf-card__head">
+    <h2 class="pf-card__title">La sesión</h2>
+  </div>
+  {% include '_plan_bloques.html' %}
+  {% if plan %}
+  <a class="pf-btn pf-btn--ghost pf-btn--block pf-mt-12"
+     href="{{ url_for('futbol.c_plan', plid=plan.id) }}">Ver el plan completo</a>
+  {% endif %}
+</div>
 {% endif %}
 
 {# ══════════ TÁCTICA DE LA SESIÓN ══════════ #}

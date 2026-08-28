@@ -15,6 +15,7 @@ vuelcan al calendario cuantas veces haga falta, que es como trabaja de verdad
 un entrenador con una pretemporada de doce semanas.
 """
 import logging
+import re
 from calendar import monthrange
 from datetime import date, datetime, timedelta, timezone
 
@@ -177,6 +178,43 @@ def etiqueta_de(evento):
     return TIPO_META.get(tipo, {}).get('etiqueta', tipo.title())
 
 
+#  Cómo queda escrito un bloque dentro de las notas del evento:
+#      · Rondo 5v2 de dos toques (15') — Cuadro de 12x12. Cinco por fuera...
+#  Lo escribe `api_plan_agendar` al volcar un plan al calendario.
+_BLOQUE_EN_NOTAS = re.compile(
+    r"^·\s*(?P<nombre>.+?)\s*\((?P<minutos>\d{1,3})\s*['\u2032\u2019]\)"
+    r"\s*(?:[\u2014\u2013-]\s*(?P<desc>.*))?$")
+
+
+def bloques_y_notas(evento, plan=None):
+    """Los bloques de una sesión y lo que queda de notas de verdad.
+
+    Los bloques salen del plan si el plan sigue vivo —trae el material, que la
+    copia no guarda—; si no, de la copia que quedó escrita en las notas. Esa
+    copia no es un resto: es lo único que sobrevive cuando se borra el plan, y
+    se borran.
+
+    `notas` es lo que el entrenador escribió de su mano, sin la copia detrás.
+    """
+    texto = (evento.get('descripcion') or '').strip()
+    copia, sueltas = [], []
+    for linea in texto.split('\n'):
+        limpia = linea.strip()
+        cuadra = _BLOQUE_EN_NOTAS.match(limpia)
+        if cuadra:
+            copia.append({'nombre': cuadra.group('nombre'),
+                          'minutos': int(cuadra.group('minutos')),
+                          'descripcion': (cuadra.group('desc') or '').strip()})
+        elif limpia == '\u00b7':
+            #  La copia se corta a 1200 caracteres y a veces deja el punto de
+            #  la siguiente línea colgando. Eso no es una nota.
+            continue
+        else:
+            sueltas.append(linea)
+
+    return ((plan or {}).get('bloques') or copia), '\n'.join(sueltas).strip()
+
+
 def decorar(eventos):
     hoy = date.today()
     for e in eventos:
@@ -191,6 +229,10 @@ def decorar(eventos):
         e['_intensidad'] = INTENSIDAD_META.get(e.get('intensidad') or 'media',
                                                INTENSIDAD_META['media'])
         e['_carga'] = carga_de(e)
+        #  Aquí no hay plan a mano —serían 30 consultas para pintar un mes—,
+        #  así que se leen los bloques de la copia. Para la ficha suelta, que
+        #  sí lo tiene, `c_evento` lo vuelve a pedir con el plan delante.
+        e['_bloques'], e['_notas'] = bloques_y_notas(e)
     return eventos
 
 
@@ -220,6 +262,10 @@ def _para_js(e):
         'fecha': str(e.get('fecha') or '')[:10],
         'hora': str(e.get('hora') or '')[:5] or None,
         'lugar': e.get('lugar') or '', 'descripcion': e.get('descripcion') or '',
+        #  `descripcion` va entera porque el formulario de editar la necesita
+        #  tal cual; `notas` es la versión sin la copia de los bloques, que es
+        #  la que se ENSEÑA.
+        'notas': e.get('_notas', ''),
         'tipo_entreno': e.get('tipo_entreno') or 'mixto',
         'intensidad': e.get('intensidad') or 'media',
         'duracion_min': e.get('duracion_min') or 90,
@@ -552,6 +598,14 @@ def c_evento(eid):
             hoja['_n'] = len([f for f in filas
                               if any((f.get(c) or 0) for c in db.CAMPOS_PARTIDO)])
 
+    #  El plan del que salió la sesión. Si ya no está —pasa, y mucho— los
+    #  bloques se leen de la copia que quedó en las notas.
+    plan = None
+    if evento.get('plan_id'):
+        plan = db.one('fut_training_plans', 'plan del evento',
+                      id=evento['plan_id'], coach_id=uid)
+    bloques, notas = bloques_y_notas(evento, plan)
+
     #  La táctica de la sesión, y el resto de la biblioteca para poder
     #  añadir más sin salir de aquí.
     colgadas = db.jugadas_de_eventos([eid]).get(eid, [])
@@ -563,6 +617,7 @@ def c_evento(eid):
     return render_template('c_evento.html',
                            tab_activa='agenda', hide_tabbar=True,
                            evento=evento,
+                           plan=plan, bloques=bloques, notas=notas,
                            jugadas=colgadas, biblioteca=biblioteca,
                            marcados=len(marcas), fueron=fueron,
                            plantilla=plantilla,

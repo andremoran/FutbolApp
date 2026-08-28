@@ -205,6 +205,9 @@ def p_evento(eid):
     if evento.get('plan_id'):
         plan = db.one('fut_training_plans', 'plan del evento',
                       id=evento['plan_id'], coach_id=coach['id'])
+    #  Si el plan ya no está, los bloques se leen de la copia que quedó en las
+    #  notas: el jugador ve lo mismo que su entrenador.
+    bloques, notas = cal.bloques_y_notas(evento, plan)
 
     #  Dos cosas distintas en la misma fila: lo que el jugador AVISO antes y
     #  lo que el entrenador MARCO despues. La segunda manda.
@@ -213,6 +216,7 @@ def p_evento(eid):
     return render_template('p_evento.html',
                            tab_activa='agenda', hide_tabbar=True,
                            evento=evento, plan=plan, entrenador=coach,
+                           bloques=bloques, notas=notas,
                            marca=marca,
                            estados=cal.ESTADOS_ASISTENCIA)
 
@@ -220,6 +224,10 @@ def p_evento(eid):
 @bp.route('/agenda')
 @solo_jugador
 def agenda():
+    #  Igual que en `p_evento`: el calendario se importa aqui dentro para no
+    #  cruzar los dos modulos al arrancar.
+    from . import calendario as cal
+
     uid = current_user.id
     desde = (date.today() - timedelta(days=7)).isoformat()
     hasta = (date.today() + timedelta(days=60)).isoformat()
@@ -239,6 +247,7 @@ def agenda():
         e['_fecha'] = f
         e['_pasado'] = bool(f and f < hoy)
         e['_hoy'] = bool(f and f == hoy)
+        e['_bloques'], e['_notas'] = cal.bloques_y_notas(e)
         e['_asistencia'] = mi_asistencia.get(e['id'])
         e['_aviso'], e['_aviso_motivo'] = mi_aviso.get(e['id'], (None, ''))
 

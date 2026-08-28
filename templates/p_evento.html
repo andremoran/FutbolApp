@@ -112,16 +112,16 @@
 {# ══════════ LO QUE PIDE EL ENTRENADOR ══════════
    Lo primero que busca el jugador la noche antes: qué tengo que llevar. Va en
    su propia tarjeta y en ámbar para que no se pierda entre los datos. #}
-{% if evento.descripcion or (plan and plan.material) %}
+{% if notas or (plan and plan.material) %}
 <div class="pf-card" style="border-color:#fcd34d;background:var(--warning-bg)">
   <div class="pf-card__head">
     <h2 class="pf-card__title" style="color:#92400e">
       <i data-ico="alert-circle" class="pf-ico--sm"></i> Lo que pide tu entrenador
     </h2>
   </div>
-  {% if evento.descripcion %}
+  {% if notas %}
   <p style="margin:10px 0 0;font-size:13.5px;line-height:1.65;color:#92400e;
-            white-space:pre-wrap">{{ evento.descripcion }}</p>
+            white-space:pre-wrap">{{ notas }}</p>
   {% endif %}
   {% if plan and plan.material %}
   <p style="margin:10px 0 0;font-size:13px;line-height:1.6;color:#92400e">
@@ -132,28 +132,28 @@
 {% endif %}
 
 {# ══════════ EL PLAN DE LA SESIÓN ══════════ #}
-{% if plan %}
+{% if plan or bloques %}
 <div class="pf-card">
   <div class="pf-card__head">
     <h2 class="pf-card__title">Qué vais a trabajar</h2>
-    {% if plan.duracion_min %}
+    {% if plan and plan.duracion_min %}
     <span class="pf-card__badge">{{ plan.duracion_min }} min</span>
     {% endif %}
   </div>
 
-  {% if plan.nombre %}
+  {% if plan and plan.nombre %}
   <div style="font-size:14px;font-weight:700;margin-top:10px">{{ plan.nombre }}</div>
   {% endif %}
-  {% if plan.objetivo %}
+  {% if plan and plan.objetivo %}
   <p style="margin:6px 0 0;font-size:13px;line-height:1.65;color:var(--text-sec)">
     {{ plan.objetivo }}
   </p>
   {% endif %}
 
-  {% if plan.bloques %}
+  {% if bloques %}
   {# `compacto`: el jugador no monta el material, así que no le sale. Lo que
      sí le sirve —y no tenía— es cuánto dura cada parte y en qué minuto entra. #}
-  {% with bloques = plan.bloques, compacto = true %}
+  {% with compacto = true %}
     {% include '_plan_bloques.html' %}
   {% endwith %}
   {% endif %}
@@ -233,7 +233,10 @@
 {% if evento._jugadas %}
 <div class="pf-card">
   <div class="pf-card__head">
-    <h2 class="pf-card__title">Lo que vamos a trabajar</h2>
+    {# Se llamaba «Lo que vamos a trabajar» y justo encima está «Qué vais a
+       trabajar», que son los bloques: dos títulos que dicen lo mismo en la
+       misma pantalla. Esta tarjeta es la pizarra, y así se llama. #}
+    <h2 class="pf-card__title">La táctica de hoy</h2>
     <span class="pf-card__badge">{{ evento._jugadas|length }}</span>
   </div>
   {% for j in evento._jugadas %}
