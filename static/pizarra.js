@@ -161,7 +161,26 @@
         formacion: datos.formacion || ''
       };
     }
+    //  Al MIRAR una jugada se quiere ver la salida, no el desenlace: el
+    //  final ya lo cuenta la animación. Al editarla, en cambio, hay que
+    //  encontrarla como se dejó — por eso es una opción y no la norma.
+    if (this.op.desdeElPrincipio) { this.alPrimerMomento(); }
     this.redimensionar();
+  };
+
+  /*  Devuelve las fichas al primer momento capturado. No toca el historial ni
+      guarda nada: es una forma de mirar, no un cambio.
+      Solo mueve a los que ya estaban en ese primer momento; el que se añadió
+      a mitad de la jugada se queda donde está, igual que en la animación.  */
+  Pizarra.prototype.alPrimerMomento = function () {
+    var m = (this.estado.momentos || [])[0];
+    if (!m) { return false; }
+    var por = {};
+    (m.elementos || []).forEach(function (e) { por[e.id] = e; });
+    this.estado.elementos.forEach(function (e) {
+      if (por[e.id]) { e.x = por[e.id].x; e.y = por[e.id].y; }
+    });
+    return true;
   };
 
   Pizarra.prototype.volcar = function () {

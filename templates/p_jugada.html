@@ -75,7 +75,8 @@
 <script src="{{ url_for('static', filename='pizarra.js') }}"></script>
 <script>
 (function () {
-  var pz = new Pizarra(document.getElementById('pj-canvas'), { soloLectura: true });
+  var pz = new Pizarra(document.getElementById('pj-canvas'),
+                       { soloLectura: true, desdeElPrincipio: true });
   pz.cargar({{ (jugada.datos or {})|tojson }});
 
   //  La leyenda se arma con lo que HAY en el campo. Poner las diez fichas y

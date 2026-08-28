@@ -21,7 +21,7 @@
 
       //  Solo lectura: ni siquiera engancha los eventos del ratón. Esto es
       //  una vista previa, no la pizarra.
-      pz = new Pizarra(lienzo, { soloLectura: true });
+      pz = new Pizarra(lienzo, { soloLectura: true, desdeElPrincipio: true });
       pz.cargar(datos);
 
       var play = caja.querySelector('.jp__play');

@@ -951,11 +951,22 @@ def _mini_jugada(datos):
     puntos, trazos = [], []
 
     if datos.get('elementos'):
+        #  Igual que en la pizarra: la miniatura enseña el ARRANQUE. Lo que se
+        #  guarda es dónde quedaron las fichas al final, y una biblioteca de
+        #  desenlaces no dice de qué va cada jugada.
+        arranque = {}
+        for m in (datos.get('momentos') or [])[:1]:
+            for e in (m.get('elementos') or []):
+                if e.get('id') is not None and e.get('x') is not None:
+                    arranque[e['id']] = e
         for e in datos['elementos']:
             color = _MINI_COLOR.get(e.get('tipo'))
-            if not color or e.get('x') is None:
+            if not color:
                 continue
-            puntos.append({'x': round(e['x'] * 100, 1), 'y': round(e['y'] * alto, 1),
+            p = arranque.get(e.get('id')) or e
+            if p.get('x') is None or p.get('y') is None:
+                continue
+            puntos.append({'x': round(p['x'] * 100, 1), 'y': round(p['y'] * alto, 1),
                            'color': color,
                            'r': 2.2 if e.get('tipo') in ('balon', 'cono') else 3.4})
         for t in (datos.get('trazos') or [])[:8]:
