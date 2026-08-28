@@ -6,7 +6,9 @@ Los consume profoot.js con PF.api(). Todos exigen sesión iniciada y token CSRF,
 con el mismo patrón "synchronizer token" de main2.py (_csrf_ok): el token viaja
 en la cabecera X-CSRFToken y se compara con el de la sesión.
 """
+import base64
 import logging
+import re
 from datetime import date, datetime, timezone
 
 from flask import jsonify, request, url_for
@@ -777,6 +779,74 @@ def api_jugada_borrar(jid):
 
     db.delete('fut_tactical_plays', 'jugada del', id=jid, coach_id=uid, obligatorio=True)
     return jsonify({'ok': True, 'mensaje': 'Jugada borrada.'})
+
+
+# ═══════════════════════ LA FOTO DEL JUGADOR ═══════════════════════
+#  Llega como data URL desde el navegador, que es quien la recorta y la
+#  encoge: subir el archivo tal cual de un móvil serían cuatro megas para
+#  pintar un círculo de 48 píxeles.
+_DATA_URL = re.compile(r'^data:(image/[a-z+]+);base64,(.+)$', re.S)
+
+#  Se comprueba que los primeros bytes son de verdad los de una imagen. El
+#  `mime` lo escribe el navegador y no vale como prueba de nada: esto se va a
+#  servir luego con ese tipo, y un archivo que dice ser JPEG y no lo es no
+#  tiene por qué acabar en la base.
+_FIRMAS = ((b'\xff\xd8\xff', 'image/jpeg'),
+           (b'\x89PNG\r\n\x1a\n', 'image/png'))
+
+
+def _leer_foto(texto):
+    """(mime, base64, bytes) de una data URL, o (None, motivo) si no vale."""
+    cuadra = _DATA_URL.match((texto or '').strip())
+    if not cuadra:
+        return None, 'Eso no parece una imagen.'
+    mime, b64 = cuadra.group(1), re.sub(r'\s+', '', cuadra.group(2))
+    if mime not in db.FOTO_MIMES:
+        return None, 'Solo valen JPG, PNG o WEBP.'
+    try:
+        crudo = base64.b64decode(b64, validate=True)
+    except Exception:
+        return None, 'La imagen llegó rota. Inténtalo otra vez.'
+    if not crudo:
+        return None, 'La imagen llegó vacía.'
+    if len(crudo) > db.FOTO_MAX_BYTES:
+        return None, 'La foto pesa demasiado. Prueba con otra.'
+
+    real = next((m for firma, m in _FIRMAS if crudo.startswith(firma)), None)
+    if real is None and crudo[:4] == b'RIFF' and crudo[8:12] == b'WEBP':
+        real = 'image/webp'
+    if real is None:
+        return None, 'Ese archivo no es una imagen.'
+    return (real, b64, len(crudo)), None
+
+
+@bp.route('/api/jugador/<pid>/foto', methods=['POST', 'DELETE'])
+@api
+def api_jugador_foto(pid):
+    """Pone, cambia o quita la foto de un jugador del equipo."""
+    if not es_coach():
+        return jsonify({'error': 'Solo el entrenador cambia las fotos.'}), 403
+
+    columna = quien_es_del_equipo(pid)
+    if not columna:
+        return jsonify({'error': 'Ese jugador no es de tu equipo.'}), 404
+    dueno = {columna: pid}
+    uid = db.equipo_id(current_user.id)
+
+    if request.method == 'DELETE':
+        db.borrar_foto(dueno)
+        return jsonify({'ok': True, 'mensaje': 'Foto quitada.'})
+
+    leida, error = _leer_foto(body().get('foto'))
+    if error:
+        return jsonify({'error': error}), 400
+    mime, b64, tamano = leida
+
+    if not db.guardar_foto(uid, dueno, mime, b64, tamano):
+        return jsonify({'error': 'No se pudo guardar la foto.'}), 500
+    return jsonify({'ok': True, 'mensaje': 'Foto guardada.',
+                    'url': url_for('futbol.foto_jugador', pid=pid),
+                    'v': int(datetime.now(timezone.utc).timestamp())})
 
 
 # ═══════════════════════ CHECK-IN DE BIENESTAR ═══════════════════════

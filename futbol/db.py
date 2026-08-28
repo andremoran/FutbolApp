@@ -575,6 +575,51 @@ def _upsert_dueno(table, dueno, datos, ctx=''):
     return insert(table, {**dueno, **datos}, ctx)
 
 
+# ─── La foto del jugador ─────────────────────────────────────────────────────
+#  Vive en su propia tabla y se lee SOLO cuando se va a enseñar. Una lista de
+#  plantilla pregunta únicamente quién tiene foto y de cuándo es —`select` sin
+#  la columna `datos`—, y los bytes se piden aparte, uno por uno, en una
+#  dirección que el navegador cachea.
+FOTO_MIMES = ('image/jpeg', 'image/png', 'image/webp')
+
+#  Lo que se acepta guardar. El navegador manda la foto ya recortada a 400 px
+#  de lado, que ronda los 30 KB; el tope está alto a propósito, para que una
+#  foto de un móvil raro no se rechace, pero no tanto como para que alguien
+#  meta un archivo de cámara entero en una fila de la base.
+FOTO_MAX_BYTES = 400 * 1024
+
+
+def fotos_del_equipo(coach_id):
+    """{id del jugador: cuándo se cambió} de los que tienen foto. Sin bytes."""
+    filas = q(lambda: _sb.table('fut_player_photos')
+              .select('player_id, manual_player_id, actualizado')
+              .eq('coach_id', coach_id).execute().data or [],
+              [], 'fotos del equipo')
+    return {str(f.get('player_id') or f.get('manual_player_id')): f.get('actualizado')
+            for f in filas}
+
+
+def foto_de(player_id=None, manual_player_id=None):
+    """La foto entera (mime + base64) de un jugador, o None."""
+    dueno = dueno_filtro(player_id, manual_player_id)
+    if not dueno:
+        return None
+    return one('fut_player_photos', 'foto del jugador', **dueno)
+
+
+def guardar_foto(coach_id, dueno, mime, datos, tamano=0):
+    """Pone o cambia la foto. Una por jugador: si ya tenía, se sustituye."""
+    return _upsert_dueno('fut_player_photos', dueno,
+                         {'coach_id': coach_id, 'mime': mime, 'datos': datos,
+                          'bytes': tamano,
+                          'actualizado': datetime.now(timezone.utc).isoformat()},
+                         'guardar foto')
+
+
+def borrar_foto(dueno):
+    return delete('fut_player_photos', 'quitar foto', **dueno)
+
+
 def fila_atributos(player_id=None, manual_player_id=None):
     """La fila cruda de fut_attributes, o None si el jugador nunca fue evaluado."""
     dueno = dueno_filtro(player_id, manual_player_id)

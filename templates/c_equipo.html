@@ -119,6 +119,45 @@
   }
   .eq-ovr__n { font-size: 16px; font-weight: 900; line-height: 18px; }
   .eq-ovr__l { font-size: 7px; font-weight: 700; color: var(--text-muted); margin-top: 1px; }
+
+  /* ─── La foto ──────────────────────────────────────────────────────────
+     El círculo pasa a ser un botón: tocarlo abre la galería. Es el objetivo
+     grande (48 px); la cámara de la esquina solo dice que se puede tocar.
+
+     Con foto, el overall no desaparece — es lo que ordena la lista —: baja a
+     una chapa blanca pegada al borde de abajo, que se lee sobre cualquier
+     imagen. */
+  /*  `z-index` no es decoracion: el nombre lleva un enlace estirado que
+      cubre la tarjeta entera (`.eq-card__name::after`), y sin esto el toque
+      cae en el enlace y abre la ficha del jugador en vez de la galeria.
+      Medido en el navegador: al tocar el centro del circulo respondia el
+      ENLACE, no el boton.  */
+  .eq-ovr { position: relative; z-index: 2; padding: 0; cursor: pointer;
+            overflow: visible; }
+  .eq-ovr__img {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    border-radius: 50%; object-fit: cover; background: var(--border-soft);
+  }
+  .eq-ovr--foto .eq-ovr__l { display: none; }
+  .eq-ovr--foto .eq-ovr__n {
+    position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%);
+    background: #fff; border: 1px solid var(--border); border-radius: 100px;
+    padding: 0 5px; font-size: 11px; line-height: 15px; z-index: 1;
+    box-shadow: 0 1px 2px rgba(0,0,0,.12);
+  }
+  /*  Por encima del enlace estirado del nombre, que cubre la tarjeta entera:
+      sin esto, tocar la cámara abriría la ficha del jugador. */
+  .eq-foto {
+    position: absolute; right: -3px; top: -3px; z-index: 2;
+    width: 20px; height: 20px; border-radius: 50%; padding: 0;
+    border: 1.5px solid #fff; background: var(--primary); color: #fff;
+    display: grid; place-items: center;
+  }
+  /*  La camara asoma FUERA del circulo, y el circulo es redondo: un toque
+      justo encima caia en la tarjeta —y abria la ficha del jugador— porque
+      esa esquina ya no es del boton. Al dejarla recibir el toque, el clic
+      sube al boton, que es su padre.  */
+  .eq-ovr:disabled { opacity: .6; }
   .eq-card__body { flex: 1; min-width: 0; }
   .eq-card__namerow { display: flex; align-items: center; gap: 6px; }
   /* El enlace del nombre cubre toda la tarjeta (patrón "stretched link"): así
@@ -279,14 +318,32 @@
            data-delta="{{ j._delta }}" data-alertas="{{ j._alertas|length }}"
            data-perfil="{{ 1 if j._tiene_perfil else 0 }}">
     <div class="eq-card__top">
-      <div class="eq-ovr" style="border-color:{{ color if j._tiene_perfil else 'var(--border)' }}">
+      {# El círculo es el botón de la foto. La imagen no va incrustada en
+         el HTML: se pide a /foto/jugador/<id>, que el navegador cachea un día
+         y que solo responde a gente de este equipo. `v` es la fecha del
+         último cambio, para que al cambiarla se vea la nueva. #}
+      <button class="eq-ovr {{ 'eq-ovr--foto' if j._foto or j.profile_photo }}" type="button"
+              style="border-color:{{ color if j._tiene_perfil else 'var(--border)' }}"
+              data-foto="{{ j.id }}" data-nombre="{{ j.name }}"
+              data-tiene="{{ 1 if j._foto else 0 }}"
+              aria-label="{{ 'Cambiar la foto de' if j._foto else 'Poner una foto a' }} {{ j.name }}">
+        {% if j._foto %}
+        <img class="eq-ovr__img" alt=""
+             src="{{ url_for('futbol.foto_jugador', pid=j.id) }}?v={{ j._foto_v }}">
+        {% elif j.profile_photo %}
+        {# La que trae la app nativa, si la hay: es una dirección de fuera. #}
+        <img class="eq-ovr__img" alt="" src="{{ j.profile_photo }}">
+        {% endif %}
+
         {% if j._tiene_perfil %}
         <span class="eq-ovr__n" style="color:{{ color }}">{{ j.overall }}</span>
         <span class="eq-ovr__l">OVR</span>
-        {% else %}
+        {% elif not (j._foto or j.profile_photo) %}
         <i data-ico="user" class="pf-ico--sm" style="color:var(--text-muted)"></i>
         {% endif %}
-      </div>
+
+        <span class="eq-foto"><i data-ico="camera" class="pf-ico--xs"></i></span>
+      </button>
 
       <div class="eq-card__body">
         <div class="eq-card__namerow">
@@ -403,9 +460,161 @@
 {% endif %}
 
 <div style="height:24px"></div>
+{# ══════════ LA FOTO: cambiarla o quitarla ══════════
+   Solo sale cuando el jugador YA tiene foto. Si no la tiene, tocar el círculo
+   abre la galería directamente, que es lo que se quiere el 90% de las veces. #}
+<div class="pf-sheet-back" id="pf-sheet-foto-back"></div>
+<aside class="pf-sheet" id="pf-sheet-foto" role="dialog" aria-modal="true"
+       aria-labelledby="foto-titulo">
+  <div class="pf-sheet__grip"></div>
+  <div class="pf-sheet__head">
+    <div class="pf-row pf-row--between">
+      <h2 class="pf-sheet__title" id="foto-titulo">Foto</h2>
+      <button type="button" class="pf-hero__btn"
+              style="background:var(--border-soft);color:var(--text-sec)"
+              onclick="PF.closeSheet('pf-sheet-foto')" aria-label="Cerrar">
+        <i data-ico="x" class="pf-ico--sm"></i>
+      </button>
+    </div>
+  </div>
+  <div class="pf-sheet__body">
+    <button class="pf-btn pf-btn--primary pf-btn--block" type="button" id="foto-cambiar">
+      <i data-ico="camera" class="pf-ico--sm"></i> Cambiar la foto
+    </button>
+    <button class="pf-btn pf-btn--ghost pf-btn--block pf-mt-12" type="button" id="foto-quitar"
+            style="color:var(--danger)">
+      <i data-ico="trash-2" class="pf-ico--sm"></i> Quitar la foto
+    </button>
+  </div>
+</aside>
+
 {% endblock %}
 
 {% block scripts %}
+<script>
+/*  ─── La foto del jugador ────────────────────────────────────────────────
+    La imagen se recorta y se encoge AQUÍ, antes de subirla: la de un móvil
+    son cuatro megas y lo que se va a ver es un círculo de 48 px. Sale
+    cuadrada de 400 px, que es nítida hasta en pantallas densas y pesa unos
+    30 KB.                                                                 */
+(function () {
+  var LADO = 400;
+  var lista = document.getElementById('tp-lista');
+  if (!lista) { return; }
+
+  var elegir = document.createElement('input');
+  elegir.type = 'file';
+  elegir.accept = 'image/*';
+  elegir.style.display = 'none';
+  document.body.appendChild(elegir);
+
+  var actual = null;          // el botón del jugador que se está tocando
+
+  function refrescar(boton, url) {
+    var img = boton.querySelector('.eq-ovr__img');
+    if (!img) {
+      img = document.createElement('img');
+      img.className = 'eq-ovr__img';
+      img.alt = '';
+      boton.insertBefore(img, boton.firstChild);
+      //  Con foto ya no hace falta el muñeco gris de «sin foto».
+      var icono = boton.querySelector('[data-ico="user"], svg[data-ico="user"]');
+      if (icono) { icono.remove(); }
+    }
+    img.src = url;
+    boton.classList.add('eq-ovr--foto');
+    boton.dataset.tiene = '1';
+  }
+
+  function quitarDeLaTarjeta(boton) {
+    var img = boton.querySelector('.eq-ovr__img');
+    if (img) { img.remove(); }
+    boton.classList.remove('eq-ovr--foto');
+    boton.dataset.tiene = '0';
+  }
+
+  /*  Recorte cuadrado por el centro. `createImageBitmap` con
+      `imageOrientation` respeta el giro que traen las fotos de móvil; sin
+      eso, media galería sale tumbada.  */
+  function encoger(archivo) {
+    var abrir = (window.createImageBitmap
+      ? createImageBitmap(archivo, { imageOrientation: 'from-image' })
+      : new Promise(function (res, rej) {
+          var im = new Image();
+          im.onload = function () { res(im); };
+          im.onerror = rej;
+          im.src = URL.createObjectURL(archivo);
+        }));
+
+    return abrir.then(function (im) {
+      var w = im.width || im.naturalWidth;
+      var h = im.height || im.naturalHeight;
+      var lado = Math.min(w, h);
+      var lienzo = document.createElement('canvas');
+      lienzo.width = lienzo.height = LADO;
+      lienzo.getContext('2d').drawImage(
+        im, (w - lado) / 2, (h - lado) / 2, lado, lado, 0, 0, LADO, LADO);
+      if (im.close) { im.close(); }
+      return lienzo.toDataURL('image/jpeg', 0.82);
+    });
+  }
+
+  lista.addEventListener('click', function (ev) {
+    var b = ev.target.closest('.eq-ovr');
+    if (!b) { return; }
+    //  El nombre lleva un enlace que cubre la tarjeta entera: sin esto,
+    //  tocar la foto abriría la ficha del jugador.
+    ev.preventDefault();
+    ev.stopPropagation();
+    actual = b;
+
+    if (b.dataset.tiene === '1') {
+      document.getElementById('foto-titulo').textContent = b.dataset.nombre || 'Foto';
+      PF.openSheet('pf-sheet-foto');
+    } else {
+      elegir.value = '';
+      elegir.click();
+    }
+  });
+
+  document.getElementById('foto-cambiar').addEventListener('click', function () {
+    PF.closeSheet('pf-sheet-foto');
+    elegir.value = '';
+    elegir.click();
+  });
+
+  document.getElementById('foto-quitar').addEventListener('click', function () {
+    var b = actual;
+    if (!b) { return; }
+    PF.closeSheet('pf-sheet-foto');
+    if (!confirm('¿Quitar la foto de ' + (b.dataset.nombre || 'este jugador') + '?')) { return; }
+    PF.api('/api/jugador/' + b.dataset.foto + '/foto', null, 'DELETE')
+      .then(function () { quitarDeLaTarjeta(b); PF.toast('Foto quitada.'); })
+      .catch(function (e) { PF.toast(e.message, 'error'); });
+  });
+
+  elegir.addEventListener('change', function () {
+    var archivo = elegir.files && elegir.files[0];
+    var b = actual;
+    if (!archivo || !b) { return; }
+
+    b.disabled = true;
+    encoger(archivo)
+      .then(function (dataUrl) {
+        return PF.api('/api/jugador/' + b.dataset.foto + '/foto', { foto: dataUrl });
+      })
+      .then(function (r) {
+        refrescar(b, (r.url || ('/foto/jugador/' + b.dataset.foto)) + '?v=' + r.v);
+        b.disabled = false;
+        PF.toast(r.mensaje || 'Foto guardada.');
+      })
+      .catch(function (e) {
+        b.disabled = false;
+        PF.toast(e.message || 'No se pudo leer esa imagen.', 'error');
+      });
+  });
+})();
+</script>
 <script>
 (function () {
   var q = document.getElementById('tp-q');

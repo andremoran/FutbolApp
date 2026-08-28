@@ -9,15 +9,19 @@ La plantilla del equipo vive en `fut_plantilla` (entrenador ↔ jugador). El
 código con el que un jugador se une es el `codigo_equipo` del entrenador, que
 se genera al darse de alta.
 """
+import base64
+import logging
 from datetime import date, timedelta
 from functools import wraps
 
-from flask import render_template, redirect, url_for, abort, request
+from flask import render_template, redirect, url_for, abort, request, Response
 from flask_login import login_required, current_user
 
 import roles
 
 from . import bp, db
+
+logger = logging.getLogger(__name__)
 
 
 def solo_entrenador(f):
@@ -242,7 +246,7 @@ def _edad_de(anio_nacimiento):
 
 def _ficha_equipo(coach_id, semana_actual, alertas_por_dueno, *, player_id=None,
                   manual_player_id=None, nombre, posicion, dorsal, anio_nacimiento,
-                  foto=None, activo=True):
+                  foto=None, activo=True, subida=None):
     """Arma la tarjeta de un jugador (con o sin cuenta) para la pantalla
     Equipo: overall/potencial, cambio semanal y alerta principal — mismos
     datos que TeamPlayersScreen.tsx, calculados en futbol/db.py.
@@ -268,7 +272,12 @@ def _ficha_equipo(coach_id, semana_actual, alertas_por_dueno, *, player_id=None,
         # Se muestra la posición tal cual, pero se filtra por su familia.
         'familia': db.familia_posicion(posicion),
         'dorsal': dorsal, 'edad': _edad_de(anio_nacimiento),
+        #  `profile_photo` es la URL que escribe la app nativa, si la hay.
+        #  `_foto` dice si tiene una subida aquí, y `_foto_v` la fecha, que va
+        #  en la dirección para que al cambiarla se vea la nueva y no la que
+        #  el navegador tenía guardada.
         'profile_photo': foto, 'activo': activo,
+        '_foto': bool(subida), '_foto_v': str(subida or '')[:19],
         'overall': ficha['overall'], 'potencial': ficha['potencial'],
         'media_tecnica': ficha['media_tecnica'], 'media_fisica': ficha['media_fisica'],
         'media_mental': ficha['media_mental'],
@@ -278,6 +287,54 @@ def _ficha_equipo(coach_id, semana_actual, alertas_por_dueno, *, player_id=None,
         # proxy de IA); la tarjeta simplemente no pinta ese párrafo.
         '_resumen_ia': None,
     }
+
+
+@bp.route('/foto/jugador/<pid>')
+@login_required
+def foto_jugador(pid):
+    """La foto de un jugador, servida por la app y no por la base.
+
+    Va por aquí y no en el HTML por dos razones. Una, el peso: veinte fotos
+    metidas en la página son medio mega en cada visita, y así el navegador se
+    las guarda un día entero. Y dos, quién las ve: son caras de chavales, y
+    varias de menores — solo las sirve a su equipo.
+    """
+    uid = db.equipo_id(current_user.id)
+    if getattr(current_user, 'role', '') == 'especialista':
+        de_mi_equipo = any(str(j['id']) == str(pid) for j in db.plantilla_completa(uid))
+    else:
+        de_mi_equipo = str(current_user.id) == str(pid)   # el jugador, la suya
+    if not de_mi_equipo:
+        abort(404)
+
+    jugador = next((j for j in db.plantilla_completa(uid) if str(j['id']) == str(pid)), None)
+    fila = db.foto_de(**db.dueno_filtro(
+        manual_player_id=pid if (jugador or {}).get('es_manual') else None,
+        player_id=None if (jugador or {}).get('es_manual') else pid))
+    if not fila or not fila.get('datos'):
+        abort(404)
+
+    #  Con ETag el navegador pregunta «¿ha cambiado?» y casi siempre se le
+    #  contesta que no con una respuesta vacía, en vez de mandar la foto otra
+    #  vez. La marca es la fecha del último cambio: si se sube otra, cambia.
+    etag = '"%s"' % str(fila.get('actualizado') or '')[:32]
+    if request.headers.get('If-None-Match') == etag:
+        return Response(status=304, headers={'ETag': etag})
+
+    try:
+        crudo = base64.b64decode(fila['datos'])
+    except (ValueError, TypeError) as e:
+        #  Solo se traga los fallos de la CONVERSIÓN. Con un `except Exception`
+        #  aquí, un despiste de programación —a esta función le faltaba el
+        #  import de base64— sale como «no hay foto» y se busca en el sitio
+        #  equivocado durante media hora.
+        logger.error('foto ilegible del jugador %s: %s', pid, e)
+        abort(404)
+    return Response(crudo, mimetype=fila.get('mime') or 'image/jpeg', headers={
+        'ETag': etag,
+        'Cache-Control': 'private, max-age=86400',
+        'Content-Length': str(len(crudo)),
+    })
 
 
 @bp.route('/coach/plantilla')
@@ -295,18 +352,25 @@ def c_equipo():
         clave = str(a.get('player_id') or a.get('manual_player_id'))
         alertas_por_dueno.setdefault(clave, []).append(a)
 
+    #  Quién tiene foto, en una sola consulta y sin traerse las imágenes.
+    fotos = db.fotos_del_equipo(uid)
+
     plantilla = []
     for j in jugadores:
         plantilla.append(_ficha_equipo(
             uid, semana_actual, alertas_por_dueno, player_id=j['id'],
             nombre=j.get('name'), posicion=(j.get('fut') or {}).get('posicion'),
             dorsal=(j.get('fut') or {}).get('dorsal'), anio_nacimiento=j.get('anio_nacimiento'),
-            foto=j.get('profile_photo'), activo=j.get('activo', True)))
+            foto=j.get('profile_photo'), activo=j.get('activo', True),
+            subida=fotos.get(str(j['id']))))
     for m in manuales:
         plantilla.append(_ficha_equipo(
             uid, semana_actual, alertas_por_dueno, manual_player_id=m['id'],
             nombre=m.get('nombre'), posicion=m.get('posicion'),
-            dorsal=m.get('dorsal'), anio_nacimiento=m.get('anio_nacimiento')))
+            dorsal=m.get('dorsal'), anio_nacimiento=m.get('anio_nacimiento'),
+            #  Al jugador sin cuenta nunca se le pasaba su `foto`, así que la
+            #  columna estaba ahí sin que nadie la leyera.
+            foto=m.get('foto'), subida=fotos.get(str(m['id']))))
 
     # Con perfil primero (de mejor a peor overall); sin evaluar, al final.
     plantilla.sort(key=lambda p: (0 if p['_tiene_perfil'] else 1, -(p['overall'] or 0)))
