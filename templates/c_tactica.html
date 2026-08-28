@@ -36,6 +36,25 @@
     overflow: hidden; box-shadow: var(--sh-sm); transition: transform .12s;
   }
   .tc-card:active { transform: scale(.98); }
+  .tc-card { position: relative; display: flex; flex-direction: column; }
+
+  /*  El enlace ocupa la tarjeta entera. Las dos columnas de la rejilla se
+      estiran a la más alta, y si el enlace mide solo su contenido, la franja
+      de abajo de la más baja deja de abrir la jugada: se toca la tarjeta y no
+      pasa nada, que es de las cosas que peor sientan.  */
+  .tc-link { flex: 1; display: block; color: inherit; text-decoration: none; }
+
+  /*  El aspa va sobre el campo y no debajo del nombre: ahí no estorba al
+      texto y queda lejos del sitio por donde se toca para abrir la jugada.
+      En un teléfono no hay «pasar el ratón por encima», así que se ve
+      siempre; lo que evita el disgusto es la pregunta de después.  */
+  .tc-borrar { position: absolute; top: 6px; right: 6px; z-index: 2;
+               width: 30px; height: 30px; border-radius: 50%; border: none;
+               background: rgba(15,23,42,.55); color: #fff; cursor: pointer;
+               display: grid; place-items: center; padding: 0;
+               backdrop-filter: blur(3px); }
+  .tc-borrar:active { background: var(--danger); }
+  .tc-borrar:disabled { opacity: .4; }
   .tc-mini { display: block; width: 100%; background: #15803d; }
   .tc-body { padding: 11px 12px; }
   .tc-t { font-size: 14px; font-weight: 700; }
@@ -66,8 +85,18 @@
 
 <div class="tc-grid" id="tc-grid">
   {% for j in jugadas %}
-  <a class="tc-card" data-carpeta="{{ j.carpeta or 'Jugada' }}"
-     href="{{ url_for('futbol.c_pizarra', jid=j.id) }}">
+  {# La tarjeta era un <a> entero. Un botón dentro de un enlace no es HTML
+     válido —y el lector de pantalla no sabe qué está tocando—, así que ahora
+     el enlace envuelve solo lo que lleva a la pizarra y el aspa va aparte. #}
+  <div class="tc-card" data-carpeta="{{ j.carpeta or 'Jugada' }}">
+    <button class="tc-borrar" type="button"
+            aria-label="Borrar {{ j.nombre }}"
+            data-id="{{ j.id }}"
+            data-nombre="{{ j.nombre }}"
+            data-sesiones="{{ j._en_sesiones }}">
+      <i data-ico="trash-2" class="pf-ico--xs"></i>
+    </button>
+  <a class="tc-link" href="{{ url_for('futbol.c_pizarra', jid=j.id) }}">
     <svg class="tc-mini" viewBox="0 0 100 {{ j._mini_alto }}" preserveAspectRatio="xMidYMid meet">
       <rect x="0" y="0" width="100" height="{{ j._mini_alto }}" fill="#15803d"/>
       {% if j._cancha == 'rondo' %}
@@ -103,9 +132,11 @@
       <div class="tc-s">
         {{ j.formacion or (j._mini|length ~ ' elementos') }}
         {%- if j._momentos %} · {{ j._momentos }} momentos{% endif %}
+        {%- if j._en_sesiones %} · en {{ j._en_sesiones }} sesión{{ '' if j._en_sesiones == 1 else 'es' }}{% endif %}
       </div>
     </div>
   </a>
+  </div>
   {% endfor %}
 </div>
 <div style="height:20px"></div>
@@ -129,6 +160,45 @@
   /*  El filtro es del navegador y no del servidor: son unas pocas tarjetas ya
       pintadas y recargar la página entera para esconder la mitad sería pedirle
       datos al móvil por nada.  */
+  /*  Borrar. La pregunta dice el nombre y, si está colgada de alguna sesión,
+      que se va a caer de ellas: borrar el rondo del martes sin saber que era
+      el del martes es el disgusto que hay que evitar.  */
+  (function () {
+    var grid = document.getElementById('tc-grid');
+    if (!grid) { return; }
+
+    grid.addEventListener('click', function (ev) {
+      var b = ev.target.closest('.tc-borrar');
+      if (!b) { return; }
+
+      var n = parseInt(b.dataset.sesiones || '0', 10);
+      var aviso = '¿Borrar «' + b.dataset.nombre + '»?';
+      if (n) {
+        aviso += '\n\nEstá en ' + n + (n === 1 ? ' sesión' : ' sesiones')
+               + ' y se quitará de ' + (n === 1 ? 'ella' : 'ellas') + '.';
+      }
+      if (!confirm(aviso + '\n\nNo se puede deshacer.')) { return; }
+
+      b.disabled = true;
+      PF.api('/api/jugada/' + b.dataset.id, null, 'DELETE')
+        .then(function (r) {
+          PF.toast(r.mensaje || 'Jugada borrada.');
+          var tarjeta = b.closest('.tc-card');
+          tarjeta.remove();
+          //  Si era la última, la pantalla tiene que enseñar el vacío de
+          //  siempre —y el contador de la cabecera es del servidor—, así que
+          //  se vuelve a pedir en vez de dejar una rejilla en blanco.
+          if (!grid.querySelector('.tc-card')) { location.reload(); return; }
+          //  El contador de la cabecera lo pinta el servidor: si no se toca,
+          //  se queda diciendo que hay ocho cuando quedan siete.
+          var cuenta = grid.querySelectorAll('.tc-card').length;
+          var sub = document.querySelector('.pf-hero__subtitle');
+          if (sub) { sub.textContent = cuenta + (cuenta === 1 ? ' guardada' : ' guardadas'); }
+        })
+        .catch(function (e) { PF.toast(e.message, 'error'); b.disabled = false; });
+    });
+  })();
+
   (function () {
     var filtros = document.getElementById('tc-filtros');
     if (!filtros) { return; }

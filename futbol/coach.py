@@ -994,10 +994,21 @@ def _mini_jugada(datos):
 @solo_entrenador
 @roles.solo_pro('tactica')
 def c_tactica():
-    jugadas = db.rows('fut_tactical_plays', 'jugadas', coach_id=db.equipo_id(current_user.id),
+    uid = db.equipo_id(current_user.id)
+    jugadas = db.rows('fut_tactical_plays', 'jugadas', coach_id=uid,
                       _order='creado', _desc=True)
+
+    #  En cuántas sesiones está colgada cada una. Al borrarla se cae de todas
+    #  —los enlaces van en cascada— y eso hay que decirlo ANTES, no después.
+    #  Una consulta para todas y no una por jugada.
+    usos = {}
+    for e in (db.rows('fut_event_plays', 'enlaces', coach_id=uid) or []):
+        clave = str(e.get('play_id'))
+        usos[clave] = usos.get(clave, 0) + 1
+
     for j in jugadas:
         j['_fecha'] = db.parse_fecha(j.get('creado'))
+        j['_en_sesiones'] = usos.get(str(j.get('id')), 0)
         j.update(_mini_jugada(j.get('datos') or {}))
 
     #  Las carpetas que se usan de verdad, en el orden de siempre y sin las

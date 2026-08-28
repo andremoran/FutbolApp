@@ -757,10 +757,26 @@ def api_evento_jugada_quitar(eid, enlace):
 @bp.route('/api/jugada/<jid>', methods=['DELETE'])
 @api
 def api_jugada_borrar(jid):
+    """Borra una jugada de la biblioteca.
+
+    Se mira de quién es ANTES. Filtrar por `coach_id` ya impedía borrar la de
+    otro club —eso estaba bien—, pero la respuesta era «ok» igualmente: la
+    pantalla decía «borrada» y la jugada seguía ahí. Un borrado que miente es
+    peor que un error.
+
+    Al irse, se lleva sus enlaces con las sesiones (`fut_event_plays` enlaza
+    en cascada). Por eso la pantalla avisa antes de en cuántas está.
+    """
     if not es_coach():
         return jsonify({'error': 'Solo el entrenador borra jugadas.'}), 403
-    db.delete('fut_tactical_plays', 'jugada del', id=jid, coach_id=db.equipo_id(current_user.id), obligatorio=True)
-    return jsonify({'ok': True})
+
+    uid = db.equipo_id(current_user.id)
+    jugada = db.one('fut_tactical_plays', 'jugada mia', id=jid, coach_id=uid)
+    if not jugada:
+        return jsonify({'error': 'Esa jugada no es de tu equipo.'}), 404
+
+    db.delete('fut_tactical_plays', 'jugada del', id=jid, coach_id=uid, obligatorio=True)
+    return jsonify({'ok': True, 'mensaje': 'Jugada borrada.'})
 
 
 # ═══════════════════════ CHECK-IN DE BIENESTAR ═══════════════════════
