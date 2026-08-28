@@ -43,7 +43,11 @@ def _ahora():
 def _coach_o_fuera():
     """Estas pantallas son del cuerpo técnico. Un jugador va a lo suyo."""
     if getattr(current_user, 'role', '') != 'especialista':
-        return redirect(url_for('futbol.p_inicio'))
+        #  `futbol.inicio`, que es como se llama de verdad. Con `p_inicio`
+        #  —el nombre de la PLANTILLA, no del endpoint— este redirect no se
+        #  podia construir y la pantalla contestaba 500: al jugador con Pro
+        #  que abriera esta direccion le reventaba en vez de echarlo.
+        return redirect(url_for('futbol.inicio'))
     return None
 
 
