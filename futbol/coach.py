@@ -417,9 +417,11 @@ PALETA_ATRIBUTOS = ('#0ea5e9', '#10b981', '#f59e0b', '#ef4444',
 
 LINEAS_PERFIL = [
     ('overall', 'Global',  '#0f172a',        3),
-    ('tecnica', 'Técnico', '#047857',        2),
-    ('fisico',  'Físico',  '#475569',        2),
-    ('mental',  'Mental',  '#7e6acb',        2),
+    #  Cuatro TONOS distintos, no cuatro grises: el fisico era gris pizarra
+    #  y sobre el negro del global no habia forma de separarlos.
+    ('tecnica', 'Técnico', '#059669',        2),   # verde
+    ('fisico',  'Físico',  '#0ea5e9',        2),   # azul
+    ('mental',  'Mental',  '#8b5cf6',        2),   # morado
 ]
 
 
@@ -568,9 +570,9 @@ def datos_de_progreso(uid, jugador, clave='30'):
     #  da: al llegar a la fila doce ya no te acuerdas de la tres.
     familias = []
     for fam, titulo, ico, tono, fondo in (
-            ('tecnica', 'Técnico', 'target', 'var(--primary)', 'var(--primary-soft)'),
-            ('fisico', 'Físico', 'zap', '#475569', '#f1f5f9'),
-            ('mental', 'Mental', 'cpu', '#7e6acb', '#ede9fe')):
+            ('tecnica', 'Técnico', 'target', '#059669', 'var(--primary-soft)'),
+            ('fisico', 'Físico', 'zap', '#0ea5e9', '#e0f2fe'),
+            ('mental', 'Mental', 'cpu', '#8b5cf6', '#ede9fe')):
         suyos = [a for a in atributos if a['familia'] == fam]
         ahora = [a['hoy'] for a in suyos if a['hoy'] is not None]
         antano = [_valor(antes, a['clave']) for a in suyos]

@@ -14,6 +14,8 @@ from datetime import date, datetime, timezone
 from flask import jsonify, request, url_for
 from flask_login import login_required, current_user
 
+import roles
+
 from . import bp, db
 from .ia import responder_ia
 
@@ -73,6 +75,20 @@ def de_mi_plantilla(pid):
     """
     equipo = db.equipo_id(current_user.id)
     return any(str(j['id']) == str(pid) for j in db.jugadores_del_entrenador(equipo))
+
+
+def _sin_pro(feature):
+    """La respuesta de «esto es de Pro», o None si sí lo tiene.
+
+    Existe porque la pizarra estaba cerrada solo por delante: sus pantallas
+    llevan `solo_pro('tactica')` y sus endpoints no, así que se podía guardar
+    una jugada desde fuera con el plan gratis. El 402 con `pro: True` es lo
+    que el navegador ya sabe leer para enseñar el cartel.
+    """
+    if roles.es_pro(current_user):
+        return None
+    return jsonify({'error': 'La pizarra táctica es del plan Pro.',
+                    'pro': True, 'url': url_for('futbol.planes')}), 402
 
 
 def quien_es_del_equipo(pid):
@@ -675,6 +691,9 @@ def api_test_resultado(tid):
 def api_jugada_guardar():
     if not es_coach():
         return jsonify({'error': 'Solo el entrenador guarda jugadas.'}), 403
+    cerrado = _sin_pro('tactica')
+    if cerrado:
+        return cerrado
     d = body()
     nombre = (d.get('nombre') or '').strip() or 'Jugada sin nombre'
     uid = db.equipo_id(current_user.id)
@@ -716,6 +735,9 @@ def api_evento_jugada(eid):
     """
     if not es_coach():
         return jsonify({'error': 'Solo el entrenador planifica la sesión.'}), 403
+    cerrado = _sin_pro('tactica')
+    if cerrado:
+        return cerrado
 
     uid = db.equipo_id(current_user.id)
     d = body()
@@ -771,6 +793,9 @@ def api_jugada_borrar(jid):
     """
     if not es_coach():
         return jsonify({'error': 'Solo el entrenador borra jugadas.'}), 403
+    cerrado = _sin_pro('tactica')
+    if cerrado:
+        return cerrado
 
     uid = db.equipo_id(current_user.id)
     jugada = db.one('fut_tactical_plays', 'jugada mia', id=jid, coach_id=uid)
