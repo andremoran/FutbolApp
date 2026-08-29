@@ -1046,26 +1046,45 @@ a.pf-avatar--xl::after   { inset: 0; }
 .pa__media    { font-size: 22px; font-weight: 800; letter-spacing: -.5px; }
 .pa__delta    { font-size: 12px; font-weight: 800; }
 
-.pa__fichas   { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 4px; }
+.pa__fichas   { display: flex; flex-wrap: wrap; gap: 5px; margin: 10px 0 2px; }
 /*  Cada ficha es leyenda, resumen y interruptor: dice de que color va ese
     atributo, cuanto vale hoy, y enciende o apaga su linea. Con siete lineas a
     la vez la grafica es una maraña; de una en una se lee perfecto.  */
-.pa__ficha    { display: inline-flex; align-items: center; gap: 6px;
-                padding: 5px 10px 5px 8px; border-radius: 100px;
+.pa__ficha    { display: inline-flex; align-items: center; gap: 5px;
+                padding: 4px 9px 4px 7px; border-radius: 100px;
                 border: 1px solid var(--border); background: #fff;
-                font: inherit; font-size: 12px; font-weight: 600;
-                color: var(--text-sec); cursor: pointer; }
-.pa__ficha[aria-pressed="false"] { opacity: .45; }
+                font: inherit; font-size: 11.5px; font-weight: 600;
+                color: var(--text-sec); cursor: pointer;
+                transition: opacity .15s, border-color .15s; }
+/*  Apagada: se va el color del punto y del numero, no solo la opacidad. Con
+    siete fichas seguidas, «un poco mas claro» no se distingue de un vistazo.  */
+.pa__ficha[aria-pressed="false"] { opacity: .55; border-color: var(--border-soft); }
+.pa__ficha[aria-pressed="false"] .pa__pt { background: var(--text-muted); }
+.pa__ficha[aria-pressed="false"] .pa__v  { color: var(--text-muted); }
 .pa__ficha[aria-pressed="true"]  { border-color: var(--tono); }
-.pa__pt       { width: 8px; height: 8px; border-radius: 50%; flex: none;
+.pa__ficha:disabled { cursor: default; }
+.pa__pt       { width: 7px; height: 7px; border-radius: 50%; flex: none;
                 background: var(--tono); }
 .pa__v        { font-weight: 800; color: var(--tono); }
-.pa__d        { font-size: 10.5px; font-weight: 800; }
-.pa__grafica  { margin-top: 8px; }
+/*  El cambio va en gris: lo que se compara entre atributos es el valor, y
+    siete numeros de colores seguidos no dejan leer ninguno.  */
+.pa__d        { font-size: 10px; font-weight: 700; color: var(--text-muted); }
+
+.pa__grafica  { margin-top: 6px; }
+/*  El techo es lo que mantiene el panel pequeno: el dibujo va en un lienzo de
+    480x200, y sin tope en una pantalla ancha se estiraba hasta 590 px de alto.
+    Con `meet` no se deforma: se centra y ya.  */
+.pa__grafica .gm__svg { max-height: 210px; }
 .pa__vacio    { margin: 12px 0 0; font-size: 12.5px; color: var(--text-muted); }
 /*  Apagar una linea no la borra del SVG: se esconde, para que al volver a
-    encenderla aparezca donde estaba y la escala no baile.  */
-.pa [data-linea][hidden] { display: none; }
+    encenderla aparezca donde estaba y la escala no baile. Va por clase porque
+    el atributo `hidden` no existe en SVG.  */
+.pa .pa-linea.pa-off { display: none; }
+/*  El hueco blanco que separa una linea de otra al cruzarse.  */
+.pa .pa-halo  { stroke: #fff; }
+/*  Los numeros de los ejes van dentro del dibujo, asi que se encogen con el:
+    a 9 px acababan en 6 px en un movil. A 12 se leen en los dos sitios.  */
+.pa__grafica .gm__etq { font-size: 12px; }
 
 .gm__leyenda  { display: flex; flex-wrap: wrap; justify-content: center;
                 gap: 6px 14px; margin-top: 10px; }

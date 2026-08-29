@@ -70,11 +70,23 @@
       {% endfor %}
 
       {% for l in g.lineas %}
-      <g data-linea="{{ l.clave }}">
-        <path class="gm__linea" d="{{ l.d }}"
+      {# Se apaga con la clase `pa-off`, no con el atributo `hidden`: `hidden`
+         es de HTML y en un elemento de SVG no hace nada — la línea seguía
+         dibujada aunque la ficha se pusiera en gris. #}
+      <g class="pa-linea" data-linea="{{ l.clave }}">
+        {# Un trazo blanco por debajo, un poco mas grueso. Con siete lineas en
+           una franja de veinte puntos se cruzan sin parar, y sin este hueco
+           blanco no se sabe cual pasa por encima de cual. #}
+        {# `non-scaling-stroke`: el dibujo se encoge para caber (480 de lienzo
+           en 310 px de movil) y con el trazo normal las lineas salian de un
+           pixel y medio, casi transparentes. Asi miden lo mismo en el movil
+           que en el escritorio. #}
+        <path class="gm__linea pa-halo" d="{{ l.d }}" vector-effect="non-scaling-stroke"
+              style="stroke-width:{{ l.grosor + 2.6 }}"></path>
+        <path class="gm__linea" d="{{ l.d }}" vector-effect="non-scaling-stroke"
               style="stroke:{{ l.color }};stroke-width:{{ l.grosor }}"></path>
-        <circle class="gm__punta" cx="{{ l.ultimo.x }}" cy="{{ l.ultimo.y }}" r="3.2"
-                style="stroke:{{ l.color }}"></circle>
+        <circle class="gm__punta" cx="{{ l.ultimo.x }}" cy="{{ l.ultimo.y }}" r="4"
+                vector-effect="non-scaling-stroke" style="stroke:{{ l.color }}"></circle>
       </g>
       {% endfor %}
     </svg>

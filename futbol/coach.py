@@ -603,7 +603,10 @@ def datos_de_progreso(uid, jugador, clave='30'):
             'clave': fam['clave'], 'titulo': fam['titulo'],
             'icono': fam['icono'], 'tono': fam['tono'], 'fondo': fam['fondo'],
             'media': fam['media'], 'delta': fam['delta'],
-            'grafica': graficas.multi(series_fam, marcas_y=4),
+            #  Más ancho que alto (480x200 en vez de 340x200): con el
+            #  cuadrado de antes, en una pantalla de escritorio la gráfica
+            #  crecía hasta 590 px de alto y el panel no cabía de un vistazo.
+            'grafica': graficas.multi(series_fam, ancho=480, alto=200, marcas_y=4),
             #  Las fichas de la leyenda: nombre, color y el valor de hoy. Van
             #  aunque no haya linea —con una sola evaluacion no hay linea pero
             #  los numeros existen— y valen de leyenda y de resumen a la vez.

@@ -426,7 +426,9 @@
       b.addEventListener('click', function () {
         var encendida = b.getAttribute('aria-pressed') === 'true';
         b.setAttribute('aria-pressed', encendida ? 'false' : 'true');
-        linea.hidden = encendida;
+        //  `classList` y no `hidden`: en SVG el atributo `hidden` no existe y
+        //  la línea se quedaba dibujada con la ficha apagada.
+        linea.classList.toggle('pa-off', encendida);
       });
     });
   });
