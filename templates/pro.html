@@ -6,7 +6,7 @@
    sin contexto: si no sabe qué acaba de intentar, no compra. #}
 
 {% block hero_back %}
-<a class="pf-hero__btn" href="javascript:history.back()" aria-label="Volver">
+<a class="pf-hero__btn" href="{{ url_for('futbol.home') }}" aria-label="Volver">
   <i data-ico="arrow-left" class="pf-ico--sm"></i>
 </a>
 {% endblock %}

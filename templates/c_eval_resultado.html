@@ -5,7 +5,10 @@
    comparó y cómo ha ido evolucionando ese jugador en esa prueba. #}
 
 {% block hero_back %}
-<a class="pf-hero__btn" href="javascript:history.back()" aria-label="Volver">
+{# `javascript:history.back()` no tenia respaldo: al abrir la marca desde un
+   enlace pegado, la flecha no hacia nada. Con una direccion de verdad, el JS
+   de profoot.js la devuelve por el historial cuando lo hay. #}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_evaluaciones') }}" aria-label="Volver">
   <i data-ico="arrow-left" class="pf-ico--sm"></i>
 </a>
 {% endblock %}

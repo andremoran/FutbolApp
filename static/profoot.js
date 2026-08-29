@@ -7,6 +7,30 @@
 
   var PF = window.PF = window.PF || {};
 
+  /* ─── La flecha de atrás ─────────────────────────────────────────────
+     Cada pantalla trae su destino escrito, que está bien como respaldo pero
+     no sabe de dónde vienes: al progreso de un jugador se llega desde la
+     lista del equipo, desde su ficha o desde el buscador, y la flecha
+     mandaba siempre al mismo sitio —a veces a un formulario en blanco—.
+
+     Se vuelve por el historial SOLO si la página anterior es de esta app y
+     no es esta misma (una recarga no cuenta). Si no, se sigue el enlace de
+     siempre, que es lo que hace falta al entrar directo por una dirección.  */
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest && e.target.closest('a.pf-hero__btn[aria-label^="Volver"], [data-volver]');
+    if (!a) return;
+    //  Ctrl/⌘ + clic o botón central: abrir en otra pestaña. Eso es del
+    //  enlace, no de la flecha.
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button) return;
+    if (!document.referrer || history.length <= 1) return;
+    var previa;
+    try { previa = new URL(document.referrer); } catch (err) { return; }
+    if (previa.origin !== location.origin) return;
+    if (previa.pathname === location.pathname) return;
+    e.preventDefault();
+    history.back();
+  });
+
   /* ─── Hoja inferior (⋯ Ver más) ─────────────────────────────────────── */
   PF.openSheet = function (id) {
     var sheet = document.getElementById(id || 'pf-sheet-mas');

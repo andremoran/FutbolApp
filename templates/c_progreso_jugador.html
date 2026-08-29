@@ -21,7 +21,9 @@
 {%- endmacro %}
 
 {% block hero_back %}
-<a class="pf-hero__btn" href="{{ url_for('futbol.c_jugador', pid=jugador.id) if not jugador.es_manual else url_for('futbol.c_manuales') }}"
+{# El respaldo de un jugador sin cuenta era «Nuevo Jugador» —la pantalla de
+   dar de alta—, que no es de donde se viene nunca. La lista del equipo sí. #}
+<a class="pf-hero__btn" href="{{ url_for('futbol.c_jugador', pid=jugador.id) if not jugador.es_manual else url_for('futbol.c_equipo') }}"
    aria-label="Volver">
   <i data-ico="arrow-left" class="pf-ico--sm"></i>
 </a>
