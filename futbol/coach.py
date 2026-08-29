@@ -423,6 +423,13 @@ def _dias_del_periodo(clave):
     return 30
 
 
+def _sin_coma_inutil(v):
+    """0.0 -> 0, 1.5 -> 1.5. Para no escribir «+0.0» en un informe."""
+    if v is None:
+        return None
+    return int(v) if float(v).is_integer() else v
+
+
 def _delta(ahora, antes):
     """El cambio entre dos numeros, o None si falta alguno.
 
@@ -517,9 +524,29 @@ def datos_de_progreso(uid, jugador, clave='30'):
             if v is not None:
                 puntos.append({'fecha': f.get('semana'), 'valor': v})
         if puntos:
-            series.append({'nombre': nombre, 'color': color,
+            series.append({'nombre': nombre, 'color': color, 'clave': cl,
                            'grosor': grosor, 'puntos': puntos})
     grafica = graficas.multi(series)
+
+    #  Las mismas cuatro líneas, en cuadros: valor de hoy, cuánto se movió y
+    #  de dónde venía. Es lo que se lee de una gráfica de dos puntos, sin
+    #  gastar media hoja en dibujarla — el informe en papel va por aquí.
+    cuadros = []
+    for s in series:
+        pts = s['puntos']
+        ultimo = pts[-1]['valor']
+        primero = pts[0]['valor']
+        cuadros.append({
+            'titulo': s['nombre'], 'color': s['color'], 'clave': s['clave'],
+            'valor': round(ultimo),
+            'desde': round(primero) if len(pts) > 1 else None,
+            #  Las medias de familia son decimales (46,6) y su cambio sale
+            #  como 0.0; en un informe en papel eso se lee peor que «=».
+            #  Se deja el decimal solo cuando dice algo.
+            'delta': _sin_coma_inutil(_delta(ultimo, primero)) if len(pts) > 1 else None,
+            'tomas': len(pts),
+            'puntos': pts,
+        })
 
     resumen = {
         'overall': overall_hoy,
@@ -662,6 +689,7 @@ def datos_de_progreso(uid, jugador, clave='30'):
         'etiqueta_periodo': next((e for c, e, _ in PERIODOS if c == clave), ''),
         'resumen': resumen, 'atributos': atributos, 'familias': familias,
         'movidos': movidos, 'grafica': grafica, 'grafica_pruebas': grafica_pruebas,
+        'cuadros': cuadros,
         'tests': tests, 'competicion': competicion, 'asistencia': asistencia,
         'lesiones': lesiones,
     }
@@ -698,6 +726,14 @@ def c_informe_jugador(pid):
     perfil = {} if jugador['es_manual'] else (db.perfil_jugador(pid) or {})
     manual = db.one('fut_manual_players', 'manual informe', id=pid) if jugador['es_manual'] else {}
 
+    #  La foto, si la tiene. En el informe importa más que en la lista: es el
+    #  papel que se le enseña a un padre o se manda a un club, y ahí una cara
+    #  vale por tres líneas de ficha. Se pide a la app, no se incrusta: quien
+    #  imprime ya tiene sesión abierta.
+    tiene_foto = bool(db.foto_de(**db.dueno_filtro(
+        manual_player_id=pid if jugador['es_manual'] else None,
+        player_id=None if jugador['es_manual'] else pid)))
+
     return render_template(
         'c_informe_jugador.html',
         #  `jugador` NO se pasa aquí: ya viene dentro de `datos`, y repetirlo
@@ -716,6 +752,7 @@ def c_informe_jugador(pid):
                             or perfil.get('anio_nacimiento')
                             or jugador.get('anio_nacimiento')),
         analisis=analisis,
+        tiene_foto=tiene_foto,
         generado=date.today().strftime('%d/%m/%Y'),
         periodos=PERIODOS,
         **datos)

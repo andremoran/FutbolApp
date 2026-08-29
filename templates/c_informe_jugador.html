@@ -44,6 +44,10 @@
     .cab__d { font-size: 12.5px; color: var(--text-sec); margin: 3px 0 0; }
     .cab__r { text-align: right; font-size: 11px; color: var(--text-muted);
               line-height: 1.6; flex: none; }
+    /*  La foto. En un informe que se enseña a un padre o se manda a un club,
+        una cara vale por tres líneas de ficha.  */
+    .cab__foto { width: 64px; height: 64px; border-radius: 50%; object-fit: cover;
+                 flex: none; border: 2px solid var(--primary); background: #eef2f7; }
     .cab__ovr { font-size: 34px; font-weight: 800; color: var(--primary);
                 line-height: 1; letter-spacing: -1px; }
 
@@ -84,6 +88,28 @@
     td.num, th.num { text-align: right; }
 
     /* ── Cifras ────────────────────────────────────────────────────────── */
+    /* ── Los cuadros de la evolución ───────────────────────────────────
+       Cuatro cuadros pequeños en vez de una gráfica de media hoja: con dos
+       tomas, aquella dibujaba cuatro rayas horizontales para decir «subió 2».
+       Aquí cada uno lleva su número, cuánto se movió, de dónde venía y la
+       forma de la línea en pequeño.  */
+    .cuadros { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .cuadro { border: 1px solid var(--border); border-radius: 8px; padding: 8px 9px;
+              break-inside: avoid; }
+    .cuadro__t { font-size: 9.5px; font-weight: 800; text-transform: uppercase;
+                 letter-spacing: .4px; color: var(--text-muted); }
+    .cuadro__f { display: flex; align-items: baseline; gap: 6px; margin-top: 2px; }
+    .cuadro__v { font-size: 22px; font-weight: 800; letter-spacing: -.6px; line-height: 1; }
+    .cuadro__d { font-size: 11px; font-weight: 800; }
+    .cuadro__s { font-size: 9.5px; color: var(--text-muted); margin-top: 2px; }
+    .cuadro__g { display: block; width: 100%; height: 26px; margin-top: 5px; }
+    /*  En un telefono, cuatro cuadros en fila dejan 79 px cada uno y «venia de
+        84 · 2 tomas» se parte en cuatro lineas. En papel siguen siendo cuatro
+        seguidos, que es donde hay ancho de sobra.  */
+    @media screen and (max-width: 560px) {
+      .cuadros { grid-template-columns: 1fr 1fr; }
+    }
+
     .cifras { display: flex; gap: 8px; }
     .cifra { flex: 1; border: 1px solid var(--border); border-radius: 8px;
              padding: 8px 6px; text-align: center; }
@@ -132,6 +158,10 @@
 
   {# ══════════ CABECERA ══════════ #}
   <div class="cab">
+    {% if tiene_foto %}
+    <img class="cab__foto" alt=""
+         src="{{ url_for('futbol.foto_jugador', pid=jugador.id) }}">
+    {% endif %}
     <div class="cab__l">
       <div class="cab__club">{{ equipo.nombre or 'ProFoot' }}</div>
       <h1 class="cab__n">{{ jugador.nombre }}</h1>
@@ -164,30 +194,52 @@
   {# ══════════ LA EVOLUCIÓN ══════════ #}
   <div class="sec">
     <h2 class="sec__t">Cómo ha evolucionado · {{ etiqueta_periodo|lower }}</h2>
-    {% if grafica %}
-      {% with g = grafica %}{% include '_grafica_multi.html' %}{% endwith %}
-    {% else %}
-      <p class="vacio">
-        Con una sola evaluación no hay evolución que dibujar. La línea aparece a
-        partir de la segunda.
-      </p>
-    {% endif %}
+    {% if cuadros %}
+    <div class="cuadros">
+      {% for c in cuadros %}
+      <div class="cuadro">
+        <div class="cuadro__t">{{ c.titulo }}</div>
+        <div class="cuadro__f">
+          <span class="cuadro__v" style="color:{{ c.color }}">{{ c.valor }}</span>
+          {% if c.delta %}
+          <span class="cuadro__d {{ 'sube' if c.delta > 0 else 'baja' }}">
+            {{- '+' if c.delta > 0 }}{{ c.delta -}}
+          </span>
+          {% elif c.delta == 0 %}
+          <span class="cuadro__d" style="color:var(--text-muted)">=</span>
+          {% endif %}
+        </div>
+        <div class="cuadro__s">
+          {%- if c.desde is not none %}venía de {{ c.desde }} · {% endif -%}
+          {{ c.tomas }} toma{{ '' if c.tomas == 1 else 's' }}
+        </div>
 
-    <div class="cifras" style="margin-top:12px">
-      {% for f in familias %}
-      <div class="cifra">
-        <div class="cifra__v" style="color:{{ f.tono }}">
-          {{ f.media|round|int if f.media is not none else '–' }}
-        </div>
-        <div class="cifra__e">{{ f.titulo }}</div>
-        {% if f.delta is not none and f.delta != 0 %}
-        <div class="cifra__e {{ 'sube' if f.delta > 0 else 'baja' }}">
-          {{ '+' if f.delta > 0 }}{{ f.delta }}
-        </div>
+        {# La forma de la línea, en pequeño. Sin ejes ni rejilla: aquí no se
+           leen alturas, se ve si sube o baja. Con una sola toma no se pinta:
+           un punto suelto no es una línea. #}
+        {% if c.puntos|length > 1 %}
+        {% set vs = c.puntos|map(attribute='valor')|list %}
+        {% set lo = vs|min %}
+        {% set hi = vs|max %}
+        {% set span = (hi - lo) if (hi - lo) > 0 else 1 %}
+        <svg class="cuadro__g" viewBox="0 0 100 26" preserveAspectRatio="none"
+             role="img" aria-label="Evolución de {{ c.titulo|lower }}">
+          <path fill="none" stroke="{{ c.color }}" stroke-width="1.6"
+                stroke-linejoin="round" stroke-linecap="round" d="
+            {%- for p in c.puntos -%}
+              {{ 'M' if loop.first else 'L' }}{{ (loop.index0 * 100 / (c.puntos|length - 1))|round(2) }},{{ (23 - ((p.valor - lo) / span) * 20)|round(2) }}
+            {%- endfor -%}"></path>
+        </svg>
         {% endif %}
       </div>
       {% endfor %}
     </div>
+    {% else %}
+      <p class="vacio">
+        Con una sola evaluación no hay evolución que enseñar. Los cuadros
+        aparecen a partir de la segunda.
+      </p>
+    {% endif %}
   </div>
 
   {# ══════════ LOS 18 ATRIBUTOS ══════════ #}
