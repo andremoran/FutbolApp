@@ -545,6 +545,19 @@ ATRIBUTOS_FISICOS = ['velocidad', 'resistencia', 'fuerza', 'agilidad', 'acelerac
 ATRIBUTOS_MENTALES = ['liderazgo', 'disciplina', 'concentracion', 'confianza', 'trabajo_equipo', 'mentalidad']
 ATRIBUTOS_18 = ATRIBUTOS_TECNICOS + ATRIBUTOS_FISICOS + ATRIBUTOS_MENTALES
 
+#  Como se llaman por escrito. Estaban repetidos dentro de tres plantillas, y
+#  quien los necesitaba desde Python acababa haciendo `clave.capitalize()`, que
+#  escribe «Vision juego». Aqui una vez y bien escritos.
+ETIQUETAS_18 = {
+    'pase': 'Pase', 'control': 'Control', 'regate': 'Regate', 'tiro': 'Tiro',
+    'definicion': 'Definición', 'centros': 'Centros', 'vision_juego': 'Visión de juego',
+    'velocidad': 'Velocidad', 'resistencia': 'Resistencia', 'fuerza': 'Fuerza',
+    'agilidad': 'Agilidad', 'aceleracion': 'Aceleración',
+    'liderazgo': 'Liderazgo', 'disciplina': 'Disciplina',
+    'concentracion': 'Concentración', 'confianza': 'Confianza',
+    'trabajo_equipo': 'Trabajo en equipo', 'mentalidad': 'Mentalidad',
+}
+
 _CAMPOS_ESTADO = ('fatiga', 'riesgo_sobrecarga', 'fortalezas', 'debilidades',
                   'evolucion_tecnica', 'lesiones_historial', 'posicion_secundaria')
 

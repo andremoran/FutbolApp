@@ -408,6 +408,13 @@ PERIODOS = [
 #  Las cuatro lineas del perfil. Los colores son los mismos que usa la
 #  pantalla de evaluar para cada familia: si alli el fisico es gris, aqui
 #  tambien, o hay que volver a aprenderse la leyenda en cada pantalla.
+#  Un color por atributo dentro de su familia. Siete tonos que se
+#  distinguen entre si tambien impresos en gris, y sobre todo que NO son los
+#  de las cargas ni los de las alertas: en esta app el rojo ya significa algo.
+PALETA_ATRIBUTOS = ('#0ea5e9', '#10b981', '#f59e0b', '#ef4444',
+                    '#8b5cf6', '#14b8a6', '#eab308')
+
+
 LINEAS_PERFIL = [
     ('overall', 'Global',  '#0f172a',        3),
     ('tecnica', 'Técnico', '#047857',        2),
@@ -496,7 +503,7 @@ def datos_de_progreso(uid, jugador, clave='30'):
             v_hoy = ficha.get(k)
         atributos.append({
             'clave': k,
-            'etiqueta': k.replace('_', ' ').capitalize(),
+            'etiqueta': db.ETIQUETAS_18.get(k, k.replace('_', ' ').capitalize()),
             'familia': ('tecnica' if k in db.ATRIBUTOS_TECNICOS
                         else 'fisico' if k in db.ATRIBUTOS_FISICOS else 'mental'),
             'hoy': v_hoy,
@@ -574,6 +581,36 @@ def datos_de_progreso(uid, jugador, clave='30'):
             'media': media,
             'delta': _delta(media, round(sum(antano) / float(len(antano)), 1)
                             if antano else None),
+        })
+
+    #  ─── Un panel por familia, con SUS atributos ────────────────────────
+    #  La gráfica de medias dice que el técnico subió dos; no dice que el pase
+    #  bajó y la definición subió cuatro, que es lo que se entrena. Cada panel
+    #  lleva sus atributos, cada uno con su color, su valor de hoy y su línea.
+    paneles = []
+    for fam in familias:
+        suyos = [a for a in atributos if a['familia'] == fam['clave']]
+        series_fam = []
+        for i, a in enumerate(suyos):
+            puntos = [{'fecha': f.get('semana'), 'valor': _valor(f, a['clave'])}
+                      for f in a_dibujar]
+            puntos = [p for p in puntos if p['valor'] is not None]
+            if puntos:
+                series_fam.append({'nombre': a['etiqueta'], 'clave': a['clave'],
+                                   'color': PALETA_ATRIBUTOS[i % len(PALETA_ATRIBUTOS)],
+                                   'grosor': 2, 'puntos': puntos})
+        paneles.append({
+            'clave': fam['clave'], 'titulo': fam['titulo'],
+            'icono': fam['icono'], 'tono': fam['tono'], 'fondo': fam['fondo'],
+            'media': fam['media'], 'delta': fam['delta'],
+            'grafica': graficas.multi(series_fam, marcas_y=4),
+            #  Las fichas de la leyenda: nombre, color y el valor de hoy. Van
+            #  aunque no haya linea —con una sola evaluacion no hay linea pero
+            #  los numeros existen— y valen de leyenda y de resumen a la vez.
+            'fichas': [{'clave': a['clave'], 'etiqueta': a['etiqueta'],
+                        'valor': a['hoy'], 'delta': a['delta'],
+                        'color': PALETA_ATRIBUTOS[i % len(PALETA_ATRIBUTOS)]}
+                       for i, a in enumerate(suyos)],
         })
 
     #  Y lo que de verdad se movio. Los atributos que no cambiaron son ruido en
@@ -689,7 +726,7 @@ def datos_de_progreso(uid, jugador, clave='30'):
         'etiqueta_periodo': next((e for c, e, _ in PERIODOS if c == clave), ''),
         'resumen': resumen, 'atributos': atributos, 'familias': familias,
         'movidos': movidos, 'grafica': grafica, 'grafica_pruebas': grafica_pruebas,
-        'cuadros': cuadros,
+        'cuadros': cuadros, 'paneles': paneles,
         'tests': tests, 'competicion': competicion, 'asistencia': asistencia,
         'lesiones': lesiones,
     }

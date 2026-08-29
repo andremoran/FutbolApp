@@ -143,6 +143,9 @@ def multi(series, ancho=ANCHO, alto=ALTO, marcas_y=4, decimales=0):
         d = ' '.join(('M' if i == 0 else 'L') + '%s,%s' % (px(f), py(v))
                      for i, (f, v) in enumerate(pts))
         lineas.append({
+            #  De quien es esta linea. Lo necesita quien quiera encenderla y
+            #  apagarla desde una leyenda; el resto de pantallas lo ignoran.
+            'clave': s.get('clave') or '',
             'nombre': s.get('nombre') or '',
             'color': s.get('color') or 'var(--primary)',
             'grosor': s.get('grosor') or 2,

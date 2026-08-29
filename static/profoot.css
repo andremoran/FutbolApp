@@ -1036,6 +1036,37 @@ a.pf-avatar--xl::after   { inset: 0; }
 .gm__etq      { font-size: 9px; fill: var(--text-muted); }
 .gm__linea    { fill: none; stroke-linecap: round; stroke-linejoin: round; }
 .gm__punta    { fill: #fff; stroke-width: 2.5; }
+/* ── Panel de una familia con SUS atributos (_panel_atributos.html) ─────
+   Una media no dice que entrenar: que el tecnico suba dos no cuenta que el
+   pase bajo tres. Cada familia trae sus atributos, con un color cada uno.  */
+.pa__cab      { display: flex; align-items: center; gap: 9px; }
+.pa__ico      { width: 30px; height: 30px; border-radius: 9px; flex: none;
+                display: grid; place-items: center; }
+.pa__t        { font-size: 15px; font-weight: 800; flex: 1; min-width: 0; }
+.pa__media    { font-size: 22px; font-weight: 800; letter-spacing: -.5px; }
+.pa__delta    { font-size: 12px; font-weight: 800; }
+
+.pa__fichas   { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 4px; }
+/*  Cada ficha es leyenda, resumen y interruptor: dice de que color va ese
+    atributo, cuanto vale hoy, y enciende o apaga su linea. Con siete lineas a
+    la vez la grafica es una maraña; de una en una se lee perfecto.  */
+.pa__ficha    { display: inline-flex; align-items: center; gap: 6px;
+                padding: 5px 10px 5px 8px; border-radius: 100px;
+                border: 1px solid var(--border); background: #fff;
+                font: inherit; font-size: 12px; font-weight: 600;
+                color: var(--text-sec); cursor: pointer; }
+.pa__ficha[aria-pressed="false"] { opacity: .45; }
+.pa__ficha[aria-pressed="true"]  { border-color: var(--tono); }
+.pa__pt       { width: 8px; height: 8px; border-radius: 50%; flex: none;
+                background: var(--tono); }
+.pa__v        { font-weight: 800; color: var(--tono); }
+.pa__d        { font-size: 10.5px; font-weight: 800; }
+.pa__grafica  { margin-top: 8px; }
+.pa__vacio    { margin: 12px 0 0; font-size: 12.5px; color: var(--text-muted); }
+/*  Apagar una linea no la borra del SVG: se esconde, para que al volver a
+    encenderla aparezca donde estaba y la escala no baile.  */
+.pa [data-linea][hidden] { display: none; }
+
 .gm__leyenda  { display: flex; flex-wrap: wrap; justify-content: center;
                 gap: 6px 14px; margin-top: 10px; }
 .gm__item     { display: inline-flex; align-items: center; gap: 5px;

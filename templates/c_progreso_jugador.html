@@ -174,7 +174,8 @@
   {% endif %}
 
   {# Las tres familias en tres números. Mismos colores e iconos que la pantalla
-     de evaluar, para que se lean como lo mismo. #}
+     de evaluar, para que se lean como lo mismo. Debajo, cada una abre su
+     propio panel con los atributos que mide. #}
   <div class="pg-fams">
     {% for f in familias %}
     <div class="pg-fam3">
@@ -245,6 +246,14 @@
   </div>
   {% endif %}
 </div>
+
+{# ══════════ CADA FAMILIA, CON LO QUE MIDE ══════════
+   Tres paneles —técnica, físico y mental— con sus atributos dentro. Arriba
+   quedan las medias, que contestan «¿va mejor?»; esto contesta la siguiente,
+   que es «¿en qué?», y es la que se lleva al campo. #}
+{% for p in paneles %}
+{% with p = p %}{% include '_panel_atributos.html' %}{% endwith %}
+{% endfor %}
 
 {# ══════════ LAS PRUEBAS ══════════ #}
 <div class="pf-card">
@@ -399,4 +408,28 @@
 
 {% block scripts %}
 {% include '_ia_analisis_js.html' %}
+<script>
+/*  Las fichas de cada panel encienden y apagan su linea. Con siete lineas a la
+    vez la grafica es una maraña; tocando dos se compara de verdad.
+    La linea no se borra, se esconde: la escala del eje la calculo el servidor
+    con TODAS, asi que al volver a encenderla aparece donde estaba en vez de
+    saltar a otra altura.  */
+(function () {
+  document.querySelectorAll('.pa').forEach(function (panel) {
+    var svg = panel.querySelector('svg');
+    if (!svg) { return; }
+    panel.querySelectorAll('.pa__ficha').forEach(function (b) {
+      var linea = svg.querySelector('[data-linea="' + b.dataset.serie + '"]');
+      //  Un atributo puede tener numero de hoy y no tener linea (una sola
+      //  evaluacion): su ficha se queda quieta en vez de fingir que hace algo.
+      if (!linea) { b.disabled = true; return; }
+      b.addEventListener('click', function () {
+        var encendida = b.getAttribute('aria-pressed') === 'true';
+        b.setAttribute('aria-pressed', encendida ? 'false' : 'true');
+        linea.hidden = encendida;
+      });
+    });
+  });
+})();
+</script>
 {% endblock %}

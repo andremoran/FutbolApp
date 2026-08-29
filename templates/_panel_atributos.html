@@ -1,0 +1,88 @@
+{# ============================================================================
+   _panel_atributos.html — Una familia y SUS atributos: fichas y línea.
+
+   La evolución se enseñaba con cuatro medias —global, técnico, físico y
+   mental— y una media no dice qué entrenar: que el técnico suba dos no cuenta
+   que el pase bajó tres y la definición subió cinco. Aquí cada familia tiene
+   su panel, con un color por atributo.
+
+   Las fichas de arriba son leyenda y resumen a la vez —el color, el nombre y
+   el valor de hoy— y además encienden y apagan su línea: con siete a la vez
+   la gráfica es una maraña, y de una en una se lee perfecto.
+
+   Se usa así:
+     {% with p = panel %}{% include '_panel_atributos.html' %}{% endwith %}
+   ============================================================================ #}
+
+<div class="pf-card pa" data-panel="{{ p.clave }}">
+
+  <div class="pa__cab">
+    <span class="pa__ico" style="background:{{ p.fondo }};color:{{ p.tono }}">
+      <i data-ico="{{ p.icono }}" class="pf-ico--sm"></i>
+    </span>
+    <span class="pa__t">{{ p.titulo }}</span>
+    <span class="pa__media" style="color:{{ p.tono }}">
+      {{- p.media|round|int if p.media is not none else '–' -}}
+    </span>
+    {% if p.delta %}
+    <span class="pa__delta {{ 'sube' if p.delta > 0 else 'baja' }}">
+      {{- '+' if p.delta > 0 }}{{ p.delta -}}
+    </span>
+    {% endif %}
+  </div>
+
+  {# Las fichas. `aria-pressed` es el estado de verdad: el JS lo lee para saber
+     si la línea está encendida, en vez de mirar clases de estilo. #}
+  <div class="pa__fichas" role="group" aria-label="Atributos de {{ p.titulo|lower }}">
+    {% for f in p.fichas %}
+    <button type="button" class="pa__ficha" data-serie="{{ f.clave }}"
+            aria-pressed="true" style="--tono:{{ f.color }}">
+      <span class="pa__pt"></span>
+      <span class="pa__n">{{ f.etiqueta }}</span>
+      <span class="pa__v">{{ f.valor if f.valor is not none else '–' }}</span>
+      {% if f.delta %}
+      <span class="pa__d {{ 'sube' if f.delta > 0 else 'baja' }}">
+        {{- '+' if f.delta > 0 }}{{ f.delta -}}
+      </span>
+      {% endif %}
+    </button>
+    {% endfor %}
+  </div>
+
+  {% if p.grafica %}
+  {% set g = p.grafica %}
+  <div class="pa__grafica">
+    <svg class="gm__svg" viewBox="0 0 {{ g.ancho }} {{ g.alto }}"
+         preserveAspectRatio="xMidYMid meet" role="img"
+         aria-label="Evolución de {{ g.lineas|map(attribute='nombre')|join(', ') }}">
+
+      {% for t in g.yticks %}
+      <line class="gm__rejilla" x1="{{ g.x0 }}" y1="{{ t.y }}" x2="{{ g.x1 }}" y2="{{ t.y }}"></line>
+      <text class="gm__etq" x="{{ g.x0 - 6 }}" y="{{ t.y }}"
+            text-anchor="end" dominant-baseline="central">{{ t.etiqueta }}</text>
+      {% endfor %}
+
+      <line class="gm__eje" x1="{{ g.x0 }}" y1="{{ g.y1 }}" x2="{{ g.x1 }}" y2="{{ g.y1 }}"></line>
+
+      {% for t in g.xticks %}
+      <text class="gm__etq" x="{{ t.x }}" y="{{ g.y1 + 14 }}"
+            text-anchor="{{ 'start' if loop.first else ('end' if loop.last else 'middle') }}">{{ t.etiqueta }}</text>
+      {% endfor %}
+
+      {% for l in g.lineas %}
+      <g data-linea="{{ l.clave }}">
+        <path class="gm__linea" d="{{ l.d }}"
+              style="stroke:{{ l.color }};stroke-width:{{ l.grosor }}"></path>
+        <circle class="gm__punta" cx="{{ l.ultimo.x }}" cy="{{ l.ultimo.y }}" r="3.2"
+                style="stroke:{{ l.color }}"></circle>
+      </g>
+      {% endfor %}
+    </svg>
+  </div>
+  {% else %}
+  <p class="pa__vacio">
+    Con una sola evaluación no hay línea que dibujar. Los números de arriba son
+    los de hoy; la línea aparece a partir de la segunda.
+  </p>
+  {% endif %}
+</div>
