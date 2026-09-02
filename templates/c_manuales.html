@@ -525,6 +525,16 @@
     // atributos a una decima parte y en su evaluacion salia casi a cero.
     Object.keys(ratings).forEach(function (k) { ratings[k] = ratings[k] * 10; });
 
+    // Y si el entrenador no toco NINGUNO, no se manda ninguno: los selectores
+    // arrancan en 5 y guardarlos le inventaba al chaval una evaluacion de
+    // cincuentas que nadie hizo. Con eso su tarjeta nacia con «50 OVR», su
+    // pantalla de progreso dibujaba una linea plana y la app ya no sabia
+    // distinguir a quien falta por evaluar. Sin tocarlos, el jugador entra
+    // «sin evaluar» y la evaluacion se hace donde toca.
+    if (!PF.ratingsTocados().filter(function (c) { return c !== 'valoracion'; }).length) {
+      ratings = {};
+    }
+
     var datos = Object.assign({
       nombre: nombre, dorsal: v('m-dorsal'), posicion: v('m-posicion'),
       posicion_secundaria: v('m-posicion2'),

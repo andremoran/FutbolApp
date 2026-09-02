@@ -302,7 +302,14 @@
       }
 
       btns.forEach(function (b) {
-        b.addEventListener('click', function () { pintar(parseInt(b.dataset.ratingBtn, 10)); });
+        b.addEventListener('click', function () {
+          // Queda marcado que este selector lo TOCÓ una persona. Sin esto no
+          // hay forma de distinguir «le pongo un 5» de «lo dejé donde estaba»,
+          // y al dar de alta a un jugador se le guardaba un Perfil Dinámico
+          // entero de cincuentas que nadie había evaluado.
+          box.dataset.ratingTocado = '1';
+          pintar(parseInt(b.dataset.ratingBtn, 10));
+        });
       });
 
       pintar(parseInt(box.dataset.value, 10) || 5);
@@ -317,6 +324,18 @@
       datos[i.dataset.campo] = parseInt(i.value, 10);
     });
     return datos;
+  };
+
+  /* Cuáles de esos selectores tocó de verdad quien rellena el formulario. Los
+     que no, valen su valor por defecto y no significan nada. */
+  PF.ratingsTocados = function (root) {
+    var tocados = [];
+    (root || document).querySelectorAll('[data-rating][data-rating-tocado]')
+      .forEach(function (box) {
+        var input = box.querySelector('[data-rating-input]');
+        if (input) tocados.push(input.dataset.campo);
+      });
+    return tocados;
   };
 
   /* ─── Copiar al portapapeles (código de equipo) ─────────────────────── */
