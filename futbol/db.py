@@ -157,7 +157,14 @@ def delete(table, ctx='', obligatorio=False, **filters):
             d = d.eq(k, v)
         return d.execute().data
     filas = q(_go, None, ctx or ('delete ' + table))
-    if obligatorio and filas is None:
+    #  Una lista vacia tambien es un fallo, igual que en `update`: quiere decir
+    #  que el filtro no encontro la fila, o sea que NO se borro nada. Con
+    #  `filas is None` a secas solo se cazaba la excepcion, y como todas estas
+    #  llamadas filtran por dueño (`id` + `coach_id`), borrar algo de otro
+    #  equipo devolvia [] y la app contestaba «Evento borrado». No se perdia el
+    #  dato ajeno —el filtro protege—, pero se le decia al usuario que habia
+    #  hecho algo que no hizo.
+    if obligatorio and not filas:
         raise ErrorDeEscritura('no se pudo borrar de %s (%s)' % (table, ctx))
     return filas
 

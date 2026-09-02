@@ -359,6 +359,127 @@ def flujo_manuales_y_solicitudes(coach, jugador):
     comprobar('El entrenador tiene código de equipo', bool(codigo_equipo), codigo_equipo)
 
 
+def flujo_cuerpo_vacio(coach, jugador_pro):
+    """Una peticion sin datos no puede pisar lo que ya estaba configurado.
+
+    Salio de barrer todos los endpoints de escritura con `{}`: habia tres que
+    daban por bueno el vacio y escribian encima. No hace falta un atacante —
+    basta con un envio a medias o un JS viejo en cache.
+    """
+    print('\n── UNA PETICIÓN VACÍA NO PISA LO QUE HAY ─────────')
+
+    from futbol.evaluaciones import contexto_equipo, guardar_contexto
+
+    uid = db.equipo_id(db.one('usuarios', 'c',
+                              correo=CUENTAS['coach_pro']['correo'])['id'])
+    #  Se deja todo como estaba: esta prueba toca la configuracion del equipo
+    #  de prueba, y las otras suites la leen.
+    antes_nombre = (db.one('fut_teams', 'equipo', coach_id=uid) or {}).get('nombre')
+    antes_contexto = contexto_equipo(uid)
+
+    #  El nombre del equipo. Con `nombre` cayendo a «Mi equipo» por defecto,
+    #  un cuerpo vacio le renombraba el equipo a quien lo tenia puesto.
+    db.update('fut_teams', {'nombre': 'Academia De Prueba'}, 'nombre',
+              coach_id=uid)
+    post(coach, '/api/equipo', {})
+    equipo = db.one('fut_teams', 'equipo', coach_id=uid) or {}
+    comprobar('Guardar el equipo sin nombre NO lo renombra',
+              equipo.get('nombre') == 'Academia De Prueba',
+              'se quedó en %r' % equipo.get('nombre'))
+    cod, j = post(coach, '/api/equipo', {'nombre': '   '})
+    comprobar('Y un nombre en blanco se rechaza con mensaje',
+              cod == 400, (j.get('error') or '')[:50])
+
+    #  El baremo del equipo. Con edad y nivel cayendo a «general», un cuerpo
+    #  vacio dejaba todas las pruebas comparandose contra otra vara.
+    guardar_contexto(uid, 'sub_18', 'amateur')
+    cod, j = post(coach, '/api/eval/contexto', {})
+    comprobar('El baremo del equipo no se reinicia con un cuerpo vacío',
+              cod == 400 and contexto_equipo(uid) == ('sub_18', 'amateur'),
+              'quedó en %s' % (contexto_equipo(uid),))
+
+    #  Y dos que respondian mal: un 500 por no mandar nada, y un entreno de
+    #  cero minutos que ensuciaba la lista del jugador.
+    cod, j = post(jugador_pro, '/api/medico', {})
+    comprobar('La ficha médica vacía se rechaza con un 400, no con un 500',
+              cod == 400, '%s %s' % (cod, (j.get('error') or '')[:40]))
+    cod, j = post(jugador_pro, '/api/entreno', {})
+    comprobar('No se guarda un entrenamiento de cero minutos',
+              cod == 400, '%s %s' % (cod, (j.get('error') or '')[:40]))
+
+    #  Y editar media ficha no borra la otra media. Escribiendo siempre los
+    #  seis campos de texto, cambiar el dorsal le borraba al chaval la
+    #  posicion, el tutor y el telefono de casa.
+    cod, j = post(coach, '/api/manual', {
+        'nombre': 'Ficha Parcial', 'posicion': 'Extremo derecho',
+        'tutor': 'Madre de prueba', 'telefono': '0999999999', 'dorsal': 21})
+    mid = j.get('id')
+    if comprobar('Se apunta un jugador con su ficha completa', cod == 200 and mid,
+                 j.get('error', '')):
+        post(coach, '/api/manual', {'id': mid, 'nombre': 'Ficha Parcial', 'dorsal': 22})
+        fila = db.one('fut_manual_players', 'parcial', id=mid) or {}
+        comprobar('Editar solo el dorsal no le borra el resto de la ficha',
+                  fila.get('posicion') == 'Extremo derecho'
+                  and fila.get('tutor') == 'Madre de prueba'
+                  and fila.get('dorsal') == 22,
+                  'quedó %s · %s' % (fila.get('posicion'), fila.get('tutor')))
+        post(coach, '/api/manual', {'id': mid, 'nombre': 'Ficha Parcial', 'tutor': ''})
+        fila = db.one('fut_manual_players', 'parcial', id=mid) or {}
+        comprobar('Pero vaciar un campo a propósito sí lo vacía',
+                  (fila.get('tutor') or '') == '', 'quedó %r' % fila.get('tutor'))
+        db.delete('fut_manual_players', 'limpiar parcial', id=mid)
+
+    if antes_nombre:
+        db.update('fut_teams', {'nombre': antes_nombre}, 'nombre', coach_id=uid)
+    guardar_contexto(uid, *antes_contexto)
+
+
+def flujo_equipo_ajeno(coach):
+    """Lo de otro equipo ni se toca, y se dice que no se ha tocado.
+
+    El filtro por `coach_id` ya protegia el dato ajeno, pero la app contestaba
+    «Evento borrado» a quien intentaba borrar el evento de otro: `db.delete`
+    solo daba por fallida la excepcion, no el «no encontre nada que borrar».
+    """
+    print('\n── LO DE OTRO EQUIPO NI SE TOCA ──────────────────')
+
+    otro = db.equipo_id(db.one('usuarios', 'v',
+                               correo=CUENTAS['entrenador']['correo'])['id'])
+    suyos = {
+        'fut_events': db.insert('fut_events', {
+            'coach_id': otro, 'tipo': 'entreno', 'titulo': 'De otro equipo',
+            'fecha': date.today().isoformat()}, 'ajeno'),
+        'fut_matches': db.insert('fut_matches', {
+            'coach_id': otro, 'rival': 'De otro equipo',
+            'fecha': date.today().isoformat()}, 'ajeno'),
+        'fut_manual_players': db.insert('fut_manual_players', {
+            'coach_id': otro, 'nombre': 'Jugador De Otro', 'activo': True}, 'ajeno'),
+    }
+    try:
+        ev, pa, ju = (suyos['fut_events'], suyos['fut_matches'],
+                      suyos['fut_manual_players'])
+        if ev:
+            cod, j = post(coach, f"/api/calendario/evento/{ev['id']}", {}, 'DELETE')
+            comprobar('Borrar el evento de otro equipo no dice que se ha borrado',
+                      cod != 200 and bool(db.one('fut_events', 'sigue', id=ev['id'])),
+                      '%s %s' % (cod, (j.get('error') or '')[:40]))
+            cod, _j = post(coach, f"/api/evento/{ev['id']}", {}, 'DELETE')
+            comprobar('Tampoco por la ruta vieja de borrar eventos', cod != 200, str(cod))
+        if pa:
+            cod, j = post(coach, f"/api/partido/{pa['id']}", {'goles_favor': 9})
+            comprobar('No se le cambia el marcador a un partido ajeno',
+                      cod != 200, '%s %s' % (cod, (j.get('error') or '')[:40]))
+        if ju:
+            cod, j = post(coach, f"/api/manual/{ju['id']}", {}, 'DELETE')
+            comprobar('No se borra un jugador de otra plantilla',
+                      cod != 200 and bool(db.one('fut_manual_players', 'sigue', id=ju['id'])),
+                      '%s %s' % (cod, (j.get('error') or '')[:40]))
+    finally:
+        for tabla, fila in suyos.items():
+            if fila:
+                db.delete(tabla, 'limpiar ajeno', id=fila['id'])
+
+
 def limpiar():
     print(f'\n{GRIS}Limpiando lo creado…{FIN}')
     for eid in _creados['eventos']:
@@ -389,6 +510,8 @@ def main():
     flujo_codigo(admin, jugador)
     flujo_deuna(admin, coach)
     flujo_admin(admin)
+    flujo_cuerpo_vacio(coach, jugador_pro)
+    flujo_equipo_ajeno(coach)
 
     limpiar()
     print('\n' + '═' * 62)

@@ -1364,6 +1364,13 @@ def api_eval_contexto():
     if error:
         return error
     d = request.get_json(silent=True) or {}
+    #  Los dos tienen que venir. Cayendo a 'general' por su cuenta, una
+    #  peticion vacia dejaba el equipo comparandose contra el baremo general:
+    #  el entrenador habia elegido sub-17 amateur y de golpe todas sus pruebas
+    #  se puntuaban con otra vara sin que nadie le dijera nada. La pantalla
+    #  manda siempre los dos campos, con 'general' explicito si no se elige.
+    if 'categoria_edad' not in d or 'nivel' not in d:
+        return jsonify({'error': 'Faltan la categoría de edad y el nivel.'}), 400
     edad = d.get('categoria_edad') or 'general'
     nivel = d.get('nivel') or 'general'
     if edad not in dict(cat.CATEGORIAS_EDAD):

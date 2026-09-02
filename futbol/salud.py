@@ -172,6 +172,13 @@ def api_medico():
         if campo in d:
             datos[campo] = (str(d[campo]) or '')[:tope]
 
+    #  Sin nada que guardar no hay fallo que contar. Antes se llamaba igual a
+    #  la base, que devolvía None por no tener campos, y al jugador le saltaba
+    #  un 500 —«no se pudo guardar»— cuando lo único que pasaba es que no había
+    #  mandado ningún dato.
+    if not datos:
+        return jsonify({'error': 'No hay nada que guardar.'}), 400
+
     # `solo_basicos`: el jugador escribe lo suyo, pero el veredicto de aptitud
     # y el cribado médico los firma el cuerpo técnico, no el interesado.
     if not db.guardar_ficha_medica(player_id=current_user.id,

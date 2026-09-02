@@ -859,7 +859,13 @@ def api_cal_borrar(eid):
     error = _guardia_coach()
     if error:
         return error
-    db.delete('fut_events', 'borrar evento', id=eid, coach_id=db.equipo_id(current_user.id), obligatorio=True)
+    #  Se comprueba de quién es ANTES de borrar, para poder decirlo con
+    #  palabras. Sin esto, borrar el evento de otro equipo no borraba nada
+    #  —el filtro por `coach_id` protege— pero contestaba «Evento borrado».
+    uid = db.equipo_id(current_user.id)
+    if not db.one('fut_events', 'evento mio', id=eid, coach_id=uid):
+        return jsonify({'error': 'Ese evento no es de tu equipo.'}), 404
+    db.delete('fut_events', 'borrar evento', id=eid, coach_id=uid, obligatorio=True)
     return jsonify({'ok': True, 'mensaje': 'Evento borrado.'})
 
 

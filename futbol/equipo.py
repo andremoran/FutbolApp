@@ -243,14 +243,16 @@ def api_manual():
     if len(nombre) < 2:
         return jsonify({'error': 'Escribe el nombre del jugador.'}), 400
 
-    datos = {
-        'nombre': nombre[:100],
-        'posicion': (d.get('posicion') or '')[:40],
-        'pie_habil': (d.get('pie_habil') or '')[:20],
-        'telefono': (d.get('telefono') or '')[:30],
-        'tutor': (d.get('tutor') or '')[:120],
-        'notas': (d.get('notas') or '')[:600],
-    }
+    #  Solo se escribe lo que LLEGA. Escribiendo siempre los seis campos, una
+    #  petición con el nombre y poco más —editar el dorsal, tocar un atributo—
+    #  le borraba al jugador la posición, el pie, el teléfono, el tutor y las
+    #  notas, que muchas veces son el único contacto con la familia. Mandar el
+    #  campo vacío a propósito sí lo borra: eso es el entrenador vaciándolo.
+    datos = {'nombre': nombre[:100]}
+    for campo, tope in (('posicion', 40), ('pie_habil', 20), ('telefono', 30),
+                        ('tutor', 120), ('notas', 600)):
+        if campo in d:
+            datos[campo] = (d.get(campo) or '')[:tope]
     for campo, tipo in (('dorsal', int), ('anio_nacimiento', int),
                         ('estatura', float), ('peso', float),
                         ('goles', int), ('asistencias', int),

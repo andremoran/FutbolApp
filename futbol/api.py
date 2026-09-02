@@ -226,11 +226,20 @@ def api_meta_borrar(mid):
 @api
 def api_entreno_crear():
     d = body()
+    #  Un entrenamiento de cero minutos no es un entrenamiento: es una fila que
+    #  ensucia su lista y su cuenta de la semana. El formulario trae 60 puesto,
+    #  asi que solo llega a cero quien manda la peticion a mano o a medias.
+    try:
+        minutos = int(d.get('duracion_min') or 0)
+    except (TypeError, ValueError):
+        minutos = 0
+    if minutos <= 0:
+        return jsonify({'error': 'Dime cuántos minutos entrenaste.'}), 400
     fila = db.insert('fut_trainings', {
         'player_id': current_user.id,
         'fecha': d.get('fecha') or db.hoy_iso(),
         'tipo': (d.get('tipo') or 'general')[:40],
-        'duracion_min': int(d.get('duracion_min') or 0),
+        'duracion_min': min(600, minutos),
         'intensidad': (d.get('intensidad') or 'media')[:20],
         'rpe': int(d.get('rpe')) if d.get('rpe') else None,
         'notas': (d.get('notas') or '')[:800],
@@ -262,7 +271,13 @@ def api_entreno_borrar(eid):
 def api_evento_borrar(eid):
     if not es_coach():
         return jsonify({'error': 'Solo el entrenador borra eventos.'}), 403
-    db.delete('fut_events', 'evento del', id=eid, coach_id=db.equipo_id(current_user.id), obligatorio=True)
+    #  Igual que en `calendario.api_cal_borrar`: se mira de quién es antes de
+    #  borrar, para contestar con algo que se entienda en vez de un «hecho»
+    #  por algo que no se hizo.
+    uid = db.equipo_id(current_user.id)
+    if not db.one('fut_events', 'evento mio', id=eid, coach_id=uid):
+        return jsonify({'error': 'Ese evento no es de tu equipo.'}), 404
+    db.delete('fut_events', 'evento del', id=eid, coach_id=uid, obligatorio=True)
     return jsonify({'ok': True})
 
 
@@ -365,10 +380,17 @@ def api_equipo_guardar():
         return jsonify({'error': 'Solo el entrenador edita el equipo.'}), 403
     d = body()
     uid = db.equipo_id(current_user.id)
-    datos = {
-        'nombre': (d.get('nombre') or 'Mi equipo')[:80],
-        'codigo': db.codigo_equipo(uid),
-    }
+    #  El nombre solo se toca si llega, y nunca se cae a «Mi equipo». Con el
+    #  valor por defecto, una peticion sin `nombre` —un cuerpo vacio, un envio
+    #  a medias— le renombraba el equipo a «Mi equipo» a quien lo tenia puesto
+    #  desde hace meses, sin avisar y sin forma de recuperarlo. Es el mismo
+    #  cuidado que ya se tenia con `categoria`, tres lineas mas abajo.
+    datos = {'codigo': db.codigo_equipo(uid)}
+    if 'nombre' in d:
+        nombre = (d.get('nombre') or '').strip()[:80]
+        if not nombre:
+            return jsonify({'error': 'El equipo necesita un nombre.'}), 400
+        datos['nombre'] = nombre
     # `categoria` es texto libre y ya no se edita desde la pantalla (la
     # categoría de verdad es `categoria_edad`, que se elige en «Nivel del
     # equipo»). Solo se toca si llega: si no, se conserva lo que hubiera.
@@ -385,6 +407,9 @@ def api_equipo_guardar():
     else:
         datos['coach_id'] = uid
         datos['creado'] = ahora()
+        #  Al CREARLO si vale un nombre de partida: el equipo tiene que
+        #  llamarse de alguna forma mientras el entrenador no le ponga uno.
+        datos.setdefault('nombre', 'Mi equipo')
         if not db.insert('fut_teams', datos):
             return jsonify({'error': 'No se pudo guardar el equipo.'}), 500
     return jsonify({'ok': True, 'equipo': datos})
