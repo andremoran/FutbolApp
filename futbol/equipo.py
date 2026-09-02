@@ -297,7 +297,11 @@ def api_manual():
             continue
         if k in campos_numericos:
             try:
-                campos_perfil[k] = int(v)
+                #  Recortado a 1-100, igual que `/api/evaluacion`: son las dos
+                #  puertas a las MISMAS columnas y no pueden validar distinto.
+                #  Sin esto entraba un `pase: 999` que dejaba la barra fuera de
+                #  la pantalla y reventaba la media de la familia.
+                campos_perfil[k] = max(1, min(100, int(v)))
             except (TypeError, ValueError):
                 pass
         else:

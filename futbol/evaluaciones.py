@@ -278,11 +278,14 @@ def guardar_resultado(coach_id, jugador, clave, valores, fecha=None, notas='',
     if not fila:
         return None, 'No se pudo guardar. Inténtalo de nuevo.'
 
-    # La marca no se queda en una tabla aparte: mueve la ficha del jugador.
+    # La marca no se queda en una tabla aparte: mueve la ficha del jugador,
+    # tenga cuenta o no.
     principal = cat.campo_principal(t)
     fila['_cambios'] = aplicar_a_ficha(
-        coach_id, (jugador or {}).get('id') if not manual_id else None, t,
-        niveles.get(principal['clave']) if principal else None)
+        coach_id,
+        db.dueno_filtro(player_id=None if manual_id else (jugador or {}).get('id'),
+                        manual_player_id=manual_id),
+        t, niveles.get(principal['clave']) if principal else None, marca=fila)
     return fila, None
 
 
@@ -303,8 +306,28 @@ def guardar_resultado(coach_id, jugador, clave, valores, fecha=None, notas='',
 DELTA_POR_NIVEL = {'elite': 2, 'bueno': 1, 'promedio': 0, 'debil': -1, 'muy_debil': -2}
 TOPE_DELTA = 2
 
-NOMBRE_ATRIBUTO = {'tecnica': 'Técnica', 'fisico': 'Físico',
-                   'tactico': 'Táctico', 'mental': 'Mental'}
+#  ...pero esas dos lecturas solo valen LA PRIMERA VEZ que el jugador hace la
+#  prueba. Dicen dónde está, y eso ya se le sumó a la ficha ese día. Volver a
+#  premiarlas en cada repetición era pagar diez veces por el mismo Cooper: un
+#  chaval que corriera los mismos 3.000 m cada lunes ganaba veinte puntos de
+#  resistencia en diez semanas sin haber mejorado nada, y el global con él.
+#
+#  De la segunda marca en adelante manda una sola pregunta: ¿ha mejorado su
+#  propia marca? El cambio se mide en porcentaje sobre su mejor marca anterior,
+#  que es lo único comparable entre segundos, metros, centímetros y
+#  repeticiones.
+#
+#  Sube antes de lo que baja, y a propósito: un mal día —viento, cronómetro a
+#  mano, mala noche— no es perder facultades, pero quedarse un 7% por debajo de
+#  tu mejor marca sí dice algo. Por debajo del 1,5% no se mueve nada: eso es
+#  ruido de medición, no progreso.
+MEJORA_GRANDE, MEJORA_MINIMA = 5.0, 1.5
+CAIDA_GRANDE, CAIDA_MINIMA = -7.0, -3.0
+
+#  Cómo se llama por escrito lo que movió la marca. Salen de `db.ETIQUETAS_18`
+#  porque lo que se mueve son los 18 del Perfil Dinámico: el aviso dice
+#  «Resistencia», que es lo que se entrenó, y no «Físico», que no dice nada.
+NOMBRE_ATRIBUTO = db.ETIQUETAS_18
 
 
 def percentil(puesto, total):
@@ -391,32 +414,104 @@ def ranking_de(coach_id, clave, t=None):
     return tabla, campo, direccion
 
 
-def aplicar_a_ficha(coach_id, player_id, t, nivel_absoluto):
+def _progreso_propio(dueno, t, marca):
+    """Cuánto ha mejorado respecto a SU mejor marca anterior, en puntos de
+    ficha (-2 a +2). Devuelve None si es la primera vez que hace esta prueba,
+    que es cuando siguen mandando el baremo y el puesto en el equipo.
+
+    Se compara contra la mejor, no contra la última: la mejor es la que ya se
+    le pagó, y con la última bastaría con alternar un día malo y otro bueno
+    para ir cobrando la misma mejora una y otra vez.
+    """
+    principal = cat.campo_principal(t) if t else None
+    if not principal or not marca:
+        return None
+    campo = principal['clave']
+    ahora = (marca.get('valores') or {}).get(campo)
+    if not isinstance(ahora, (int, float)):
+        return None
+
+    previas = []
+    for f in db.rows('fut_eval_results', 'marcas previas',
+                     test_clave=t.get('clave'), **dueno):
+        if str(f.get('id')) == str(marca.get('id')):
+            continue
+        v = (f.get('valores') or {}).get(campo)
+        if isinstance(v, (int, float)):
+            previas.append(v)
+    if not previas:
+        return None
+
+    menor_mejor = principal.get('direccion') == cat.MENOR
+    mejor = min(previas) if menor_mejor else max(previas)
+    if not mejor:
+        return None
+
+    cambio = (mejor - ahora) if menor_mejor else (ahora - mejor)
+    pct = cambio / abs(mejor) * 100
+    if pct >= MEJORA_GRANDE:
+        return 2
+    if pct >= MEJORA_MINIMA:
+        return 1
+    if pct <= CAIDA_GRANDE:
+        return -2
+    if pct <= CAIDA_MINIMA:
+        return -1
+    return 0
+
+
+def aplicar_a_ficha(coach_id, dueno, t, nivel_absoluto, marca=None):
     """Mueve los atributos del jugador según cómo le fue. Devuelve los cambios.
 
-    Solo afecta a jugadores con cuenta: uno anotado a mano no tiene ficha.
+    `dueno` es el par de `db.dueno_filtro()`: vale igual para un jugador con
+    cuenta y para uno apuntado a mano. Antes solo movía la ficha del
+    registrado, y en un equipo de formación —donde casi nadie tiene cuenta—
+    eso quería decir que las pruebas no movían nada de nadie.
+
+    Se escribe por `db.guardar_atributos`, que es la única puerta al Perfil
+    Dinámico: recalcula el overall, las tres medias de familia y deja la foto
+    de la semana. Antes se escribía en las cuatro columnas derivadas
+    (`guardar_familias`) y pasaban dos cosas malas: el overall no se movía y la
+    siguiente evaluación borraba lo que las pruebas habían subido.
+
+    A quien todavía no tiene Perfil Dinámico no se le toca nada. Sumarle
+    puntos a los cincuenta con los que `ficha_atributos()` rellena los huecos
+    sería inventarle una evaluación que nadie hizo, y a partir de ahí la
+    pantalla de progreso enseñaría la «evolución» de un jugador sin evaluar.
     """
-    if not player_id:
+    if not dueno:
         return []
 
-    tabla, _, _ = ranking_de(coach_id, t.get('clave'), t)
-    mio = next((r for r in tabla if r.get('player_id') == player_id), None)
-    por_equipo = (_delta_por_percentil(mio.get('_percentil'), len(tabla))
-                  if mio else None)
-    por_baremo = DELTA_POR_NIVEL.get(nivel_absoluto)
-
-    lecturas = [d for d in (por_equipo, por_baremo) if d is not None]
-    if not lecturas:
+    ficha = db.ficha_atributos(**dueno)
+    if not ficha.get('_tiene_perfil'):
         return []
-    base = max(lecturas)
+
+    #  ¿Es la primera vez que hace esta prueba, o ya tiene marca con la que
+    #  compararse? Ver el comentario de MEJORA_MINIMA: la respuesta cambia por
+    #  completo de dónde sale el delta.
+    base = _progreso_propio(dueno, t, marca)
+    if base is None:
+        tabla, _, _ = ranking_de(coach_id, t.get('clave'), t)
+        mio_id = str(list(dueno.values())[0])
+        mio = next((r for r in tabla
+                    if str(r.get('player_id') or r.get('manual_player_id')) == mio_id), None)
+        por_equipo = (_delta_por_percentil(mio.get('_percentil'), len(tabla))
+                      if mio else None)
+        por_baremo = DELTA_POR_NIVEL.get(nivel_absoluto)
+
+        lecturas = [d for d in (por_equipo, por_baremo) if d is not None]
+        if not lecturas:
+            return []
+        base = max(lecturas)
     if base == 0:
         return []
 
-    actuales = db.atributos(player_id)
-    nuevos, cambios = dict(actuales), []
+    nuevos, cambios = {}, []
     for atributo, peso in cat.atributos_de(t).items():
         delta = max(-TOPE_DELTA, min(TOPE_DELTA, _redondear(base * peso)))
-        antes = actuales.get(atributo, 50)
+        antes = ficha.get(atributo)
+        if antes is None:
+            continue
         despues = max(1, min(100, antes + delta))
         if despues == antes:
             continue
@@ -425,7 +520,7 @@ def aplicar_a_ficha(coach_id, player_id, t, nivel_absoluto):
                         'antes': antes, 'despues': despues})
 
     if cambios:
-        db.guardar_familias(player_id, nuevos)
+        db.guardar_atributos(**dueno, **nuevos)
     return cambios
 
 
@@ -1022,7 +1117,15 @@ def c_evolucion():
         return fuera
 
     uid = db.equipo_id(current_user.id)
-    jugadores = db.jugadores_del_entrenador(uid)
+    #  TODA la plantilla, con cuenta y sin ella. Con `jugadores_del_entrenador`
+    #  esta pantalla dejaba fuera a los apuntados a mano: en el equipo real hay
+    #  19 y ninguno tiene cuenta, así que la media del equipo salía calculada
+    #  con sus marcas y debajo no aparecía nadie. Es el mismo despiste que ya
+    #  hubo con la asistencia y con el contexto de la IA, y por eso existe
+    #  `db.plantilla_completa`.
+    jugadores = [{'id': j['id'], 'name': j['nombre'], 'profile_photo': j.get('foto'),
+                  'es_manual': j['es_manual']}
+                 for j in db.plantilla_completa(uid)]
     todos = enriquecer(resultados_equipo(uid, 400), uid)
 
     # Puntaje medio del equipo por mes: la línea que enseña si se progresa.
@@ -1038,7 +1141,8 @@ def c_evolucion():
     # Ficha resumida por jugador, ordenada por quién está mejor.
     resumen = []
     for j in jugadores:
-        suyos = [r for r in todos if str(r.get('player_id')) == str(j['id'])]
+        columna = 'manual_player_id' if j['es_manual'] else 'player_id'
+        suyos = [r for r in todos if str(r.get(columna)) == str(j['id'])]
         ultimos = {}
         for r in suyos:
             ultimos.setdefault(r['test_clave'], r)

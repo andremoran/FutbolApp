@@ -1993,41 +1993,133 @@ CATEGORIA_META = {c: {'etiqueta': e, 'emoji': em, 'descripcion': d}
 #  original. Es el principio del proyecto — lo que el entrenador mide cambia
 #  las estadísticas reales del jugador.
 #
-#  Manda la familia de la prueba. Solo se listan aparte las que miden algo
-#  distinto de lo que sugiere su familia; inventar pesos para las treinta y
-#  una sería precisión fingida.
-ATRIBUTO_DE_FAMILIA = {'fisico': 'fisico', 'tecnico': 'tecnica', 'mental': 'mental'}
+#  Se apunta a los DIECIOCHO atributos del Perfil Dinámico, que son los que
+#  mandan: el overall del jugador es su media y el histórico semanal guarda
+#  esos dieciocho. Antes esto apuntaba a las cuatro familias clásicas
+#  (`tecnica/fisico/tactico/mental`), que son columnas DERIVADAS: la marca
+#  movía una media que la siguiente evaluación volvía a calcular desde los 18,
+#  así que el trabajo de tres meses de pruebas se borraba solo y el global no
+#  se enteraba nunca. Un test de Cooper de élite subía el «físico» dos puntos y
+#  dejaba el overall clavado.
+#
+#  Cada prueba mueve lo que MIDE, no su familia entera: el Cooper mueve el
+#  fondo, no la velocidad; el sprint de 10 m mueve la aceleración, no el fondo.
+#  Los pesos suman 1 y salen del propio protocolo de la prueba.
+PESOS_POR_PRUEBA = {
+    # ── Resistencia ──
+    'cooper': {'resistencia': 1.0},
+    'yoyo_ir1': {'resistencia': 1.0},
+    'course_navette': {'resistencia': 1.0},
+    'vo2max': {'resistencia': 1.0},
+    'ift_30_15': {'resistencia': 1.0},
+    'list_test': {'resistencia': 0.7, 'velocidad': 0.3},
+    # Las de sprint repetido miden aguantar la velocidad, no solo correr.
+    'rsa': {'resistencia': 0.5, 'velocidad': 0.5},
+    'rast': {'resistencia': 0.5, 'aceleracion': 0.5},
 
-PESOS_PROPIOS = {
-    # Está entre las mentales porque se puntúa observando, pero lo que mide es
-    # lectura de juego y posicionamiento.
-    'perfil_tactico': {'tactico': 1.0},
-    # Conducir entre conos es técnica, pero el cronómetro premia la agilidad.
-    'conduccion_conos': {'tecnica': 0.7, 'fisico': 0.3},
-    # Las de conducción de la biblioteca son el mismo caso: se puntúan con el
-    # cronómetro, así que reparten igual que la de conos. Dejarlas en técnica
-    # pura haría que dos pruebas casi iguales movieran atributos distintos.
-    'dribbling_fpf': {'tecnica': 0.7, 'fisico': 0.3},
-    'conduccion_vallas': {'tecnica': 0.7, 'fisico': 0.3},
-    'conduccion_cambio_ritmo': {'tecnica': 0.7, 'fisico': 0.3},
-    'conduccion_circuito_30s': {'tecnica': 0.7, 'fisico': 0.3},
-    'regate_1vs0': {'tecnica': 0.7, 'fisico': 0.3},
-    # Esta es directamente un sprint con balón: manda lo físico.
-    'conduccion_recta': {'tecnica': 0.5, 'fisico': 0.5},
+    # ── Velocidad y aceleración ──
+    #  En 10 m no se llega a la velocidad máxima: eso es arrancar.
+    'sprint_10m': {'aceleracion': 1.0},
+    'sprint_20m': {'aceleracion': 0.5, 'velocidad': 0.5},
+    'sprint_30m': {'velocidad': 0.6, 'aceleracion': 0.4},
+
+    # ── Fuerza y potencia ──
+    'squat_1rm': {'fuerza': 1.0},
+    'dinamometria': {'fuerza': 1.0},
+    'abdominales_30s': {'fuerza': 1.0},
+    'abdominales_60s': {'fuerza': 0.6, 'resistencia': 0.4},
+    'plancha': {'fuerza': 0.5, 'resistencia': 0.5},
+    #  Un salto es fuerza que se aplica en un instante: eso es arrancar.
+    'cmj': {'fuerza': 0.6, 'aceleracion': 0.4},
+    'sj': {'fuerza': 0.7, 'aceleracion': 0.3},
+    'abalakov': {'fuerza': 0.6, 'aceleracion': 0.4},
+    'salto_horizontal': {'fuerza': 0.6, 'aceleracion': 0.4},
+    'margaria_kalamen': {'fuerza': 0.5, 'aceleracion': 0.5},
+
+    # ── Agilidad ──
+    'illinois': {'agilidad': 1.0},
+    'test_505': {'agilidad': 1.0},
+    't_test': {'agilidad': 1.0},
+    'y_balance': {'agilidad': 1.0},
+    'sit_and_reach': {'agilidad': 1.0},
+    #  La antropometría MIDE, no puntúa: pesar 62 kg no es ser mejor ni peor.
+    'antropometria': {},
+
+    # ── Pase ──
+    'pase_precision': {'pase': 1.0},
+    'pase_largo_precision': {'pase': 1.0},
+    'lspt': {'pase': 0.7, 'control': 0.3},
+    'pared_primer_toque': {'pase': 0.6, 'control': 0.4},
+    'golpeo_largo': {'pase': 0.6, 'centros': 0.4},
+    #  Un saque de banda largo es medio brazo y medio puntería.
+    'saque_banda': {'fuerza': 0.5, 'pase': 0.5},
+
+    # ── Control ──
+    'control_orientado': {'control': 1.0},
+    'recepcion_orientada': {'control': 1.0},
+    'trapping_test': {'control': 1.0},
+    'recepcion_pivot': {'control': 0.7, 'vision_juego': 0.3},
+    'juegos_malabares': {'control': 0.7, 'regate': 0.3},
+    'dominio_balon_fifa': {'control': 0.7, 'regate': 0.3},
+    #  Se mide la técnica cuando ya no quedan piernas: la cabeza cuenta.
+    'tecnica_bajo_fatiga': {'control': 0.4, 'pase': 0.3, 'concentracion': 0.3},
+
+    # ── Regate y conducción ──
+    'regate_1v1': {'regate': 1.0},
+    'regate_1vs0': {'regate': 1.0},
+    #  Conducir entre conos es regate, pero el cronómetro premia la agilidad.
+    'conduccion_conos': {'regate': 0.7, 'agilidad': 0.3},
+    'conduccion_vallas': {'regate': 0.7, 'agilidad': 0.3},
+    'dribbling_fpf': {'regate': 0.7, 'agilidad': 0.3},
+    'conduccion_cambio_ritmo': {'regate': 0.6, 'aceleracion': 0.4},
+    'conduccion_circuito_30s': {'regate': 0.7, 'resistencia': 0.3},
+    #  Esta es directamente un sprint con balón.
+    'conduccion_recta': {'regate': 0.5, 'velocidad': 0.5},
+
+    # ── Tiro y remate ──
+    'tiro_potencia_radar': {'tiro': 1.0},
+    'tiros_porteria': {'tiro': 0.5, 'definicion': 0.5},
+    'golpeo_porteria_ali': {'tiro': 0.5, 'definicion': 0.5},
+    #  El penalti es definición con el partido mirando.
+    'penalti_test': {'definicion': 0.7, 'confianza': 0.3},
+    'cabeceo_bangsbo': {'tiro': 0.5, 'fuerza': 0.5},
+    'juego_aereo': {'fuerza': 0.6, 'agilidad': 0.4},
+
+    # ── Cabeza ──
+    #  El perfil táctico se puntúa observando, pero lo que mide es lectura de
+    #  juego y posicionamiento.
+    'perfil_tactico': {'vision_juego': 0.5, 'concentracion': 0.3, 'disciplina': 0.2},
+    'perfil_mental': {'confianza': 0.25, 'concentracion': 0.25, 'mentalidad': 0.2,
+                      'disciplina': 0.15, 'liderazgo': 0.15},
+    'checkin_diario': {'mentalidad': 1.0},
+    'reaccion': {'concentracion': 0.6, 'aceleracion': 0.4},
+}
+
+#  Para las pruebas que se inventa el entrenador no se sabe qué miden, solo de
+#  qué familia son. Ahí se mueve la familia entera con el mismo peso: es lo que
+#  hacía el modelo viejo y es lo honesto —«va bien de físico»— sin fingir que
+#  sabemos si corrió o saltó.
+ATRIBUTOS_DE_FAMILIA = {
+    'fisico': ('velocidad', 'resistencia', 'fuerza', 'agilidad', 'aceleracion'),
+    'tecnico': ('pase', 'control', 'regate', 'tiro', 'definicion', 'centros',
+                'vision_juego'),
+    'mental': ('liderazgo', 'disciplina', 'concentracion', 'confianza',
+               'trabajo_equipo', 'mentalidad'),
 }
 
 
 def atributos_de(t):
-    """{atributo: peso} que mueve una prueba. Los pesos suman 1.
+    """{atributo del Perfil Dinámico: peso} que mueve una prueba.
 
     Acepta la prueba entera —no solo la clave— para que valga igual con las
     pruebas que se inventa el entrenador, que no están en el catálogo.
     """
-    propios = PESOS_PROPIOS.get((t or {}).get('clave'))
-    if propios:
-        return dict(propios)
+    clave = (t or {}).get('clave')
+    if clave in PESOS_POR_PRUEBA:
+        return dict(PESOS_POR_PRUEBA[clave])
     familia = (t or {}).get('categoria') or 'fisico'
-    return {ATRIBUTO_DE_FAMILIA.get(familia, 'fisico'): 1.0}
+    return {a: 1.0 for a in ATRIBUTOS_DE_FAMILIA.get(
+        familia, ATRIBUTOS_DE_FAMILIA['fisico'])}
 
 
 def test(clave):

@@ -28,6 +28,18 @@ def sb():
     return _sb
 
 
+class ErrorDeLectura(Exception):
+    """No se pudo PREGUNTAR a la base. No es lo mismo que «no hay nada».
+
+    `q()` se traga los errores a proposito para que una pantalla de lectura no
+    se caiga por una tabla ausente. Pero hay una lectura donde ese silencio
+    miente de forma grave: la que averigua quien esta usando la app. Si
+    Supabase no contesta, «no encuentro al usuario» se lee como «no hay
+    sesion» y la app echa fuera a todo el mundo. Paso de verdad: un corte de
+    DNS de treinta segundos mando a `/entrar` a los cinco roles de la prueba.
+    """
+
+
 # ─── Envoltorio tolerante ────────────────────────────────────────────────────
 def q(fn, default=None, ctx=''):
     """Ejecuta una consulta y devuelve `default` si falla.
@@ -67,6 +79,26 @@ def rows(table, ctx='', **filters):
 def one(table, ctx='', **filters):
     r = rows(table, ctx, **filters)
     return r[0] if r else None
+
+
+def one_estricto(table, ctx='', **filters):
+    """Como `one()`, pero si la base no contesta lo dice en vez de callarse.
+
+    Devuelve la fila o None si de verdad no existe; lanza `ErrorDeLectura` si
+    la consulta falló. Solo para lo que no se puede confundir: ver
+    `ErrorDeLectura`.
+    """
+    def _go():
+        sel = _sb.table(table).select('*')
+        for k, v in filters.items():
+            sel = sel.eq(k, v)
+        return sel.limit(1).execute().data or []
+    try:
+        filas = _go()
+    except Exception as e:
+        logger.warning('db no contesta en %s: %s', ctx or table, e)
+        raise ErrorDeLectura(str(e))
+    return filas[0] if filas else None
 
 
 class ErrorDeEscritura(Exception):
@@ -514,20 +546,10 @@ def asistencia_de(event_ids, player_id=None):
 
 
 # ─── Atributos y evaluaciones ────────────────────────────────────────────────
+#  Las cuatro familias de siempre. Ya no son columnas que alguien escriba: se
+#  calculan desde los 18 en `atributos()`, más abajo, junto al resto del Perfil
+#  Dinámico. El orden es el del radar de «Mi Ficha».
 ATRIBUTOS = ['tecnica', 'fisico', 'tactico', 'mental']
-
-
-def atributos(player_id):
-    a = one('fut_attributes', 'atributos', player_id=player_id)
-    if not a:
-        # Punto de partida neutro: 50/100 en todo, como hace la app al crear un jugador.
-        return {k: 50 for k in ATRIBUTOS}
-    return {k: (a.get(k) if a.get(k) is not None else 50) for k in ATRIBUTOS}
-
-
-def media_atributos(player_id):
-    a = atributos(player_id)
-    return round(sum(a.values()) / len(a))
 
 
 # ─── Perfil Dinámico: los 18 atributos ───────────────────────────────────────
@@ -676,7 +698,10 @@ def ficha_atributos(player_id=None, manual_player_id=None):
 
     ficha = {k: (fila.get(k) if fila.get(k) is not None else 50) for k in ATRIBUTOS_18}
     ficha['overall'] = fila.get('overall') if fila.get('overall') is not None else 50
-    ficha['potencial'] = fila.get('potencial') if fila.get('potencial') is not None else ficha['overall']
+    #  Nunca por debajo del overall: un techo por debajo de donde ya está el
+    #  jugador no es un techo. Se corrige también al leer para que las fichas
+    #  guardadas antes de esta regla no sigan enseñándolo.
+    ficha['potencial'] = max(fila.get('potencial') or 0, ficha['overall'])
     ficha['media_tecnica'] = _media_familia(fila, ATRIBUTOS_TECNICOS) or 50
     ficha['media_fisica'] = _media_familia(fila, ATRIBUTOS_FISICOS) or 50
     ficha['media_mental'] = _media_familia(fila, ATRIBUTOS_MENTALES) or 50
@@ -689,6 +714,44 @@ def ficha_atributos(player_id=None, manual_player_id=None):
     ficha['posicion_secundaria'] = fila.get('posicion_secundaria') or ''
     ficha['_tiene_perfil'] = tiene_perfil
     return ficha
+
+
+#  El táctico no tiene familia propia entre los 18 —nadie evalúa «táctico» a
+#  secas—, así que sale de los tres que miden leer el juego. Son los mismos que
+#  mueve la prueba «Perfil Táctico» (tests_catalogo.PESOS_POR_PRUEBA), para que
+#  la prueba y la ficha hablen de lo mismo.
+#
+#  Antes se leía la columna `tactico` de la tabla, que NADIE escribía: se
+#  quedaba en 50 para siempre y arrastraba la media hacia abajo. El jugador
+#  leía 58 en «Mi Ficha» mientras su entrenador veía 61 en la tarjeta, y en la
+#  ficha del entrenador salían los dos números en la MISMA pantalla.
+ATRIBUTOS_TACTICOS = ['vision_juego', 'concentracion', 'disciplina']
+
+#  De dónde sale cada una de las cuatro de `ATRIBUTOS`, en su mismo orden.
+_FAMILIAS_CLASICAS = {'tecnica': ATRIBUTOS_TECNICOS, 'fisico': ATRIBUTOS_FISICOS,
+                      'tactico': ATRIBUTOS_TACTICOS, 'mental': ATRIBUTOS_MENTALES}
+
+
+def atributos(player_id=None, manual_player_id=None):
+    """Las cuatro familias de siempre (1-100), calculadas desde los 18.
+
+    Los huecos salen a 50, que es el punto de partida neutro con el que la app
+    crea un jugador. Ese 50 NO significa que exista una evaluación: para eso
+    está `ficha_atributos()['_tiene_perfil']`.
+    """
+    fila = fila_atributos(player_id, manual_player_id) or {}
+    return {clave: (_media_familia(fila, _FAMILIAS_CLASICAS[clave]) or 50)
+            for clave in ATRIBUTOS}
+
+
+def media_atributos(player_id=None, manual_player_id=None):
+    """El global del jugador: EL MISMO número que ve su entrenador.
+
+    Es el `overall` del Perfil Dinámico, no otra media paralela. Cuando eran
+    dos cuentas distintas, el jugador y el entrenador miraban al mismo chaval y
+    leían números que no coincidían.
+    """
+    return ficha_atributos(player_id, manual_player_id)['overall']
 
 
 def guardar_atributos(player_id=None, manual_player_id=None, **campos):
@@ -717,7 +780,12 @@ def guardar_atributos(player_id=None, manual_player_id=None, **campos):
     overall = calcular_overall(fusion)
     if overall is not None:
         datos['overall'] = overall
-        datos['potencial'] = fusion.get('potencial') if fusion.get('potencial') is not None else overall
+        potencial = fusion.get('potencial')
+        #  El potencial es un TECHO: hasta dónde puede llegar este chaval. Si
+        #  ya está por encima, el techo estaba mal puesto y sube con él — la
+        #  tarjeta llegaba a enseñar «81 OVR · POT 70», que es decir que el
+        #  jugador es mejor de lo que puede llegar a ser.
+        datos['potencial'] = max(potencial, overall) if potencial is not None else overall
         for clave, familia in (('tecnica', ATRIBUTOS_TECNICOS),
                                ('fisico', ATRIBUTOS_FISICOS),
                                ('mental', ATRIBUTOS_MENTALES)):
@@ -745,38 +813,65 @@ def guardar_atributos(player_id=None, manual_player_id=None, **campos):
 
 
 def _foto_de_esta_semana(dueno):
-    """Deja guardado como esta el jugador esta semana.
+    """Deja guardado como esta el jugador esta semana, y repasa sus alertas.
 
-    No toca las alertas: de eso se sigue encargando el recalculo del equipo.
-    Aqui solo interesa que quede el rastro, y que quede sin que nadie tenga
-    que acordarse.
+    Las alertas van aqui y no solo en el boton «Recalcular evolucion del
+    equipo»: si un chaval retrocede cinco puntos, el aviso no puede depender de
+    que alguien se acuerde de pulsar un boton. Antes pasaba justo eso —evaluar
+    a la baja dejaba cero alertas— y el aviso llegaba tarde o no llegaba.
     """
     fila = one('fut_attributes', 'ficha para la foto', **dueno)
     if not fila or fila.get('overall') is None:
         return
+    semana = _lunes_de_esta_semana()
+    delta = _delta_semanal(dueno, fila['overall'], semana)
     _upsert_dueno('fut_attribute_history',
-                  {**dueno, 'semana': _lunes_de_esta_semana()},
+                  {**dueno, 'semana': semana},
                   {'atributos': {k: fila.get(k) for k in ATRIBUTOS_18},
                    'overall': fila['overall'], 'origen': 'automatico'},
                   'foto semanal')
+    coach_id = coach_del_jugador(dueno)
+    if coach_id:
+        _actualizar_alertas(coach_id, dueno, delta, fila)
 
 
-def guardar_familias(player_id, valores):
-    """Escribe solo las 4 familias clásicas (0-100), sin tocar los 18.
+def coach_del_jugador(dueno):
+    """De que equipo es este jugador, tenga cuenta o no.
 
-    Lo usa evaluaciones.py cuando la marca de una prueba mueve la ficha del
-    jugador. No puede ser un `upsert(on_conflict='player_id')`: desde
-    schema_v3 la unicidad de fut_attributes es un índice PARCIAL, y Postgres
-    no admite ON CONFLICT contra un índice parcial.
+    Hace falta porque las alertas son del EQUIPO (`fut_player_alerts.coach_id`)
+    y quien guarda una ficha no siempre sabe de quien es —una evaluacion la
+    puede escribir un asistente, y `guardar_atributos` solo recibe al jugador.
     """
-    dueno = dueno_filtro(player_id=player_id)
-    if not dueno:
-        return None
-    datos = {k: v for k, v in valores.items() if k in ATRIBUTOS}
-    if not datos:
-        return None
-    datos['actualizado'] = _ahora()
-    return _upsert_dueno('fut_attributes', dueno, datos, 'ficha por prueba')
+    if dueno.get('manual_player_id'):
+        m = one('fut_manual_players', 'coach del manual', id=dueno['manual_player_id'])
+        return (m or {}).get('coach_id')
+    if dueno.get('player_id'):
+        f = one('fut_plantilla', 'coach del jugador',
+                player_id=dueno['player_id'], activo=True)
+        return (f or {}).get('coach_id')
+    return None
+
+
+def _delta_semanal(dueno, overall, semana):
+    """Cuanto se ha movido desde la ultima foto que NO sea la de esta semana.
+
+    Comparar contra la de esta semana daria siempre cero: es la que se acaba de
+    escribir.
+    """
+    historial = rows('fut_attribute_history', 'historial', _order='semana', _desc=True,
+                     **dueno)
+    previa = next((h for h in historial if h.get('semana') != semana), None)
+    if not previa or previa.get('overall') is None:
+        return 0
+    return overall - previa['overall']
+
+
+#  Aquí vivía `guardar_familias()`, que escribía solo las cuatro familias
+#  clásicas cuando una prueba movía la ficha. Se retiró: esas cuatro columnas
+#  son DERIVADAS de los 18 y `guardar_atributos()` las recalcula, así que lo
+#  que escribía duraba hasta la siguiente evaluación y el overall no se
+#  enteraba. Ahora `evaluaciones.aplicar_a_ficha()` mueve los 18 por la puerta
+#  de siempre, que además deja la foto de la semana.
 
 
 # ─── Ficha médica ────────────────────────────────────────────────────────────
@@ -874,7 +969,14 @@ def guardar_ficha_medica(player_id=None, manual_player_id=None,
 
 
 def _lunes_de_esta_semana():
-    hoy = date.today()
+    """El lunes de la semana del EQUIPO, no la del servidor.
+
+    Con `date.today()` mandaba el reloj de la máquina, y la de producción va en
+    UTC: un domingo a las 20:00 en Ecuador allí ya es lunes, así que la foto
+    del domingo se archivaba en la semana siguiente. En una pantalla que
+    compara semana contra semana eso corre la evolución entera un casillero.
+    """
+    hoy = hoy_local()
     return (hoy - timedelta(days=hoy.weekday())).isoformat()
 
 
@@ -901,10 +1003,7 @@ def _recalcular_uno(coach_id, semana, player_id=None, manual_player_id=None):
 
     dueno = dueno_filtro(player_id, manual_player_id)
     overall = fila['overall']
-
-    historial = rows('fut_attribute_history', 'historial', _order='semana', _desc=True, **dueno)
-    previa = next((h for h in historial if h.get('semana') != semana), None)
-    delta = (overall - previa['overall']) if previa and previa.get('overall') is not None else 0
+    delta = _delta_semanal(dueno, overall, semana)
 
     snapshot = {k: fila.get(k) for k in ATRIBUTOS_18}
     _upsert_dueno('fut_attribute_history', {**dueno, 'semana': semana},
@@ -921,15 +1020,18 @@ _TIPOS_RECALCULADOS = ('caida', 'fisico', 'mental')
 
 
 def _actualizar_alertas(coach_id, dueno, delta, fila):
-    """Resuelve las alertas de la semana pasada y crea las que sigan aplicando.
+    """Deja activas exactamente las alertas que aplican hoy, y ni una más.
 
     Mismas reglas, en el mismo orden, que TeamPlayersScreen.tsx:buildAlerts().
+
+    Una alerta que SIGUE aplicando no se toca: ni se resuelve ni se vuelve a
+    crear. Antes se borraban todas y se reescribían en cada guardado, y desde
+    que esto corre en cada evaluación —y en cada marca de una prueba— eso eran
+    cientos de filas al día por una tarde de tests. Además la fila nueva
+    empezaba a contar de cero: un chaval que llevaba tres semanas con la
+    condición física baja aparecía siempre como alerta de hoy.
     """
     activas = rows('fut_player_alerts', 'alertas previas', activa=True, **dueno)
-    for a in activas:
-        if a.get('tipo') in _TIPOS_RECALCULADOS:
-            update('fut_player_alerts', {'activa': False, 'resuelto': _ahora()},
-                   'resolver alerta', id=a['id'])
 
     nuevas = []
     # Retroceso semanal
@@ -949,7 +1051,30 @@ def _actualizar_alertas(coach_id, dueno, delta, fila):
         elif mental < 55:
             nuevas.append(('mental', 'aviso', 'Motivación reducida'))
 
+    #  Qué había y qué toca. Una alerta es «la misma» si coinciden tipo,
+    #  severidad y texto: «Retroceso de 3 pts» y «Retroceso de 5 pts» son dos
+    #  cosas distintas y tienen que relevarse.
+    def _clave(a):
+        return (a.get('tipo'), a.get('severidad'), a.get('mensaje'))
+
+    tocan = set(nuevas)
+    siguen = set()
+    #  De la mas antigua a la mas nueva: si de cuando se reescribian todas
+    #  quedaron duplicadas, la que se queda es la primera, que es la que dice
+    #  desde cuando arrastra el problema.
+    for a in sorted(activas, key=lambda x: x.get('creado') or ''):
+        if a.get('tipo') not in _TIPOS_RECALCULADOS:
+            continue        # de otro tipo: no es cosa de este recalculo
+        clave = _clave(a)
+        if clave in tocan and clave not in siguen:
+            siguen.add(clave)
+            continue        # sigue aplicando: se deja como esta, con su fecha
+        update('fut_player_alerts', {'activa': False, 'resuelto': _ahora()},
+               'resolver alerta', id=a['id'])
+
     for tipo, severidad, mensaje in nuevas:
+        if (tipo, severidad, mensaje) in siguen:
+            continue        # ya estaba activa
         insert('fut_player_alerts', {
             **dueno, 'coach_id': coach_id, 'tipo': tipo, 'severidad': severidad,
             'mensaje': mensaje, 'activa': True,
@@ -1007,6 +1132,14 @@ def anio_de(fecha_nacimiento=None, anio_nacimiento=None):
 #  19:00 y medianoche —justo cuando el entrenador repasa despues del
 #  entrenamiento— un informe de hoy sale fechado MAÑANA.
 HORAS_UTC_LOCAL = -5
+
+
+def hoy_local():
+    """Qué día es donde está el equipo, pase lo que pase con el reloj del
+    servidor. En la máquina de desarrollo coincide con `date.today()`; en
+    producción, que va en UTC, entre las 19:00 y medianoche no coincidía.
+    """
+    return (datetime.now(timezone.utc) + timedelta(hours=HORAS_UTC_LOCAL)).date()
 
 
 def fecha_local(s, por_defecto=None):
