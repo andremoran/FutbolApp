@@ -38,6 +38,25 @@ _ok = _mal = 0
 _fallos = []
 
 
+#  Esto habla con el Supabase de verdad cientos de veces seguidas, asi que un
+#  corte de red se cuela como una fila que «no existe» —`db.q()` se traga los
+#  errores de lectura a proposito— y sale por pantalla como un fallo de la app.
+#  Paso de verdad: media prueba en rojo por un getaddrinfo que fallo. Se
+#  cuentan aparte para poder decirlo al final, en vez de mandar a nadie a
+#  buscar en el codigo un fallo que estaba en el wifi.
+class _FallosDeRed(logging.Handler):
+    def __init__(self):
+        super().__init__(level=logging.WARNING)
+        self.n = 0
+
+    def emit(self, record):
+        self.n += 1
+
+
+_red = _FallosDeRed()
+logging.getLogger('futbol.db').addHandler(_red)
+
+
 def comprobar(texto, condicion, detalle=''):
     global _ok, _mal
     if condicion:
@@ -153,6 +172,17 @@ def crear_jugador(coach_id):
     if not fila:
         raise SystemExit('No se pudo crear el jugador de simulacion.')
     return fila['id']
+
+
+def limpiar_jugador(pid):
+    """Deja al jugador CON CUENTA de la prueba como si no hubiera pasado nada.
+
+    Incluye sus marcas (`fut_eval_results`): ver el comentario de `main()`.
+    """
+    dueno = db.dueno_filtro(player_id=pid)
+    for tabla in ('fut_attribute_history', 'fut_attributes', 'fut_player_alerts',
+                  'fut_eval_results'):
+        db.delete(tabla, 'limpiar jugador', **dueno)
 
 
 def borrar_jugador(mid):
@@ -442,7 +472,7 @@ def probar_prueba_fisica(uid, ids, reloj):
     #  Un mes de pruebas: cuatro jornadas, una por semana. Eso SÍ tiene que
     #  verse en el numero de arriba — es la pregunta del entrenador, «¿esto que
     #  estamos haciendo sirve?».
-    ovr_mes = db.fila_atributos(player_id=pid).get('overall')
+    ovr_mes = (db.fila_atributos(player_id=pid) or {}).get('overall')
     for i, semanas_atras in enumerate((3, 2, 1, 0)):
         reloj.en(lunes_de(semanas_atras))
         fecha = (lunes_de(semanas_atras) + timedelta(days=3)).isoformat()
@@ -784,6 +814,13 @@ def main():
     print(AMARILLO + 'Simulando una temporada entera...' + FIN)
     ids = preparar()
     uid = db.equipo_id(ids['coach_pro'])
+
+    #  Se empieza en limpio. Las marcas mandan: desde que una prueba premia
+    #  MEJORAR y no repetir, una marca vieja del jugador de pruebas —de una
+    #  ejecucion que se corto a medias, por ejemplo— hace que el «primer
+    #  Cooper» de esta ya no sea el primero, y media prueba sale en rojo por
+    #  algo que no esta en el codigo.
+    limpiar_jugador(ids['jugador'])
     mid = crear_jugador(uid)
     reloj = Reloj()
     try:
@@ -804,14 +841,15 @@ def main():
     finally:
         reloj.restaurar()
         borrar_jugador(mid)
-        d = db.dueno_filtro(player_id=ids['jugador'])
-        db.delete('fut_attribute_history', 'limpiar', **d)
-        db.delete('fut_attributes', 'limpiar', **d)
-        db.delete('fut_player_alerts', 'limpiar', **d)
+        limpiar_jugador(ids['jugador'])
 
     print('\n' + '=' * 68)
     color = VERDE if not _mal else ROJO
     print(color + '%d comprobaciones bien - %d con problema' % (_ok, _mal) + FIN)
+    if _red.n:
+        print(AMARILLO + 'Ojo: la base no contesto %d vez/veces durante la prueba '
+              '(red o Supabase). Si hay fallos arriba, repite antes de buscarlos '
+              'en el codigo.' % _red.n + FIN)
     if _fallos:
         print('\n' + ROJO + 'Lo que no cuadra:' + FIN)
         for texto, detalle in _fallos:

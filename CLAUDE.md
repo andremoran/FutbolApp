@@ -23,11 +23,12 @@ crean cuentas `*@prueba.profoot` / `*@simula.profoot` que borran al terminar.
 
 ```bash
 python _probar.py             # 181 · pantallas de los 5 roles + candados de plan
-python _probar_flujos.py      #  46 · recorridos de punta a punta
+python _probar_flujos.py      #  58 · recorridos de punta a punta
 python _probar_segmentos.py   #  49 · los tres perfiles son tres cosas distintas
 python _simular_perfiles.py   #  60 · el primer día de un entrenador de cada perfil
-python _probar_global.py      #  76 · el OVR de un jugador a lo largo de 12 semanas
+python _probar_global.py      #  78 · el OVR de un jugador a lo largo de 12 semanas
 python _paridad.py            #       que no falte ninguna pantalla del MVP
+python _medir_pantallas.py    #       cuántas consultas cuesta abrir cada pantalla
 ```
 
 Antes de subir algo que toque pantallas del entrenador, corre al menos
