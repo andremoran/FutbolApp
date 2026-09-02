@@ -1307,12 +1307,34 @@ def _respaldo(user, pregunta):
                            "moverse con datos reales."]
         return "\n".join(lineas)
 
-    attrs = db.atributos(user.id)
-    flojo = min(attrs, key=attrs.get)
-    fuerte = max(attrs, key=attrs.get)
     racha = db.racha_actual(user.id)
     nombres = {'tecnica': 'técnica', 'fisico': 'físico',
                'tactico': 'táctico', 'mental': 'mental'}
+
+    #  Sin evaluación no hay números que leer. `db.atributos()` devuelve 50 en
+    #  todo como punto de partida, y con los cuatro iguales `min` y `max` daban
+    #  la MISMA familia: la IA le decía al chaval que su punto fuerte y su
+    #  punto flojo eran los dos «lo técnico, 50/100». Es la misma nota
+    #  inventada que se quitó de «Mi Ficha».
+    if not db.fila_atributos(player_id=user.id):
+        lineas = [f"{nombre}, todavía no tengo tus números: tu entrenador aún no "
+                  f"te ha evaluado.", ""]
+        lineas.append("· En cuanto lo haga, aquí verás tus puntos fuertes y en qué "
+                      "te toca apretar.")
+        if racha:
+            lineas.append(f"· Mientras tanto ya llevas {racha} día"
+                          f"{'s' if racha != 1 else ''} seguidos cumpliendo hábitos. "
+                          "Eso sí depende de ti, y cuenta.")
+        else:
+            lineas.append("· Mientras tanto, lo que sí está en tu mano: elige un hábito, "
+                          "el más fácil de cumplir, y encadena días.")
+        lineas += ["", "Mi consejo: pídele a tu entrenador que te evalúe. Es lo que "
+                       "pone en marcha todo lo demás."]
+        return "\n".join(lineas)
+
+    attrs = db.atributos(user.id)
+    flojo = min(attrs, key=attrs.get)
+    fuerte = max(attrs, key=attrs.get)
 
     lineas = [f"{nombre}, esto es lo que dicen tus números:", ""]
     lineas.append(f"· Tu punto fuerte es lo {nombres[fuerte]} ({attrs[fuerte]}/100).")

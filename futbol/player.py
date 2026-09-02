@@ -397,6 +397,11 @@ def mis_tests():
 def ficha():
     uid = current_user.id
     atributos = db.atributos(uid)
+    #  ¿Le ha evaluado alguien, o son los cincuenta de relleno? Sin esta
+    #  pregunta la pantalla le enseñaba un «50 · En progreso» y un radar entero
+    #  que nadie le había puesto — y es EL número que mira un chaval. Su
+    #  entrenador, en la misma app, veía «sin evaluar».
+    ficha = db.ficha_atributos(player_id=uid)
     perfil = db.perfil_jugador(uid)
     evaluaciones = db.rows('fut_evaluations', 'evaluaciones', player_id=uid,
                            _order='fecha', _desc=True, _limit=10)
@@ -412,6 +417,7 @@ def ficha():
                            },
                            atributos=atributos,
                            media=db.media_atributos(uid),
+                           evaluado=ficha['_tiene_perfil'],
                            perfil=perfil,
                            evaluaciones=evaluaciones,
                            entrenador=db.entrenador_del_jugador(uid))

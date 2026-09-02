@@ -15,7 +15,9 @@
 <div class="pf-hero__subtitle">
   {{ perfil.posicion|capitalize if perfil.posicion else 'Sin posición' }}
   {%- if perfil.dorsal %} · Dorsal {{ perfil.dorsal }}{% endif %}
-  · Valoración {{ media }}
+  {# Solo si alguien le ha evaluado. Esta misma pantalla dice más abajo
+     «Todavía sin evaluar» y arriba ponía «Valoración 50»: el 50 es relleno. #}
+  {%- if ficha._tiene_perfil %} · Valoración {{ media }}{% endif %}
 </div>
 {% endblock %}
 

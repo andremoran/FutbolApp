@@ -17,12 +17,15 @@
 <div style="display:flex;align-items:center;gap:14px;margin-top:18px">
   <div style="width:62px;height:62px;border-radius:31px;background:#fff;color:var(--primary);
               display:flex;align-items:center;justify-content:center;
-              font-size:24px;font-weight:800;flex:none">{{ media }}</div>
+              font-size:24px;font-weight:800;flex:none">{{ media if evaluado else '—' }}</div>
   <div>
     <div style="font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;
                 color:rgba(255,255,255,.75)">Valoración general</div>
     <div style="font-size:13px;color:rgba(255,255,255,.9);margin-top:3px">
-      {% if media >= 80 %}Nivel destacado
+      {# Sin evaluación no hay número. El 50 de relleno se leía como una nota
+         puesta por su entrenador, y no la había puesto nadie. #}
+      {% if not evaluado %}Tu entrenador aún no te ha evaluado
+      {% elif media >= 80 %}Nivel destacado
       {% elif media >= 65 %}Buen nivel
       {% elif media >= 50 %}En progreso
       {% else %}Con mucho margen de mejora{% endif %}
@@ -82,8 +85,17 @@
 <div class="pf-card">
   <div class="pf-card__head">
     <h2 class="pf-card__title">Atributos</h2>
-    <span class="pf-card__badge">{{ media }}/100</span>
+    {% if evaluado %}<span class="pf-card__badge">{{ media }}/100</span>{% endif %}
   </div>
+
+  {% if not evaluado %}
+  {# Dibujar el radar con los cincuentas de relleno es enseñarle una foto de
+     sí mismo que no le ha hecho nadie. Mejor decirle lo que falta. #}
+  <p style="font-size:14px;color:var(--text-sec);line-height:1.6;margin:4px 0 0">
+    Aquí verás tus atributos en cuanto tu entrenador te evalúe por primera vez.
+    Los mueve él, y también las pruebas físicas y técnicas que vayas haciendo.
+  </p>
+  {% else %}
 
   <div style="display:flex;justify-content:center;padding:10px 0 4px">
     {% set a = atributos %}
@@ -134,6 +146,7 @@
   <p style="font-size:12px;color:var(--text-muted);margin:12px 0 0;line-height:1.5">
     Estos valores los actualiza tu entrenador cada vez que te evalúa.
   </p>
+  {% endif %}
 </div>
 
 {# ── Datos personales ── #}
