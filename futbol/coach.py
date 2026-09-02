@@ -380,7 +380,13 @@ def c_equipo():
         'con_perfil': len(con_perfil),
         'total': len(plantilla),
         'overall_prom': round(sum(p['overall'] for p in con_perfil) / len(con_perfil)) if con_perfil else 0,
-        'cambio_semanal': sum(p['_delta'] for p in con_perfil),
+        #  La MEDIA de lo que se movió cada uno, no la suma. Sumando, un equipo
+        #  de diecinueve donde todos suben uno enseñaba «+19» al lado de un
+        #  «Overall promedio 61»: dos números en la misma caja, uno promedio y
+        #  el otro no, y el segundo crece solo con fichar gente. Con la media,
+        #  «+1» quiere decir que el jugador medio ha subido un punto.
+        'cambio_medio': (round(sum(p['_delta'] for p in con_perfil) / len(con_perfil), 1)
+                         if con_perfil else 0),
         'subiendo': len([p for p in con_perfil if p['_delta'] > 0]),
         'bajando': len([p for p in con_perfil if p['_delta'] < 0]),
         'con_alertas': len([p for p in plantilla if p['_alertas']]),
@@ -489,6 +495,14 @@ def datos_de_progreso(uid, jugador, clave='30'):
     antes = next((h for h in reversed(historial) if (h.get('semana') or '') < desde_iso),
                  dentro[0] if dentro else None)
     hoy = historial[-1] if historial else None
+
+    #  Si la unica foto que hay es la de hoy, no hay contra que comparar. Antes
+    #  se comparaba esa foto CONSIGO MISMA: la cabecera decia «61 · igual ·
+    #  comparado con la semana del 24/08» justo encima del aviso de «solo hay
+    #  una foto de este jugador». El macro `flecha` ya sabe decir «sin
+    #  comparar» cuando el delta es None; lo que faltaba era no inventarselo.
+    if antes is not None and antes is hoy:
+        antes = None
 
     #  `ficha_atributos` rellena los huecos con 50 para no dejar pantallas en
     #  blanco, y avisa de ello en `_tiene_perfil`. Aqui ese 50 no vale: seria

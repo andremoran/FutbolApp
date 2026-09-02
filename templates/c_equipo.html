@@ -245,17 +245,20 @@
       <div class="eq-dyn__label">Overall promedio</div>
     </div>
     <div class="eq-dyn__sep"></div>
-    <div class="eq-dyn__stat">
+    <div class="eq-dyn__stat" title="Lo que se ha movido el jugador medio desde su evaluación anterior">
       <div class="eq-dyn__num">
-        {% if resumen.cambio_semanal > 0 %}
-          <i data-ico="trending-up" class="pf-ico--xs"></i>+{{ resumen.cambio_semanal }}
-        {% elif resumen.cambio_semanal < 0 %}
-          <i data-ico="trending-down" class="pf-ico--xs" style="color:#fecaca"></i>{{ resumen.cambio_semanal }}
+        {% if resumen.cambio_medio > 0 %}
+          <i data-ico="trending-up" class="pf-ico--xs"></i>+{{ resumen.cambio_medio }}
+        {% elif resumen.cambio_medio < 0 %}
+          <i data-ico="trending-down" class="pf-ico--xs" style="color:#fecaca"></i>{{ resumen.cambio_medio }}
         {% else %}
           <i data-ico="minus" class="pf-ico--xs"></i>0
         {% endif %}
       </div>
-      <div class="eq-dyn__label">Cambio semanal</div>
+      {# «Cambio semanal» decía dos cosas que no eran: ni era semanal —cada
+         jugador se compara con su evaluación anterior, sea de cuándo sea— ni
+         era un cambio por jugador, porque se sumaban todos. #}
+      <div class="eq-dyn__label">Cambio medio</div>
     </div>
     <div class="eq-dyn__sep"></div>
     <div class="eq-dyn__stat">
