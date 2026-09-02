@@ -26,6 +26,7 @@ python _probar.py             # 181 · pantallas de los 5 roles + candados de pl
 python _probar_flujos.py      #  46 · recorridos de punta a punta
 python _probar_segmentos.py   #  49 · los tres perfiles son tres cosas distintas
 python _simular_perfiles.py   #  60 · el primer día de un entrenador de cada perfil
+python _probar_global.py      #  76 · el OVR de un jugador a lo largo de 12 semanas
 python _paridad.py            #       que no falte ninguna pantalla del MVP
 ```
 
@@ -115,6 +116,35 @@ el barato.
 `db.update`/`db.insert` aceptan `obligatorio=True`: úsalo siempre que el usuario
 vaya a leer un «Listo» después. Perder una escritura en silencio es peor que
 fallar.
+
+### 7. El global del jugador sale de los 18 atributos, y de nada más
+
+`fut_attributes` tiene cuatro columnas viejas (`tecnica/fisico/tactico/mental`)
+que son **derivadas**: las recalcula `db.guardar_atributos()` desde los 18 y las
+lee `db.atributos()`. Nadie más las escribe. Cuando las pruebas escribían ahí,
+el overall no se enteraba y la siguiente evaluación borraba tres meses de
+marcas. **Toda escritura del Perfil Dinámico pasa por `guardar_atributos()`**,
+que recalcula el overall, las medias de familia, deja la foto semanal y repasa
+las alertas.
+
+El táctico no se evalúa: se calcula desde `db.ATRIBUTOS_TACTICOS`
+(visión de juego + concentración + disciplina), los mismos que mueve la prueba
+«Perfil Táctico».
+
+### 8. Una marca premia MEJORAR, no repetir
+
+`evaluaciones.aplicar_a_ficha()`: la primera vez que un jugador hace una prueba
+se le coloca por baremo y por su puesto en el equipo. A partir de la segunda
+manda `_progreso_propio()` — cuánto ha mejorado respecto a su mejor marca
+anterior. Si no, un entrenador que pase el Cooper todos los lunes le sube 20
+puntos de resistencia a un chaval que corre lo mismo que en agosto.
+
+### 9. El 50 de relleno no es una nota
+
+`ficha_atributos()` rellena los huecos con 50 para no dejar pantallas en
+blanco, y `_tiene_perfil` dice si hay evaluación de verdad. **Ninguna pantalla
+puede enseñar ese 50 como si fuera una valoración**: ni «Mi Ficha», ni la
+cabecera del entrenador, ni la IA. A quien nadie ha evaluado se le dice eso.
 
 ---
 
