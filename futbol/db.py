@@ -122,6 +122,8 @@ def insert(table, data, ctx='', obligatorio=False):
     def _go():
         return (_sb.table(table).insert(data).execute().data or [None])[0]
     fila = q(_go, None, ctx or ('insert ' + table))
+    if table == 'fut_team_coaches':
+        _olvidar_equipos()
     if obligatorio and not fila:
         raise ErrorDeEscritura('no se pudo insertar en %s (%s)' % (table, ctx))
     return fila
@@ -134,6 +136,8 @@ def update(table, data, ctx='', obligatorio=False, **filters):
             upd = upd.eq(k, v)
         return upd.execute().data
     filas = q(_go, None, ctx or ('update ' + table))
+    if table == 'fut_team_coaches':
+        _olvidar_equipos()
     #  Una lista vacia tambien es un fallo cuando la escritura es obligatoria:
     #  significa que el filtro no encontro la fila, o sea que no se actualizo
     #  nada aunque no hubiera excepcion.
@@ -157,6 +161,8 @@ def delete(table, ctx='', obligatorio=False, **filters):
             d = d.eq(k, v)
         return d.execute().data
     filas = q(_go, None, ctx or ('delete ' + table))
+    if table == 'fut_team_coaches':
+        _olvidar_equipos()
     #  Una lista vacia tambien es un fallo, igual que en `update`: quiere decir
     #  que el filtro no encontro la fila, o sea que NO se borro nada. Con
     #  `filas is None` a secas solo se cazaba la excepcion, y como todas estas
@@ -178,6 +184,53 @@ def delete(table, ctx='', obligatorio=False, **filters):
 #  `equipo_id()` es la traducción: «quién soy» → «de qué equipo escribo». Las
 #  vistas hacen `uid = db.equipo_id(current_user.id)` al principio y todo lo
 #  demás sigue funcionando igual, sin tocar cien consultas.
+def _memoria_de_la_peticion(nombre):
+    """Un diccionario que vive lo que dura una peticion. None fuera de una.
+
+    Solo para respuestas que no cambian a mitad de peticion. Se vacia sola al
+    terminar, y a mano cuando se escribe en la tabla de la que sale.
+    """
+    try:
+        from flask import g, has_request_context
+        if not has_request_context():
+            return None
+    except Exception:
+        return None
+    cache = getattr(g, '_fut_cache', None)
+    if cache is None:
+        cache = {}
+        g._fut_cache = cache
+    return cache.setdefault(nombre, {})
+
+
+def _fila_cuerpo_tecnico(coach_id):
+    """La fila de `fut_team_coaches` de este entrenador, o None si no esta en
+    ningun cuerpo tecnico.
+
+    Se guarda mientras dura la peticion. La piden `equipo_id` y `es_asistente`
+    —y entre las vistas y el procesador de contexto de app.py se llaman tres o
+    cuatro veces por pantalla— y las dos preguntan por la MISMA fila. A 150 ms
+    la consulta, eso son medio segundo en cada pantalla de un movil con datos.
+    Entrar o salir de un cuerpo tecnico la olvida (`_olvidar_equipos`).
+    """
+    memoria = _memoria_de_la_peticion('cuerpo_tecnico')
+    if memoria is not None and coach_id in memoria:
+        return memoria[coach_id]
+    fila = one('fut_team_coaches', 'cuerpo tecnico del coach',
+               coach_id=coach_id, estado='activo')
+    if memoria is not None:
+        memoria[coach_id] = fila
+    return fila
+
+
+def _olvidar_equipos():
+    """Alguien ha entrado o salido de un cuerpo tecnico: lo que guardamos en
+    esta peticion ya no vale."""
+    memoria = _memoria_de_la_peticion('cuerpo_tecnico')
+    if memoria is not None:
+        memoria.clear()
+
+
 def equipo_id(coach_id):
     """El id del equipo al que pertenece este entrenador.
 
@@ -186,15 +239,14 @@ def equipo_id(coach_id):
     """
     if not coach_id:
         return coach_id
-    fila = one('fut_team_coaches', 'equipo del coach',
-               coach_id=coach_id, estado='activo')
+    fila = _fila_cuerpo_tecnico(coach_id)
     if fila and fila.get('rol') == 'asistente' and fila.get('principal_id'):
         return fila['principal_id']
     return coach_id
 
 
 def es_asistente(coach_id):
-    fila = one('fut_team_coaches', 'rol coach', coach_id=coach_id, estado='activo')
+    fila = _fila_cuerpo_tecnico(coach_id)
     return bool(fila and fila.get('rol') == 'asistente')
 
 
@@ -670,6 +722,47 @@ def fila_atributos(player_id=None, manual_player_id=None):
     return one('fut_attributes', 'fila atributos', **dueno)
 
 
+#  ─── Toda la plantilla de una vez ───────────────────────────────────────────
+#  La pantalla Equipo pintaba veinte tarjetas pidiendo por CADA jugador su
+#  ficha y su historico: con veintiuno eran 42 consultas y ocho segundos de
+#  espera. Son cuatro consultas contando a los que tienen cuenta y a los que
+#  no, y la pantalla que mas se abre baja de ocho segundos a menos de uno.
+def atributos_de_varios(player_ids=(), manual_ids=()):
+    """{id del jugador: su fila de fut_attributes} de toda la plantilla."""
+    salida = {}
+    for columna, ids in (('player_id', player_ids), ('manual_player_id', manual_ids)):
+        ids = [str(i) for i in ids if i]
+        if not ids:
+            continue
+        filas = q(lambda c=columna, i=ids: _sb.table('fut_attributes').select('*')
+                  .in_(c, i).execute().data or [], [], 'atributos del equipo')
+        for f in filas:
+            if f.get(columna):
+                salida[str(f[columna])] = f
+    return salida
+
+
+def historial_de_varios(player_ids=(), manual_ids=()):
+    """{id del jugador: [sus fotos semanales, de la mas nueva a la mas vieja]}.
+
+    Sin la columna `atributos`, que es un JSON entero por foto y aqui solo hace
+    falta saber el overall de la semana anterior.
+    """
+    salida = {}
+    for columna, ids in (('player_id', player_ids), ('manual_player_id', manual_ids)):
+        ids = [str(i) for i in ids if i]
+        if not ids:
+            continue
+        filas = q(lambda c=columna, i=ids: _sb.table('fut_attribute_history')
+                  .select('player_id, manual_player_id, semana, overall')
+                  .in_(c, i).order('semana', desc=True).limit(2000).execute().data or [],
+                  [], 'historial del equipo')
+        for f in filas:
+            if f.get(columna):
+                salida.setdefault(str(f[columna]), []).append(f)
+    return salida
+
+
 #  Los 18 atributos van en escala 1-100, igual que en la app
 #  (PlayerEvaluationScreen.tsx: «los 18 atributos son la fuente de verdad,
 #  escala 1-100»). El overall es su media directa, sin convertir nada: por eso
@@ -693,14 +786,20 @@ def _media_familia(valores, claves):
     return max(ESCALA_MIN, min(ESCALA_MAX, round(sum(vals) / len(vals))))
 
 
-def ficha_atributos(player_id=None, manual_player_id=None):
+def ficha_atributos(player_id=None, manual_player_id=None, fila=None):
     """Los 18 atributos + overall/potencial/estado, listos para pintar.
 
     Los huecos se muestran como 5/10 (punto de partida neutro), pero eso es
     solo para no dejar la pantalla en blanco — nunca se guarda un valor que
     nadie evaluó. `_tiene_perfil` distingue "aún sin evaluar" de verdad.
+
+    `fila` sirve para pintar una lista entera sin una consulta por jugador:
+    quien ya tiene la fila —`atributos_de_varios`— la pasa y aquí no se
+    pregunta nada. Pasar `{}` significa «este no tiene ficha», que no es lo
+    mismo que no pasar nada.
     """
-    fila = fila_atributos(player_id, manual_player_id) or {}
+    if fila is None:
+        fila = fila_atributos(player_id, manual_player_id) or {}
     tiene_perfil = fila.get('overall') is not None
 
     ficha = {k: (fila.get(k) if fila.get(k) is not None else 50) for k in ATRIBUTOS_18}

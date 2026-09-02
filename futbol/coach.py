@@ -246,15 +246,21 @@ def _edad_de(anio_nacimiento):
 
 def _ficha_equipo(coach_id, semana_actual, alertas_por_dueno, *, player_id=None,
                   manual_player_id=None, nombre, posicion, dorsal, anio_nacimiento,
-                  foto=None, activo=True, subida=None):
+                  foto=None, activo=True, subida=None, fila=None, historial=None):
     """Arma la tarjeta de un jugador (con o sin cuenta) para la pantalla
     Equipo: overall/potencial, cambio semanal y alerta principal — mismos
     datos que TeamPlayersScreen.tsx, calculados en futbol/db.py.
+
+    `fila` e `historial` los trae quien pinta la lista entera, de una vez
+    (`db.atributos_de_varios` / `db.historial_de_varios`). Si no llegan, se
+    piden aquí: así esta función sigue valiendo para una tarjeta suelta.
     """
-    ficha = db.ficha_atributos(player_id, manual_player_id)
-    historial = db.rows('fut_attribute_history', 'historial equipo',
-                        _order='semana', _desc=True,
-                        **db.dueno_filtro(player_id, manual_player_id))
+    if fila is None or historial is None:
+        fila = db.fila_atributos(player_id, manual_player_id) or {}
+        historial = db.rows('fut_attribute_history', 'historial equipo',
+                            _order='semana', _desc=True,
+                            **db.dueno_filtro(player_id, manual_player_id))
+    ficha = db.ficha_atributos(player_id, manual_player_id, fila=fila)
     anterior = next((h for h in historial if h.get('semana') != semana_actual), None)
     delta = 0
     if ficha['_tiene_perfil'] and anterior and anterior.get('overall') is not None:
@@ -355,6 +361,14 @@ def c_equipo():
     #  Quién tiene foto, en una sola consulta y sin traerse las imágenes.
     fotos = db.fotos_del_equipo(uid)
 
+    #  Y la ficha y el histórico de TODA la plantilla, también de una vez. Con
+    #  una consulta por jugador esta pantalla tardaba ocho segundos en abrirse
+    #  con veinte fichas, que es justo el tamaño de un equipo de verdad.
+    ids_reg = [j['id'] for j in jugadores]
+    ids_man = [m['id'] for m in manuales]
+    attrs = db.atributos_de_varios(ids_reg, ids_man)
+    historiales = db.historial_de_varios(ids_reg, ids_man)
+
     plantilla = []
     for j in jugadores:
         plantilla.append(_ficha_equipo(
@@ -362,7 +376,9 @@ def c_equipo():
             nombre=j.get('name'), posicion=(j.get('fut') or {}).get('posicion'),
             dorsal=(j.get('fut') or {}).get('dorsal'), anio_nacimiento=j.get('anio_nacimiento'),
             foto=j.get('profile_photo'), activo=j.get('activo', True),
-            subida=fotos.get(str(j['id']))))
+            subida=fotos.get(str(j['id'])),
+            fila=attrs.get(str(j['id'])) or {},
+            historial=historiales.get(str(j['id']), [])))
     for m in manuales:
         plantilla.append(_ficha_equipo(
             uid, semana_actual, alertas_por_dueno, manual_player_id=m['id'],
@@ -370,7 +386,9 @@ def c_equipo():
             dorsal=m.get('dorsal'), anio_nacimiento=m.get('anio_nacimiento'),
             #  Al jugador sin cuenta nunca se le pasaba su `foto`, así que la
             #  columna estaba ahí sin que nadie la leyera.
-            foto=m.get('foto'), subida=fotos.get(str(m['id']))))
+            foto=m.get('foto'), subida=fotos.get(str(m['id'])),
+            fila=attrs.get(str(m['id'])) or {},
+            historial=historiales.get(str(m['id']), [])))
 
     # Con perfil primero (de mejor a peor overall); sin evaluar, al final.
     plantilla.sort(key=lambda p: (0 if p['_tiene_perfil'] else 1, -(p['overall'] or 0)))
