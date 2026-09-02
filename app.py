@@ -253,6 +253,39 @@ def _404(_e):
     return redirect(url_for('auth.entrar'))
 
 
+#  Página de «la base no contesta». Va escrita aquí y no en una plantilla a
+#  propósito: este error lo levanta `usuarios.cargar_usuario` cuando Supabase no
+#  responde, y cualquier plantilla de la casa mira a `current_user` — que
+#  volvería a preguntar por el usuario y a fallar otra vez. Sin sesión, sin
+#  contexto y sin base: solo HTML.
+_SIN_CONEXION = """<!doctype html><html lang="es"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sin conexión · ProFoot</title>
+<body style="margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+             background:#f8fafc;color:#0f172a">
+<div style="max-width:400px;margin:0 auto;padding:72px 24px;text-align:center">
+  <div style="width:80px;height:80px;border-radius:40px;background:#fef3c7;color:#d97706;
+              display:flex;align-items:center;justify-content:center;margin:0 auto 20px;
+              font-size:38px">!</div>
+  <h1 style="font-size:23px;font-weight:800;letter-spacing:-.4px;margin:0 0 10px">
+    No hay conexión con el servidor</h1>
+  <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 26px">
+    Tu sesión sigue abierta: es la base de datos la que no contesta ahora mismo.
+    Espera unos segundos y vuelve a intentarlo.</p>
+  <a href="/" style="display:block;padding:14px;border-radius:12px;background:#047857;
+     color:#fff;text-decoration:none;font-weight:600">Reintentar</a>
+</div></body></html>"""
+
+
+@app.errorhandler(503)
+def _503(_e):
+    """La base no contesta. Ni es culpa del usuario ni se le tira la sesión."""
+    if es_llamada_api():
+        return jsonify({'error': 'No hay conexión con el servidor. '
+                                 'Vuelve a intentarlo en unos segundos.'}), 503
+    return _SIN_CONEXION, 503
+
+
 @app.errorhandler(500)
 def _500(e):
     logger.error('Error 500 en %s: %s', request.path, e, exc_info=True)

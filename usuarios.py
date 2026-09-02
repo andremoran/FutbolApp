@@ -150,11 +150,28 @@ class User(UserMixin):
 
 
 def cargar_usuario(user_id):
-    """user_loader de Flask-Login."""
+    """user_loader de Flask-Login.
+
+    Si la base no contesta NO se devuelve None. Devolver None aquí significa
+    «esta persona no tiene sesión», y con eso un corte de red de medio minuto
+    echaba de la app a todo el que estuviera dentro: el usuario veía la
+    pantalla de acceso, volvía a entrar y le funcionaba, sin entender nada. Un
+    fallo de la base es un 503 —«ahora no puedo, prueba otra vez»—, que además
+    no le tira la sesión.
+    """
+    from flask import abort
     from futbol import db
     if not user_id or db.sb() is None:
         return None
-    fila = db.one('usuarios', 'cargar usuario', id=user_id)
+    try:
+        fila = db.one_estricto('usuarios', 'cargar usuario', id=user_id)
+    except db.ErrorDeLectura:
+        #  Un reintento: casi todos estos cortes duran un instante y el segundo
+        #  intento entra. Si tampoco, se dice la verdad.
+        try:
+            fila = db.one_estricto('usuarios', 'cargar usuario (2.º intento)', id=user_id)
+        except db.ErrorDeLectura:
+            abort(503)
     return User(fila) if fila else None
 
 
